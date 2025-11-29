@@ -44,18 +44,16 @@ body{ margin:0; color:#e9eef5; background:#000; }
    y el SVG en /public/assets/img/mesh-light.svg,
    la ruta correcta es ../img/mesh-light.svg */
 .mesh{
-  position:fixed; right:-220px; top:-140px;
-  width:1400px; height:900px;
-  z-index:-1; opacity:var(--mesh-opacity);
-  background: url("../img/fondo.png") no-repeat center/contain;
-  mix-blend-mode:screen;
-  filter: drop-shadow(0 0 36px rgba(124,196,255,.25));
-  pointer-events:none;
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  opacity: 1; /* o ajustá si querés transparencia */
+  background: url("../img/fondo.png") center center / cover no-repeat fixed;
+  pointer-events: none;
+  mix-blend-mode: normal; /* si querés eliminar efectos raros */
+  filter: none;           /* sin brillo ni sombras */
 }
-.mesh.mesh--left{
-  left:-260px; top:180px; right:auto;
-  transform:scaleX(-1) rotate(3deg);
-}
+
 
 /* ===== Encabezado tipo “hero” ===== */
 .brand-hero{ position:relative; padding:22px 0 16px; color:#e9f2ff; isolation:isolate; }

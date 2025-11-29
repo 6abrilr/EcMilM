@@ -14,7 +14,7 @@ function norm($s){ return preg_replace('/\s+/u','',mb_strtoupper(trim((string)$s
 $PUBLIC_URL = rtrim(str_replace('\\','/', dirname($_SERVER['SCRIPT_NAME'] ?? $_SERVER['PHP_SELF'])), '/');
 $APP_URL    = rtrim(str_replace('\\','/', dirname($PUBLIC_URL)), '/');
 $ASSETS_URL = ($APP_URL === '' ? '' : $APP_URL) . '/assets';
-$IMG_BG     = $ASSETS_URL . '../assets/img/fondo.png';
+$IMG_BG     = $ASSETS_URL . '../assets/img/fondo.png'; // ya no se usa en el body, pero lo dejamos por compatibilidad
 
 /* ===== Parámetros ===== */
 $rel = $_GET['p'] ?? '';
@@ -54,8 +54,8 @@ $scopeMeta = [
 $SCOPE = $scopeMeta[$inScope];
 $isVisitas = ($inScope === 'visitas_de_estado_mayor');
 
-/* Tooltip de Acción Correctiva en VISITAS y ÚLTIMA INSPECCIÓN */
-$hasAccionTooltip = in_array($inScope, ['visitas_de_estado_mayor','ultima_inspeccion'], true);
+/* Tooltip de Acción Correctiva en VISITAS, LISTAS y ÚLTIMA INSPECCIÓN */
+$hasAccionTooltip = in_array($inScope, ['visitas_de_estado_mayor','listas_control','ultima_inspeccion'], true);
 
 /* Ya no usamos “Carácter” del Excel como columna fija */
 $showCaracter = false;
@@ -200,7 +200,7 @@ else{
   else{ [$rows,$rowFill,$sheetNames,$err]=read_xlsx_all($abs,$sheetIdx,$sheetNames,$err); }
 }
 
-/* Copia cruda para tooltip de “Acción Correctiva” (VISITAS y ÚLTIMA INSPECCIÓN) */
+/* Copia cruda para tooltip de “Acción Correctiva” */
 $rawRows = $rows;
 
 /* ===== Detección de encabezado real ===== */
@@ -313,7 +313,7 @@ foreach($rows as $i=>$r){
   }
   if($lastSection){ $visible[]=$lastSection; $lastSection=null; }
 
-  /* Tooltip de Acción Correctiva (VISITAS / ÚLTIMA INSPECCIÓN): 3ra col del Excel original */
+  /* Tooltip de Acción Correctiva: 3ra col del Excel original */
   $accion = '';
   if ($hasAccionTooltip) {
     $raw = $rawRows[$i] ?? [];
@@ -386,24 +386,60 @@ $listBackUrl = $SCOPE['list_url'] . ($areaParam !== '' ? ('?area='.rawurlencode(
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 <link rel="stylesheet" href="../assets/css/theme-602.css">
+<link rel="icon" type="image/png" href="../assets/img/bcom602.png">
 <style>
 body{
-  background: url("<?= e($IMG_BG) ?>") no-repeat center center fixed;
-  background-size: cover;
-  background-attachment: fixed;
-  background-color:#0f1117; color:#e9eef5; margin:0; padding:0;
+  background-color:#020617;
+  color:#e9eef5;
+  margin:0;
+  padding:0;
   font-family:system-ui,-apple-system,"Segoe UI",Roboto,Ubuntu,sans-serif;
 }
 .page{ padding:16px 16px 24px }
-.box{ background:rgba(20,24,33,.75); border:1px solid rgba(255,255,255,.14); border-radius:16px; padding:12px; backdrop-filter:blur(6px) }
+.box{
+  background:rgba(20,24,33,.80);
+  border:1px solid rgba(255,255,255,.14);
+  border-radius:16px;
+  padding:12px;
+  backdrop-filter:blur(6px)
+}
 .toolbar { gap: .6rem; flex-wrap: wrap; }
-.toolbar .left, .toolbar .right { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; }
-.badge-area { background: #0e1525; border: 1px solid rgba(255,255,255,.15); color: #d9e2ef; padding: .22rem .55rem; border-radius: 999px; font-weight: 800; font-size: .78rem; }
+.toolbar .left, .toolbar .right {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  flex-wrap: wrap;
+}
+.badge-area {
+  background: #0e1525;
+  border: 1px solid rgba(255,255,255,.15);
+  color: #d9e2ef;
+  padding: .22rem .55rem;
+  border-radius: 999px;
+  font-weight: 800;
+  font-size: .78rem;
+}
 
-.btnx { --padY: .42rem; --padX: .7rem; --radius: 10px; --border: rgba(255,255,255,.18);
-  display: inline-flex; align-items: center; gap: .45rem; padding: var(--padY) var(--padX); border-radius: var(--radius);
-  font-weight: 800; font-size: .86rem; line-height: 1; border: 1px solid var(--border); background: #0f1520; color: #e7ecf4; text-decoration: none; }
-.btnx:hover { background: #141c2b; color: #f3f7fb; border-color: rgba(255,255,255,.28); }
+.btnx {
+  --padY: .42rem; --padX: .7rem; --radius: 10px; --border: rgba(255,255,255,.18);
+  display: inline-flex;
+  align-items: center;
+  gap: .45rem;
+  padding: var(--padY) var(--padX);
+  border-radius: var(--radius);
+  font-weight: 800;
+  font-size: .86rem;
+  line-height: 1;
+  border: 1px solid var(--border);
+  background: #0f1520;
+  color: #e7ecf4;
+  text-decoration: none;
+}
+.btnx:hover {
+  background: #141c2b;
+  color: #f3f7fb;
+  border-color: rgba(255,255,255,.28);
+}
 .btnx--accent { background: #16a34a; color: #04110a; border-color: #13853e; }
 .btnx--accent:hover { background: #22c55e; border-color: #1ea152; color: #031007; }
 .btnx--muted  { background: #0b111a; border-color: rgba(255,255,255,.15); }
@@ -417,12 +453,24 @@ thead th{
   position:sticky; top:0; z-index:3;
   background:#11151d; color:#e7ecf4;
   border-bottom:1px solid rgba(255,255,255,.2);
-  padding:12px; text-transform:uppercase; letter-spacing:.04em; font-weight:800;
+  padding:12px;
+  text-transform:uppercase;
+  letter-spacing:.04em;
+  font-weight:800;
 }
-tbody td{ padding:12px; border-bottom:1px solid rgba(255,255,255,.10); vertical-align:top; color:#d5deea; }
+tbody td{
+  padding:12px;
+  border-bottom:1px solid rgba(255,255,255,.10);
+  vertical-align:top;
+  color:#d5deea;
+}
 tbody tr:nth-child(even){ background:rgba(255,255,255,.02) }
 tbody tr:hover{ background:rgba(255,255,255,.05) }
-.section{ background:linear-gradient(90deg, rgba(34,197,94,.18), rgba(34,197,94,.10)); color:#eaf7ee; font-weight:800; }
+.section{
+  background:linear-gradient(90deg, rgba(34,197,94,.18), rgba(34,197,94,.10));
+  color:#eaf7ee;
+  font-weight:800;
+}
 
 @media (min-width: 1100px){
   thead th:nth-last-child(4), tbody td:nth-last-child(4){ width:140px }   /* Criticidad */
@@ -432,31 +480,87 @@ tbody tr:hover{ background:rgba(255,255,255,.05) }
 }
 
 select, input[type="text"]{
-  width:100%; background:#0f1520; color:#e6edf7; border:1px solid rgba(255,255,255,.22); border-radius:10px; padding:.45rem .55rem;
+  width:100%;
+  background:#0f1520;
+  color:#e6edf7;
+  border:1px solid rgba(255,255,255,.22);
+  border-radius:10px;
+  padding:.45rem .55rem;
 }
 input[type="file"]{
-  background:#0f1520; color:#e6edf7; border:1px solid rgba(255,255,255,.22); border-radius:10px; padding:.35rem .55rem;
+  background:#0f1520;
+  color:#e6edf7;
+  border:1px solid rgba(255,255,255,.22);
+  border-radius:10px;
+  padding:.35rem .55rem;
 }
 
-#overlay{ position:fixed; inset:0; background:rgba(0,0,0,.55); display:none; align-items:center; justify-content:center; z-index:9999; }
+#overlay{
+  position:fixed;
+  inset:0;
+  background:rgba(0,0,0,.55);
+  display:none;
+  align-items:center;
+  justify-content:center;
+  z-index:9999;
+}
 #overlay.show{ display:flex; }
-.spinner{ width:72px; height:72px; border-radius:50%; border:6px solid rgba(255,255,255,.2); border-top-color:#22c55e; animation: spin 1s linear infinite; }
+.spinner{
+  width:72px;
+  height:72px;
+  border-radius:50%;
+  border:6px solid rgba(255,255,255,.2);
+  border-top-color:#22c55e;
+  animation: spin 1s linear infinite;
+}
 @keyframes spin { to{ transform: rotate(360deg); } }
 
-.brand-hero .brand-title{ color:#f3f7fb } .brand-hero .brand-sub{ color:#b9c6d8 }
+.brand-hero .brand-title{ color:#f3f7fb }
+.brand-hero .brand-sub{ color:#b9c6d8 }
 
 /* Tooltip Acción Correctiva */
 .tip-wrap{ display:inline-flex; align-items:center; gap:.35rem }
-.tip-dot{ display:inline-flex; width:18px; height:18px; border-radius:999px; align-items:center; justify-content:center; font-size:.78rem; font-weight:900; color:#9CF3AC; background:#1b2a1e; border:1px solid #2a804c; cursor:help; user-select:none; outline:0; }
-.tip-box{ position:absolute; left: 1.2rem; top:50%; transform: translateY(-50%); background:#0b1220; color:#eaf2ff; border:1px solid rgba(255,255,255,.15);
-  padding:.48rem .62rem; border-radius:10px; max-width:440px; min-width:240px; box-shadow:0 10px 24px rgba(0,0,0,.45); font-size:.92rem; line-height:1.25; visibility:hidden; opacity:0; transition:opacity .12s ease; z-index: 10; }
+.tip-dot{
+  display:inline-flex;
+  width:18px; height:18px;
+  border-radius:999px;
+  align-items:center; justify-content:center;
+  font-size:.78rem;
+  font-weight:900;
+  color:#9CF3AC;
+  background:#1b2a1e;
+  border:1px solid #2a804c;
+  cursor:help;
+  user-select:none;
+  outline:0;
+}
+.tip-box{
+  position:absolute;
+  left: 1.2rem;
+  top:50%;
+  transform: translateY(-50%);
+  background:#0b1220;
+  color:#eaf2ff;
+  border:1px solid rgba(255,255,255,.15);
+  padding:.48rem .62rem;
+  border-radius:10px;
+  max-width:440px;
+  min-width:240px;
+  box-shadow:0 10px 24px rgba(0,0,0,.45);
+  font-size:.92rem;
+  line-height:1.25;
+  visibility:hidden;
+  opacity:0;
+  transition:opacity .12s ease;
+  z-index: 10;
+}
 .tip{ position:relative; display:inline-flex; }
 .tip:hover .tip-box, .tip:focus-within .tip-box{ visibility:visible; opacity:1; }
 
 /* Criticidad (celda bien visible) */
 .td-criticidad{
   position: relative;
-  transition: background-color .15s ease, border-color .15s.ease, box-shadow .15s ease, color .15s ease;
+  transition: background-color .15s ease, border-color .15s ease, box-shadow .15s ease, color .15s ease;
   border-left: 4px solid transparent;
   box-shadow: inset 0 0 0 1px rgba(255,255,255,.08);
 }
@@ -467,13 +571,31 @@ input[type="file"]{
   border-radius: 8px;
   font-weight: 700;
 }
-.td-criticidad select option{ background: #0f1520; color: #e5e7eb; font-weight: 600; }
+.td-criticidad select option{
+  background: #0f1520;
+  color: #e5e7eb;
+  font-weight: 600;
+}
+.td-criticidad.crit-baja{
+  background: linear-gradient(90deg, rgba(22,163,74,.92), rgba(22,163,74,.65));
+  border-left-color:#22c55e;
+  color:#eafff3;
+  box-shadow: 0 0 0 1px rgba(22,163,74,.7);
+}
+.td-criticidad.crit-media{
+  background: linear-gradient(90deg, rgba(245,158,11,.95), rgba(245,158,11,.72));
+  border-left-color:#f59e0b;
+  color:#1f1300;
+  box-shadow: 0 0 0 1px rgba(245,158,11,.7);
+}
+.td-criticidad.crit-alta{
+  background: linear-gradient(90deg, rgba(239,68,68,.96), rgba(239,68,68,.78));
+  border-left-color:#ef4444;
+  color:#fff5f5;
+  box-shadow: 0 0 0 1px rgba(239,68,68,.8);
+}
 
-.td-criticidad.crit-baja{  background: linear-gradient(90deg, rgba(22,163,74,.92), rgba(22,163,74,.65));  border-left-color:#22c55e; color:#eafff3;  box-shadow: 0 0 0 1px rgba(22,163,74,.7); }
-.td-criticidad.crit-media{ background: linear-gradient(90deg, rgba(245,158,11,.95), rgba(245,158,11,.72)); border-left-color:#f59e0b; color:#1f1300; box-shadow: 0 0 0 1px rgba(245,158,11,.7); }
-.td-criticidad.crit-alta{  background: linear-gradient(90deg, rgba(239,68,68,.96), rgba(239,68,68,.78));  border-left-color:#ef4444; color:#fff5f5;  box-shadow: 0 0 0 1px rgba(239,68,68,.8); }
-
-/* Mini barra de progreso (arriba de la tabla) */
+/* Mini barra de progreso */
 .prog-mini{
   display:flex;
   flex-direction:column;
@@ -507,11 +629,82 @@ input[type="file"]{
   font-weight:700;
   color:#e5e7eb;
 }
+
+/* Footer tabla (paginador abajo) */
+.table-footer {
+  margin-top: .75rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: .75rem;
+  padding: .5rem .8rem;
+  background: rgba(8, 12, 22, .9);
+  border-radius: 12px;
+  border: 1px solid rgba(148,163,184,.4);
+  box-shadow: 0 8px 24px rgba(0,0,0,.6);
+  font-size: .8rem;
+}
+.table-footer .pagination {
+  margin-bottom: 0;
+}
+.table-footer .page-link {
+  background: #020617;
+  border-color: rgba(148,163,184,.6);
+  color: #e5e7eb;
+  font-weight: 600;
+  padding: .22rem .55rem;
+  border-radius: 999px !important;
+}
+.table-footer .page-item.active .page-link {
+  background: #22c55e;
+  border-color: #16a34a;
+  color: #022c22;
+}
+.table-footer .page-item.disabled .page-link {
+  opacity: .35;
+}
+.form-compact{
+  display:inline-flex;
+  align-items:center;
+  gap:.35rem;
+  flex-wrap:wrap;
+  font-size:.8rem;
+}
+.form-compact label{
+  margin:0;
+  font-weight:700;
+  color:#cbd5f5;
+}
+.form-compact select{
+  width:auto;
+  min-width:80px;
+  padding:.22rem .35rem;
+  font-size:.8rem;
+}
+
+/* === Botones Volver / Inicio arriba derecha === */
+.top-right-actions{
+  position:fixed;
+  top:10px;
+  right:16px;
+  display:flex;
+  gap:.5rem;
+  z-index:1100;
+}
+@media (max-width: 576px){
+  .top-right-actions{
+    top:8px;
+    right:8px;
+    flex-direction:column;
+    align-items:flex-end;
+  }
+}
 </style>
 </head>
 <body>
 
-<div class="page-bg"></div><span class="mesh"></span><span class="mesh mesh--left"></span>
+<span class="mesh"></span>
 
 <header class="brand-hero">
   <div class="hero-inner container-fluid">
@@ -522,6 +715,21 @@ input[type="file"]{
     </div>
   </div>
 </header>
+
+<!-- Botones fijos arriba a la derecha -->
+<div class="top-right-actions">
+  <a
+    class="btnx btnx--muted"
+    href="<?= e($listBackUrl) ?>"
+    title="Volver al listado"
+    onclick="if (window.history.length > 1) { history.back(); return false; }"
+  >
+    📁 Volver
+  </a>
+  <a class="btnx btnx--muted" href="index.php?scope=<?= e($SCOPE['dash_scope']) ?>" title="Ir al inicio">
+    🏠 Inicio
+  </a>
+</div>
 
 <!-- Toast de confirmación de guardado -->
 <div class="position-fixed top-0 start-50 translate-middle-x p-3" style="z-index: 11000;">
@@ -540,18 +748,10 @@ input[type="file"]{
 
 <div class="page container-fluid">
 
-  <!-- Toolbar superior -->
+  <!-- Toolbar superior (sin Volver / Inicio, que están fijos arriba) -->
   <div class="d-flex align-items-center justify-content-between toolbar mb-3">
     <div class="left">
-        <a
-          class="btnx btnx--muted"
-          href="<?= e($listBackUrl) ?>"
-          title="Volver al listado"
-          onclick="if (window.history.length > 1) { history.back(); return false; }"
-        >
-          📁 Volver
-        </a>
-      <a class="btnx btnx--muted" href="index.php?scope=<?= e($SCOPE['dash_scope']) ?>" title="Ir al Dashboard">🏠 Dashboard</a>
+
       <?php if ($lastUpd): ?>
         <span class="badge-area">
           Última actualización:
@@ -592,6 +792,22 @@ input[type="file"]{
           </select>
         </form>
       <?php endif; ?>
+
+      <!-- Ítems por página en la misma barra -->
+      <form method="get" class="form-compact">
+        <input type="hidden" name="p" value="<?= e($rel) ?>">
+        <input type="hidden" name="s" value="<?= (int)$sheetIdx ?>">
+        <?php if($debugShowColor): ?><input type="hidden" name="showcolor" value="1"><?php endif; ?>
+        <?php if($tableFmt): ?><input type="hidden" name="fmt" value="<?= e($tableFmt) ?>"><?php endif; ?>
+        <?php if($areaParam !== ''): ?><input type="hidden" name="area" value="<?= e($areaParam) ?>"><?php endif; ?>
+        <label>Ítems por página:</label>
+        <select name="pp" class="form-select form-select-sm" onchange="this.form.submit()">
+          <?php foreach($allowedPP as $pp): ?>
+            <option value="<?= $pp ?>" <?= $pp===$perPage?'selected':'' ?>><?= $pp ?></option>
+          <?php endforeach; ?>
+        </select>
+        <input type="hidden" name="page" value="1">
+      </form>
     </div>
 
     <div class="right">
@@ -626,46 +842,6 @@ input[type="file"]{
       <button form="bulkForm" class="btnx btnx--accent" title="Guardar cambios de esta página">💾 Guardar</button>
     </div>
   </div>
-
-  <!-- Ítems por página -->
-  <div class="d-flex flex-wrap align-items-center justify-content-between mb-2">
-    <form method="get" class="form-compact">
-      <input type="hidden" name="p" value="<?= e($rel) ?>">
-      <input type="hidden" name="s" value="<?= (int)$sheetIdx ?>">
-      <?php if($debugShowColor): ?><input type="hidden" name="showcolor" value="1"><?php endif; ?>
-      <?php if($tableFmt): ?><input type="hidden" name="fmt" value="<?= e($tableFmt) ?>"><?php endif; ?>
-      <?php if($areaParam !== ''): ?><input type="hidden" name="area" value="<?= e($areaParam) ?>"><?php endif; ?>
-      <label>Ítems por página:</label>
-      <select name="pp" class="form-select form-select-sm" onchange="this.form.submit()">
-        <?php foreach($allowedPP as $pp): ?><option value="<?= $pp ?>" <?= $pp===$perPage?'selected':'' ?>><?= $pp ?></option><?php endforeach; ?>
-      </select>
-      <input type="hidden" name="page" value="1">
-    </form>
-  </div>
-
-  <!-- Paginador -->
-  <?php if($totalPages>1): ?>
-    <nav class="mb-2">
-      <ul class="pagination pagination-sm">
-        <li class="page-item <?= $page<=1?'disabled':'' ?>">
-          <a class="page-link" href="ver_tabla.php?<?= $baseQS ?>&page=<?= max(1,$page-1) ?>">«</a>
-        </li>
-        <?php
-          $win=2;
-          $from=max(1,$page-$win); $to=min($totalPages,$page+$win);
-          if($from>1){ echo '<li class="page-item"><a class="page-link" href="ver_tabla.php?'.$baseQS.'&page=1">1</a></li>'; if($from>2) echo '<li class="page-item disabled"><span class="page-link">…</span></li>'; }
-          for($p=$from;$p<=$to;$p++){
-            $act = $p===$page?' active':''; 
-            echo '<li class="page-item'.$act.'"><a class="page-link" href="ver_tabla.php?'.$baseQS.'&page='.$p.'">'.$p.'</a></li>';
-          }
-          if($to<$totalPages){ if($to<$totalPages-1) echo '<li class="page-item disabled"><span class="page-link">…</span></li>'; echo '<li class="page-item"><a class="page-link" href="ver_tabla.php?'.$baseQS.'&page='.$totalPages.'">'.$totalPages.'</a></li>'; }
-        ?>
-        <li class="page-item <?= $page>=$totalPages?'disabled':'' ?>">
-          <a class="page-link" href="ver_tabla.php?<?= $baseQS ?>&page=<?= min($totalPages,$page+1) ?>">»</a>
-        </li>
-      </ul>
-    </nav>
-  <?php endif; ?>
 
   <!-- Overlay -->
   <div id="overlay" aria-hidden="true"><div class="spinner" role="status" aria-label="Guardando..."></div></div>
@@ -719,7 +895,7 @@ input[type="file"]{
               // Columna 1 (Nro)
               echo '<td>'.e($r[0] ?? '').'</td>';
 
-              // Columna 2 (Observaciones) + Tooltip (VISITAS / ÚLTIMA INSPECCIÓN)
+              // Columna 2 (Observaciones) + Tooltip
               echo '<td>';
               echo e($r[1] ?? '');
               if($hasAccionTooltip && $accion !== ''){
@@ -772,9 +948,51 @@ input[type="file"]{
     </div>
   </form>
 
+  <!-- Footer con resumen + paginador abajo -->
+  <?php if ($totalItems > 0 || $totalPages > 1): ?>
+    <div class="table-footer mt-2">
+      <div>
+        <?php if ($totalItems > 0): ?>
+          Mostrando <strong><?= $startItem ?></strong>–<strong><?= $endItem ?></strong> de <strong><?= $totalItems ?></strong> ítems
+        <?php else: ?>
+          Sin ítems para mostrar.
+        <?php endif; ?>
+      </div>
+
+      <?php if($totalPages>1): ?>
+        <nav>
+          <ul class="pagination pagination-sm">
+            <li class="page-item <?= $page<=1?'disabled':'' ?>">
+              <a class="page-link" href="ver_tabla.php?<?= $baseQS ?>&page=<?= max(1,$page-1) ?>">«</a>
+            </li>
+            <?php
+              $win=2;
+              $from=max(1,$page-$win); $to=min($totalPages,$page+$win);
+              if($from>1){
+                echo '<li class="page-item"><a class="page-link" href="ver_tabla.php?'.$baseQS.'&page=1">1</a></li>';
+                if($from>2) echo '<li class="page-item disabled"><span class="page-link">…</span></li>';
+              }
+              for($p=$from;$p<=$to;$p++){
+                $act = $p===$page?' active':''; 
+                echo '<li class="page-item'.$act.'"><a class="page-link" href="ver_tabla.php?'.$baseQS.'&page='.$p.'">'.$p.'</a></li>';
+              }
+              if($to<$totalPages){
+                if($to<$totalPages-1) echo '<li class="page-item disabled"><span class="page-link">…</span></li>';
+                echo '<li class="page-item"><a class="page-link" href="ver_tabla.php?'.$baseQS.'&page='.$totalPages.'">'.$totalPages.'</a></li>';
+              }
+            ?>
+            <li class="page-item <?= $page>=$totalPages?'disabled':'' ?>">
+              <a class="page-link" href="ver_tabla.php?<?= $baseQS ?>&page=<?= min($totalPages,$page+1) ?>">»</a>
+            </li>
+          </ul>
+        </nav>
+      <?php endif; ?>
+    </div>
+  <?php endif; ?>
+
 </div>
 
-<!-- Bootstrap JS primero -->
+<!-- Bootstrap JS -->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
 <script>
@@ -851,13 +1069,13 @@ input[type="file"]{
       const toast = new bootstrap.Toast(toastEl);
       toast.show();
 
-      // Limpiar el parámetro ?saved=1 de la URL para que no vuelva a saltar
+      // Limpiar el parámetro ?saved=1 de la URL
       try {
         const url = new URL(window.location.href);
         url.searchParams.delete('saved');
         window.history.replaceState({}, '', url);
       } catch (e) {
-        // si falla, no pasa nada grave
+        // ignore
       }
     }
   }
@@ -867,4 +1085,3 @@ input[type="file"]{
 
 </body>
 </html>
-s

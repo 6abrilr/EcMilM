@@ -18,9 +18,10 @@ function cps_authenticate(string $username, string $password): array {
             'username' => $username,
             'password' => $password,
         ],
-        // DESARROLLO: SSL desactivado (para CA interna)
-        CURLOPT_SSL_VERIFYPEER  => false,
-        CURLOPT_SSL_VERIFYHOST  => false,
+        CURLOPT_SSL_VERIFYPEER  => 0,
+        CURLOPT_SSL_VERIFYHOST  => 0,
+        CURLOPT_SSLVERSION      => CURL_SSLVERSION_TLSv1_2,
+        CURLOPT_FOLLOWLOCATION  => true,
     ]);
 
     $response = curl_exec($ch);
@@ -75,8 +76,10 @@ function cps_get_profile(string $bearerToken): array {
             'Accept: application/json',
             'Authorization: Bearer ' . $bearerToken,
         ],
-        CURLOPT_SSL_VERIFYPEER  => false,
-        CURLOPT_SSL_VERIFYHOST  => false,
+        CURLOPT_SSL_VERIFYPEER  => 0,
+        CURLOPT_SSL_VERIFYHOST  => 0,
+        CURLOPT_SSLVERSION      => CURL_SSLVERSION_TLSv1_2,
+        CURLOPT_FOLLOWLOCATION  => true,
     ]);
 
     $resp = curl_exec($ch);
@@ -104,6 +107,7 @@ function cps_get_profile(string $bearerToken): array {
 
 /**
  * 3) Mapear rol local usando la BD `inspecciones`.
+ *    Solo permite acceso si el DNI está en roles_locales.
  */
 function map_local_role(string $dniOrUser): string {
     require_once __DIR__ . '/config/db.php'; // acá se define $pdo para `inspecciones`
@@ -120,8 +124,8 @@ function map_local_role(string $dniOrUser): string {
     }
 
     if (!$exists) {
-        // Mientras no definís la tabla, sos admin para no quedarte afuera
-        return 'admin';
+        // Si la tabla no existe, no dejamos entrar a nadie
+        throw new Exception("Configuración local de roles ausente. Contactá al administrador.");
     }
 
     $stmt = $pdo->prepare("SELECT rol_app FROM roles_locales WHERE dni = ? LIMIT 1");
@@ -132,7 +136,8 @@ function map_local_role(string $dniOrUser): string {
         return (string)$row['rol_app'];
     }
 
-    return 'usuario';
+    // DNI no listado => sin permiso
+    throw new Exception("No tenés autorización local para acceder a esta aplicación.");
 }
 
 /**
@@ -178,7 +183,7 @@ function auth_login_cps(string $username, string $password): bool {
     $resolvedUsername = $perfil['username'] ?? $perfil['user'] ?? $username;
     $resolvedUsername = (string)$resolvedUsername;
 
-    // 3) rol interno
+    // 3) rol interno + control por DNI
     $keyForRole = ($dni !== '' ? $dni : $resolvedUsername);
     $rolLocal   = map_local_role($keyForRole);
 

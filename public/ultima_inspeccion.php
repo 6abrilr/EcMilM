@@ -1,24 +1,91 @@
 <?php
-// public/ultima_inspeccion.php — Listado de XLSX dentro de /storage/ultima_inspeccion (sin S1–S4)
+// public/ultima_inspeccion.php — Listado de XLSX dentro de /storage/ultima_inspeccion
+
+require_once __DIR__ . '/../auth/bootstrap.php';
+require_login();
+
 require_once __DIR__ . '/../config/db.php';
 
 function e($v){ return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'); }
 
+/* ===== Helpers de áreas ===== */
+
+// devuelve ['S1','S3','GRAL'] según la tabla roles_locales. Si no hay dato, sin restricciones.
+function get_user_areas(PDO $pdo): array {
+    $user = function_exists('current_user') ? current_user() : null;
+    if (!$user) return [];
+
+    $dni = $user['dni'] ?? null;
+    if (!$dni) return [];
+
+    $st = $pdo->prepare("SELECT areas_acceso FROM roles_locales WHERE dni = ? LIMIT 1");
+    $st->execute([$dni]);
+    $row = $st->fetch(PDO::FETCH_ASSOC);
+    if (!$row || empty($row['areas_acceso'])) return [];
+
+    $areas = json_decode($row['areas_acceso'], true);
+    return is_array($areas) ? $areas : [];
+}
+
+/**
+ * Indica si un usuario con ciertas áreas puede ver la carpeta de primer nivel
+ * (por ejemplo: "Aspectos Generales", "Personal (S-1)", etc).
+ *
+ * Reglas:
+ * - Si no hay áreas configuradas -> sin restricciones.
+ * - Si tiene GRAL -> ve todo.
+ * - "Aspectos Generales" -> lo ve cualquiera que tenga S1/S2/S3/S4 o GRAL.
+ * - S1 -> "Personal (S-1)"
+ * - S2 -> "Inteligencia (S-2)"
+ * - S3 -> "Operaciones (S-3)"
+ * - S4 -> "Materiales (S-4)"
+ * - Cualquier otra carpeta -> solo GRAL.
+ */
+function can_user_see_folder(string $folderName, array $areas): bool {
+    $folderName = trim($folderName);
+
+    // sin configuración: no restringimos
+    if (empty($areas)) return true;
+
+    // GRAL ve todo
+    if (in_array('GRAL', $areas, true)) return true;
+
+    // Aspectos Generales visible para cualquiera que tenga alguna Sx
+    if ($folderName === 'Aspectos Generales') {
+        foreach (['S1','S2','S3','S4'] as $sx) {
+            if (in_array($sx, $areas, true)) return true;
+        }
+        return false;
+    }
+
+    $code = null;
+    if ($folderName === 'Personal (S-1)')      $code = 'S1';
+    elseif ($folderName === 'Inteligencia (S-2)') $code = 'S2';
+    elseif ($folderName === 'Operaciones (S-3)')  $code = 'S3';
+    elseif ($folderName === 'Materiales (S-4)')   $code = 'S4';
+
+    if ($code === null) {
+        // carpeta rara: solo GRAL, pero ya lo chequeamos arriba
+        return false;
+    }
+
+    return in_array($code, $areas, true);
+}
+
 /* ===== Config ===== */
-const BASE_PREFIX = 'ultima_inspeccion'; // carpeta en /storage
+const BASE_PREFIX     = 'ultima_inspeccion';             // carpeta en /storage
+const STORAGE_PREFIX  = 'storage/' . BASE_PREFIX . '/';  // para sacar la carpeta top
 
 $projectBase = realpath(__DIR__ . '/..');
 $baseDir     = realpath($projectBase . '/storage/' . BASE_PREFIX);
 if(!$baseDir){ http_response_code(404); echo "No existe /storage/".BASE_PREFIX; exit; }
 
-/* Subcarpeta (primer nivel) opcional para tabs */
+/* Áreas del usuario */
+$userAreas = get_user_areas($pdo);
+
+/* Subcarpeta (primer nivel) opcional para tabs (se valida más abajo) */
 $sub = $_GET['sub'] ?? '';
 $sub = trim(str_replace(['..','\\'], ['','/'], $sub), '/');
-$root = $baseDir;
-if ($sub !== '') {
-  $try = realpath($baseDir . '/' . $sub);
-  if ($try && str_starts_with($try, $baseDir)) $root = $try;
-}
 
 /* ===== Tabs: todas las subcarpetas de primer nivel ===== */
 $tabsRaw = []; // acá guardamos todas menos "(Todos)"
@@ -27,17 +94,18 @@ foreach ($it as $entry) {
   if($entry->isDot()) continue;
   if($entry->isDir()){
     $name = $entry->getFilename();
+    // primero juntamos todo, después filtramos por áreas
     $tabsRaw[$name] = $name;
   }
 }
 
 /*
  * Prioridad de orden:
- *   1) Personal (S-1)
- *   2) Inteligencia (S-2)
- *   3) Operaciones (S-3)
- *   4) Materiales (S-4)
- *   999) Aspectos Generales (al final)
+ *   1) Aspectos Generales
+ *   2) Personal (S-1)
+ *   3) Inteligencia (S-2)
+ *   4) Operaciones (S-3)
+ *   999) Materiales (S-4)
  *   50) cualquier otro (en el medio, por si en el futuro agregás algo)
  */
 $priority = [
@@ -57,8 +125,25 @@ uksort($tabsRaw, function(string $a, string $b) use ($priority){
   return $pa <=> $pb;
 });
 
-// armamos el array final de tabs, empezando por "(Todos)"
-$tabs = ['' => '(Todos)'] + $tabsRaw;
+/* Filtrado de tabs según áreas del usuario */
+$tabs = ['' => '(Todos)'];
+foreach ($tabsRaw as $name => $label) {
+    if (can_user_see_folder($name, $userAreas)) {
+        $tabs[$name] = $label;
+    }
+}
+
+/* Validar sub: si el usuario no tiene acceso, lo mandamos a (Todos) */
+if ($sub !== '' && !array_key_exists($sub, $tabs)) {
+    $sub = '';
+}
+
+/* Root efectivo según sub permitido */
+$root = $baseDir;
+if ($sub !== '') {
+  $try = realpath($baseDir . '/' . $sub);
+  if ($try && str_starts_with($try, $baseDir)) $root = $try;
+}
 
 /* ===== Recorrer archivos XLSX ===== */
 $rows=[];
@@ -72,6 +157,17 @@ foreach($rii as $f){
 
   $abs = $f->getPathname();
   $rel = str_replace('\\','/', substr($abs, strlen($projectBase)+1)); // relativo al proyecto
+
+  // detectar carpeta de primer nivel para aplicar permisos también a nivel archivo
+  $topFolder = '';
+  if (str_starts_with($rel, STORAGE_PREFIX)) {
+      $relFromStorage = substr($rel, strlen(STORAGE_PREFIX)); // ej: "Personal (S-1)/archivo.xlsx"
+      $parts = explode('/', $relFromStorage, 2);
+      $topFolder = $parts[0] ?? '';
+  }
+  if ($topFolder !== '' && !can_user_see_folder($topFolder, $userAreas)) {
+      continue; // no tiene permiso para esta carpeta
+  }
 
   $subPath = str_replace('\\','/', substr($abs, strlen($root)+1));
   $loc = dirname($subPath);

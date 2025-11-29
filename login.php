@@ -13,14 +13,15 @@ if (!function_exists('h')) {
 /*
  * Calcula la base de la app y el home post-login.
  * Ej: si la app está en /inspeccion/login.php → base = /inspeccion
- * HOME_AFTER_LOGIN = /inspeccion/public/index.php
+ * HOME_AFTER_LOGIN = /inspeccion/public/elegir_inicio.php
  */
 $APP_BASE = rtrim(dirname($_SERVER['SCRIPT_NAME'] ?? ''), '/');
 if ($APP_BASE === '/' || $APP_BASE === '\\') {
     $APP_BASE = '';
 }
 
-$HOME_AFTER_LOGIN = $APP_BASE . '/public/index.php';
+// AHORA el home post-login es la página intermedia
+$HOME_AFTER_LOGIN = $APP_BASE . '/public/elegir_inicio.php';
 
 // Sanitizar "next"
 $next = $_GET['next'] ?? $_POST['next'] ?? $HOME_AFTER_LOGIN;
@@ -308,7 +309,7 @@ $ESCUDO_URL = $IMG_BASE . '/bcom602.png';
     </div>
   </header>
 
-  <!-- Toast de notificaciones (sesión cerrada / acceso denegado / error) -->
+  <!-- Toast de notificaciones -->
   <div class="position-fixed top-0 start-50 translate-middle-x p-3" style="z-index: 11000;">
     <div id="loginToast" class="toast border-0 shadow text-bg-success"
          role="alert" aria-live="assertive" aria-atomic="true"
@@ -327,8 +328,7 @@ $ESCUDO_URL = $IMG_BASE . '/bcom602.png';
         <div class="card-body">
           <h4 class="mb-3">Iniciar sesión</h4>
 
-          <!-- Sin alertas dentro de la card -->
-
+          <!-- Formulario -->
           <form id="login-form" method="post" action="<?= h($_SERVER['PHP_SELF']) ?>">
             <?= csrf_input() ?>
             <input type="hidden" name="next" value="<?= h($next) ?>">

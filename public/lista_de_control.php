@@ -1,16 +1,68 @@
 <?php
 // public/lista_de_control.php — Listado por área S1–S4 en /storage/listas_control (progreso desde DB)
+
+require_once __DIR__ . '/../auth/bootstrap.php';
+require_login();
+
 require_once __DIR__ . '/../config/db.php';
 
 function e($v){ return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'); }
 
+/* ===== Helper: áreas del usuario desde roles_locales ===== */
+function get_user_areas_lista(PDO $pdo): array {
+    $user = function_exists('current_user') ? current_user() : null;
+    if (!$user) return [];
+
+    $dni = $user['dni'] ?? null;
+    if (!$dni) return [];
+
+    $st = $pdo->prepare("SELECT areas_acceso FROM roles_locales WHERE dni = ? LIMIT 1");
+    $st->execute([$dni]);
+    $row = $st->fetch(PDO::FETCH_ASSOC);
+    if (!$row || empty($row['areas_acceso'])) return [];
+
+    $areas = json_decode($row['areas_acceso'], true);
+    return is_array($areas) ? $areas : [];
+}
+
 /* ===== Config ===== */
 const BASE_PREFIX = 'listas_control';
-$AREAS   = ['S1','S2','S3','S4'];
-$ALIASES = ['S1'=>'Personal (S-1)','S2'=>'Inteligencia (S-2)','S3'=>'Operaciones (S-3)','S4'=>'Material (S-4)'];
+$AREAS   = ['S1','S2','S3','S4','S5'];
+$ALIASES = [
+    'S1'=>'Personal (S-1)',
+    'S2'=>'Inteligencia (S-2)',
+    'S3'=>'Operaciones (S-3)',
+    'S4'=>'Material (S-4)',
+    'S5'=>'Presupuesto (S-5)'
+];
 
-$area = $_GET['area'] ?? 'S1';
-if(!in_array($area,$AREAS,true)) $area='S1';
+/* ÁREAS PERMITIDAS AL USUARIO */
+$userAreas = get_user_areas_lista($pdo);
+
+if (empty($userAreas) || in_array('GRAL', $userAreas, true)) {
+    // Sin configuración o con GRAL: ve todas las áreas
+    $ALLOWED_AREAS = $AREAS;
+} else {
+    // Solo las Sx que tenga el usuario
+    $ALLOWED_AREAS = array_values(array_filter($AREAS, fn($a) => in_array($a, $userAreas, true)));
+}
+
+// Si no tiene ninguna área asignada, mostramos mensaje sencillo
+if (empty($ALLOWED_AREAS)) {
+    http_response_code(403);
+    echo "No tenés áreas asignadas para Listas de control.";
+    exit;
+}
+
+/* Área seleccionada por GET, forzada a las permitidas */
+$area = $_GET['area'] ?? $ALLOWED_AREAS[0];
+if (!in_array($area, $AREAS, true)) {
+    $area = $ALLOWED_AREAS[0];
+}
+if (!in_array($area, $ALLOWED_AREAS, true)) {
+    // si pidió algo que no le corresponde, lo mando a la primera permitida
+    $area = $ALLOWED_AREAS[0];
+}
 
 /* ===== Paths ===== */
 $projectBase = realpath(__DIR__ . '/..');
@@ -63,6 +115,7 @@ $ESCUDO     = $ASSETS_URL . '/img/escudo_bcom602.png';
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 <link rel="stylesheet" href="../assets/css/theme-602.css">
+<link rel="icon" type="image/png" href="../assets/img/bcom602.png">
 <style>
   body{
     background: url("<?= e($IMG_BG) ?>") no-repeat center center fixed;
@@ -116,7 +169,7 @@ $ESCUDO     = $ASSETS_URL . '/img/escudo_bcom602.png';
   <div class="page-wrap container-fluid">
     <div class="d-flex justify-content-between align-items-center mb-3">
       <div class="tabs">
-        <?php foreach($AREAS as $a): ?>
+        <?php foreach($ALLOWED_AREAS as $a): ?>
           <a class="btn btn-outline-light <?= $area===$a?'active':'' ?>" href="?area=<?= e($a) ?>"><?= e($ALIASES[$a] ?? $a) ?></a>
         <?php endforeach; ?>
       </div>

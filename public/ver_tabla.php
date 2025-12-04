@@ -927,17 +927,74 @@ input[type="file"]{
               // Observación editable
               echo '<td><input class="form-control form-control-sm" type="text" name="observacion['.$rowIdx.']" value="'.e($obs).'" placeholder="Escribir..."></td>';
 
-              // Evidencia
-              echo '<td><div class="d-flex align-items-center gap-2 flex-wrap">';
-              echo   '<input class="form-control form-control-sm" type="file" name="evidencia['.$rowIdx.']" accept=".jpg,.jpeg,.png,.pdf,.webp">';
+              // ==== Evidencia (múltiples archivos + listado) ====
+              echo '<td>';
+              echo '<div class="d-flex flex-column gap-2 ev-cell" data-row="'.$rowIdx.'">';
+
+              // Input file múltiple
+              echo '<div>';
+              echo '<input '
+                  .'class="form-control form-control-sm ev-input" '
+                  .'type="file" '
+                  .'name="evidencia['.$rowIdx.'][]" '
+                  .'data-row="'.$rowIdx.'" '
+                  .'multiple '
+                  .'accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.ppt,.pptx,.rar,.zip,.7z,.jpg,.jpeg,.png,.webp">';
+              echo '</div>';
+
+              // Normalizar evidencia_path a array de rutas
+              $files = [];
               if ($ev) {
-                $qsBack = $baseQS.'&page='.(int)$page;
-                echo '<a class="btn btn-sm btn-outline-info" href="../'.e($ev).'" target="_blank">Ver</a>';
-                echo '<a class="btn btn-sm btn-outline-danger" href="delete_evidencia.php?row='.$rowIdx.'&'.$qsBack.'" onclick="return confirm(\'¿Eliminar la evidencia de la fila '.$rowIdx.'?\')">Eliminar</a>';
-              } else {
-                echo '<span class="text-muted">Sin archivos…</span>';
+                $decoded = json_decode((string)$ev, true);
+                if (is_array($decoded)) {
+                  foreach ($decoded as $p) {
+                    $p = trim((string)$p);
+                    if ($p !== '') { $files[] = $p; }
+                  }
+                } else {
+                  $sep = null;
+                  if (strpos((string)$ev, '|') !== false)      $sep = '|';
+                  elseif (strpos((string)$ev, ';') !== false) $sep = ';';
+                  elseif (strpos((string)$ev, ',') !== false) $sep = ',';
+
+                  if ($sep !== null) {
+                    foreach (explode($sep, (string)$ev) as $p) {
+                      $p = trim($p);
+                      if ($p !== '') { $files[] = $p; }
+                    }
+                  } else {
+                    $p = trim((string)$ev);
+                    if ($p !== '') { $files[] = $p; }
+                  }
+                }
               }
-              echo '</div></td>';
+
+              // Archivos ya cargados
+              echo '<div class="ev-current small" id="ev-current-'.$rowIdx.'">';
+              if ($files) {
+                $qsBack = $baseQS.'&page='.(int)$page;
+                echo '<div class="d-flex flex-wrap gap-1">';
+                foreach ($files as $idx => $path) {
+                  $label = basename($path);
+                  $href  = '../'.ltrim($path, '/');
+                  echo '<div class="btn-group btn-group-sm mb-1" role="group">';
+                  echo '  <a class="btn btn-outline-info" href="'.e($href).'" target="_blank">'.e($label).'</a>';
+                  echo '  <a class="btn btn-outline-danger" '
+                       .'href="delete_evidencia.php?row='.$rowIdx.'&file='.$idx.'&'.$qsBack.'" '
+                       .'onclick="return confirm(\'¿Eliminar este archivo de evidencia?\')">&times;</a>';
+                  echo '</div>';
+                }
+                echo '</div>';
+              } else {
+                echo '<span class="text-muted">Sin archivos cargados…</span>';
+              }
+              echo '</div>'; // ev-current
+
+              // Archivos recién seleccionados (sin guardar aún)
+              echo '<div class="ev-selected small text-info" id="ev-selected-'.$rowIdx.'"></div>';
+
+              echo '</div>'; // ev-cell
+              echo '</td>';
 
               echo '</tr>';
             }
@@ -1079,6 +1136,41 @@ input[type="file"]{
       }
     }
   }
+
+  // === Mostrar nombres de archivos seleccionados (sin guardar aún) ===
+  function escapeHtml(str){
+    return String(str).replace(/[&<>"']/g, function(m){
+      return ({
+        '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+      })[m] || m;
+    });
+  }
+
+  document.querySelectorAll('.ev-input').forEach(function(input){
+    input.addEventListener('change', function(){
+      var row = this.getAttribute('data-row') || (this.name.match(/\[(\d+)\]/) || [null, null])[1];
+      if (!row) return;
+
+      var box = document.getElementById('ev-selected-'+row);
+      if (!box) return;
+
+      var files = Array.from(this.files || []);
+      if (!files.length) {
+        box.innerHTML = '';
+        return;
+      }
+
+      var html = '<div class="text-info">Archivos seleccionados (pendiente de guardar):</div>';
+      html += '<ul class="mb-0 ps-3">';
+      files.forEach(function(f){
+        html += '<li>'+escapeHtml(f.name)+'</li>';
+      });
+      html += '</ul>';
+      html += '<div class="text-muted mt-1">Recordá presionar "Guardar" para subirlos.</div>';
+
+      box.innerHTML = html;
+    });
+  });
 
 })();
 </script>

@@ -351,9 +351,6 @@ $porcGlobal   = $totalPersonal > 0 ? round($personalActivo * 100 / $totalPersona
 
               <div class="accordion-item">
                 <h2 class="accordion-header" id="s1-h-doc">
-                  <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#s1-doc" aria-expanded="false" aria-controls="s1-doc">
-                    Documentación de personal
-                  </button>
                 </h2>
                 <div id="s1-doc" class="accordion-collapse collapse" aria-labelledby="s1-h-doc" data-bs-parent="#accordionS1">
                   <div class="accordion-body">
@@ -367,9 +364,6 @@ $porcGlobal   = $totalPersonal > 0 ? round($personalActivo * 100 / $totalPersona
 
               <div class="accordion-item">
                 <h2 class="accordion-header" id="s1-h-estad">
-                  <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#s1-estad" aria-expanded="false" aria-controls="s1-estad">
-                    Estadísticas y reportes
-                  </button>
                 </h2>
                 <div id="s1-estad" class="accordion-collapse collapse" aria-labelledby="s1-h-estad" data-bs-parent="#accordionS1">
                   <div class="accordion-body">

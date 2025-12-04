@@ -158,6 +158,7 @@ $ESCUDO     = $ASSETS_URL . '/img/escudo_bcom602.png';
   }
   .user-info{
     margin-left:auto;
+    margin-right:17px;
     text-align:right;
     font-size:.85rem;
   }

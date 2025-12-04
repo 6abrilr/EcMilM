@@ -29,7 +29,7 @@ if ($personal_id <= 0) {
     jexit(['ok' => false, 'error' => 'personal_id inválido']);
 }
 
-/* Campos que se permiten tocar */
+/* ===== Campos permitidos para edición normal ===== */
 $permitidos_rca = [
     'armamento_principal',
     'ni_armamento_principal',
@@ -119,7 +119,7 @@ try {
         // ya se hizo arriba
     }
 
-    /* ===== 3) Asegurar "UN SOLO rol por persona" en rol_combate_asignaciones ===== */
+    /* ===== 3) Asegurar "UN SOLO rol activo por persona" en rol_combate_asignaciones ===== */
 
     if ($es_campo_rca) {
 
@@ -128,7 +128,7 @@ try {
             SELECT id, rol_combate_id
               FROM rol_combate_asignaciones
              WHERE personal_id = :per
-               AND (hasta IS NULL OR hasta >= CURDATE())
+               AND (hasta IS NULL OR hasta > CURDATE())
              ORDER BY id ASC
         ");
         $stmtAct->execute([':per' => $personal_id]);

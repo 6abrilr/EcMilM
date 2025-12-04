@@ -1,5 +1,5 @@
 <?php
-// public/rol_combate.php — Rol de Combate B Com 602 (vista por secciones)
+// public/rol_combate.php — Rol de Combate B Com 602 (tabla única con filtros)
 declare(strict_types=1);
 
 require_once __DIR__ . '/../auth/bootstrap.php';
@@ -17,51 +17,44 @@ $esS1       = ($areaSesion === 'S1');
 $esS3       = ($areaSesion === 'S3');
 
 // -------- Permisos reales tomados de roles_locales ----------
-$rolApp      = '';
-$areasAcceso = '';
+$rolApp         = 'usuario';
+$areasAccesoArr = [];
 
 try {
-    // ADAPTAR: si tu campo en roles_locales no es usuario_id o tu sesión no usa 'id',
-    // cambiá estas 2 cosas por las reales.
-    $usuarioId = (int)($user['id'] ?? 0);
+    // Usamos el DNI del usuario logueado (como en areas.php)
+    $dniUser = trim((string)($user['dni'] ?? ''));
 
-    if ($usuarioId > 0 && isset($pdo)) {
+    if ($dniUser !== '' && isset($pdo)) {
         $sqlRoles = "SELECT rol_app, areas_acceso
                      FROM roles_locales
-                     WHERE usuario_id = :uid
+                     WHERE dni = :dni
                      LIMIT 1";
         $stmtRoles = $pdo->prepare($sqlRoles);
-        $stmtRoles->execute([':uid' => $usuarioId]);
-        $rowRol = $stmtRoles->fetch(PDO::FETCH_ASSOC);
+        $stmtRoles->execute([':dni' => $dniUser]);
+        if ($rowRol = $stmtRoles->fetch(PDO::FETCH_ASSOC)) {
+            $rolApp = strtolower(trim((string)($rowRol['rol_app'] ?? 'usuario')));
 
-        if ($rowRol) {
-            $rolApp      = strtoupper(trim((string)($rowRol['rol_app'] ?? '')));
-            $areasAcceso = strtoupper(trim((string)($rowRol['areas_acceso'] ?? '')));
+            // areas_acceso viene como JSON: ["S1","S3",...]
+            $rawAreas = $rowRol['areas_acceso'] ?? '[]';
+            $tmp = json_decode($rawAreas, true);
+            if (is_array($tmp)) {
+                $areasAccesoArr = array_map(
+                    static fn($x) => strtoupper(trim((string)$x)),
+                    $tmp
+                );
+            }
         }
     }
 } catch (Throwable $e) {
-    // En caso de error, se cae a solo lectura (fail-safe)
-    $rolApp = '';
-    $areasAcceso = '';
+    // fail-safe: sin permisos
+    $rolApp         = 'usuario';
+    $areasAccesoArr = [];
 }
 
-// Normalizamos flags de permiso
-$esAdminApp = ($rolApp === 'ADMIN');
-
-// si áreas_acceso es un string tipo "S1,S3,GRAL" o un JSON con esos textos,
-// igual usamos strpos para detectar GRAL / S3.
-$tieneGral  = (strpos($areasAcceso, 'GRAL') !== false);
-$tieneS3Acc = (strpos($areasAcceso, 'S3')   !== false);
-
-/*
- * 🔐 LÓGICA DE PERMISOS:
- *  - ADMIN de la app
- *  - Cualquiera que tenga GRAL en áreas_acceso
- *  - Cualquiera que tenga S3 en áreas_acceso
- *  - O que su área de sesión sea S3
- */
-$puedeEditar = $esAdminApp || $tieneGral || $tieneS3Acc || $esS3;
-$soloLectura = !$puedeEditar;
+// Solo tiene permiso de edición el que tenga S3 en sus áreas
+$tieneS3Acc   = in_array('S3', $areasAccesoArr, true);
+$puedeEditar  = $tieneS3Acc;
+$soloLectura  = !$puedeEditar;
 
 // URL de "Volver a áreas" según el área principal de la sesión
 if ($esS1) {
@@ -79,7 +72,7 @@ $ASSETS_URL = ($APP_URL === '' ? '' : $APP_URL) . '/assets';
 $IMG_BG     = $ASSETS_URL . '/img/fondo.png';
 $ESCUDO     = $ASSETS_URL . '/img/escudo_bcom602.png';
 
-/* ===== Secciones / elementos ===== */
+/* ===== Secciones / elementos (1–8) ===== */
 $RC_ELEMENTOS = [
     1 => 'Rol de Combate de la Jefatura',
     2 => 'Rol de Combate de la Plana Mayor',
@@ -90,287 +83,87 @@ $RC_ELEMENTOS = [
     7 => 'Rol de Combate de la Compañía Telepuerto Satelital',
     8 => 'Personal en Comisión',
 ];
-$RC_SECCIONES = $RC_ELEMENTOS + [
-    9 => 'Listado completo de personal (todos los elementos)',
-];
 
-/* ===== Parámetros ===== */
-$seccion   = isset($_GET['seccion']) ? (int)$_GET['seccion'] : 0;
-$personaId = isset($_GET['id']) ? (int)$_GET['id'] : 0;
+/* ===== Parámetros de filtros ===== */
+$personaId      = isset($_GET['id']) ? (int)$_GET['id'] : 0; // por si venís de otro lado
+$from           = $_GET['from'] ?? 's1';
+if ($from !== 's1' && $from !== 's3') $from = 's1';
 
-// origen opcional
-$from = $_GET['from'] ?? '';
-if ($from !== 's1' && $from !== 's3') {
-    $from = 's1';
-}
+$filtroDni      = trim((string)($_GET['dni'] ?? ''));
+$filtroNombre   = trim((string)($_GET['nombre'] ?? ''));
+$filtroSeccion  = isset($_GET['seccion']) ? trim((string)$_GET['seccion']) : ''; // '', '1'..'8'
 
-if ($seccion < 1 || $seccion > 9) {
-    $seccion = 0;
-}
-
-/* ===== Buscador superior (por DNI / Nombre) ===== */
-$busqDni   = trim((string)($_GET['dni'] ?? ''));
-$busqNom   = trim((string)($_GET['nombre'] ?? ''));
-$searchResults = [];
-
-if ($busqDni !== '' || $busqNom !== '') {
-    try {
-        // Busca personas con asignación de rol de combate
-        $sqlSearch = "
-            SELECT
-                p.id              AS personal_id,
-                p.dni,
-                p.grado,
-                p.arma,
-                p.nombre_apellido,
-                rc.id             AS rol_id,
-                rc.seccion,
-                rc.puesto         AS rol_combate,
-                rc.grupo,
-                rc.subgrupo
-            FROM rol_combate_asignaciones rca
-            LEFT JOIN rol_combate rc
-              ON rc.id = rca.rol_combate_id
-            INNER JOIN personal_unidad p
-              ON p.id = rca.personal_id
-            WHERE (rca.hasta IS NULL OR rca.hasta >= CURDATE())
-        ";
-
-        $conds = [];
-        $params = [];
-
-        if ($busqDni !== '') {
-            $conds[] = "p.dni LIKE :dni";
-            $params[':dni'] = '%' . $busqDni . '%';
-        }
-
-        if ($busqNom !== '') {
-            $conds[] = "p.nombre_apellido LIKE :nom";
-            $params[':nom'] = '%' . $busqNom . '%';
-        }
-
-        if ($conds) {
-            $sqlSearch .= " AND " . implode(" AND ", $conds);
-        }
-
-        $sqlSearch .= "
-            ORDER BY
-              p.grado,
-              p.nombre_apellido,
-              rc.seccion,
-              rc.grupo,
-              rc.subgrupo,
-              rc.orden
-            LIMIT 100
-        ";
-
-        $stmtSearch = $pdo->prepare($sqlSearch);
-        $stmtSearch->execute($params);
-        $searchResults = $stmtSearch->fetchAll(PDO::FETCH_ASSOC) ?: [];
-    } catch (Throwable $e) {
-        // Si falla la búsqueda no frenamos la página
-        $searchResults = [];
-    }
-}
-
-/* ===== Mensajes simples (para futuro POST normal) ===== */
-$mensajeOk = '';
-$mensajeError = '';
-
-/* ===== Consulta a BD cuando hay sección seleccionada ===== */
+/* ===== Consulta principal (tabla) ===== */
 $filasRol = [];
 $listadoError = '';
 
-if ($seccion > 0) {
-    try {
+try {
+    $pdo->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
 
-        if ($seccion === 9) {
-            // Tarjeta 9: listado completo de todo el personal (sin A/C)
-            $sqlFallback = "
-                SELECT
-                    NULL                AS rol_id,
-                    NULL                AS seccion,
-                    NULL                AS hoja,
-                    NULL                AS grupo,
-                    NULL                AS subgrupo,
-                    NULL                AS rol_combate,
-                    NULL                AS orden,
-                    NULL                AS obs_rol,
+    $sql = "
+        SELECT
+            p.id                  AS personal_id,
+            p.dni,
+            p.grado,
+            p.arma_espec          AS arma,
+            p.apellido_nombre     AS nombre_apellido,
 
-                    NULL                AS asignacion_id,
-                    NULL                AS desde,
-                    NULL                AS hasta,
-                    NULL                AS obs_asignacion,
-                    NULL                AS armamento_principal,
-                    NULL                AS ni_armamento_principal,
-                    NULL                AS armamento_secundario,
-                    NULL                AS ni_armamento_secundario,
-                    NULL                AS rol_administrativo,
-                    NULL                AS vehiculo,
-                    p.id                AS personal_id,
+            rc.id                 AS rol_id,
+            rc.seccion,
+            rc.puesto             AS rol_combate,
 
-                    p.grado,
-                    p.arma,
-                    p.nombre_apellido
-                FROM personal_unidad p
-                WHERE (p.grado IS NULL OR p.grado <> 'A/C')
-                ORDER BY
-                  CASE p.grado
-                    -- Oficiales
-                    WHEN 'TG' THEN 1
-                    WHEN 'GD' THEN 2
-                    WHEN 'GB' THEN 3
-                    WHEN 'CY' THEN 4
-                    WHEN 'CR' THEN 5
-                    WHEN 'TC' THEN 6
-                    WHEN 'MY' THEN 7
-                    WHEN 'CT' THEN 8
-                    WHEN 'TP' THEN 9
-                    WHEN 'TT' THEN 10
-                    WHEN 'ST' THEN 11
+            rca.id                AS asignacion_id,
+            rca.armamento_principal,
+            rca.ni_armamento_principal,
+            rca.armamento_secundario,
+            rca.ni_armamento_secundario,
+            rca.rol_administrativo,
+            rca.vehiculo
+        FROM personal_unidad p
+        LEFT JOIN rol_combate_asignaciones rca
+               ON p.id = rca.personal_id
+              AND (rca.hasta IS NULL OR rca.hasta > CURDATE())
+        LEFT JOIN rol_combate rc
+               ON rc.id = rca.rol_combate_id
+        WHERE (p.grado IS NULL OR p.grado <> 'A/C')
+    ";
 
-                    -- Suboficiales
-                    WHEN 'SM' THEN 12
-                    WHEN 'SP' THEN 13
-                    WHEN 'SA' THEN 14
-                    WHEN 'SI' THEN 15
-                    WHEN 'SG' THEN 16
-                    WHEN 'CI' THEN 17
-                    WHEN 'CB' THEN 18
+    $conds  = [];
+    $params = [];
 
-                    -- Soldados
-                    WHEN 'SV' THEN 19
-                    WHEN 'VP' THEN 20
-                    WHEN 'VS' THEN 21
-                    WHEN 'VN' THEN 22
-
-                    -- Agente civil u otros
-                    WHEN 'A/C' THEN 998
-                    ELSE 999
-                  END,
-                  p.nombre_apellido
-            ";
-            $stmt = $pdo->query($sqlFallback);
-            $filasRol = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-        } else {
-            // Secciones 1–8: primero intento traer datos reales del Rol de Combate
-            $sql = "SELECT
-                        rc.id              AS rol_id,
-                        rc.seccion,
-                        rc.hoja,
-                        rc.grupo,
-                        rc.subgrupo,
-                        rc.puesto          AS rol_combate,
-                        rc.orden,
-                        rc.observaciones   AS obs_rol,
-
-                        rca.id             AS asignacion_id,
-                        rca.desde,
-                        rca.hasta,
-                        rca.observaciones  AS obs_asignacion,
-                        rca.armamento_principal,
-                        rca.ni_armamento_principal,
-                        rca.armamento_secundario,
-                        rca.ni_armamento_secundario,
-                        rca.rol_administrativo,
-                        rca.vehiculo,
-                        rca.personal_id,
-
-                        p.grado,
-                        p.arma,
-                        p.nombre_apellido
-                    FROM rol_combate rc
-                    LEFT JOIN rol_combate_asignaciones rca
-                      ON rca.rol_combate_id = rc.id
-                      AND (rca.hasta IS NULL OR rca.hasta >= CURDATE())
-                    LEFT JOIN personal_unidad p
-                      ON p.id = rca.personal_id
-                    WHERE rc.seccion = :sec
-                    ORDER BY rc.orden ASC, p.grado ASC, p.nombre_apellido ASC";
-
-            $stmt = $pdo->prepare($sql);
-            $stmt->execute([':sec' => $seccion]);
-            $filasRol = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-            // Si no hay nada cargado todavía, muestro TODO el personal (excepto A/C)
-            if (!$filasRol) {
-                $sqlFallback = "
-                    SELECT
-                        NULL                AS rol_id,
-                        :sec                AS seccion,
-                        NULL                AS hoja,
-                        NULL                AS grupo,
-                        NULL                AS subgrupo,
-                        NULL                AS rol_combate,
-                        NULL                AS orden,
-                        NULL                AS obs_rol,
-
-                        NULL                AS asignacion_id,
-                        NULL                AS desde,
-                        NULL                AS hasta,
-                        NULL                AS obs_asignacion,
-                        NULL                AS armamento_principal,
-                        NULL                AS ni_armamento_principal,
-                        NULL                AS armamento_secundario,
-                        NULL                AS ni_armamento_secundario,
-                        NULL                AS rol_administrativo,
-                        NULL                AS vehiculo,
-                        p.id                AS personal_id,
-
-                        p.grado,
-                        p.arma,
-                        p.nombre_apellido
-                    FROM personal_unidad p
-                    WHERE (p.grado IS NULL OR p.grado <> 'A/C')
-                    ORDER BY
-                      CASE p.grado
-                        -- Oficiales
-                        WHEN 'TG' THEN 1
-                        WHEN 'GD' THEN 2
-                        WHEN 'GB' THEN 3
-                        WHEN 'CY' THEN 4
-                        WHEN 'CR' THEN 5
-                        WHEN 'TC' THEN 6
-                        WHEN 'MY' THEN 7
-                        WHEN 'CT' THEN 8
-                        WHEN 'TP' THEN 9
-                        WHEN 'TT' THEN 10
-                        WHEN 'ST' THEN 11
-
-                        -- Suboficiales
-                        WHEN 'SM' THEN 12
-                        WHEN 'SP' THEN 13
-                        WHEN 'SA' THEN 14
-                        WHEN 'SI' THEN 15
-                        WHEN 'SG' THEN 16
-                        WHEN 'CI' THEN 17
-                        WHEN 'CB' THEN 18
-
-                        -- Soldados
-                        WHEN 'SV' THEN 19
-                        WHEN 'VP' THEN 20
-                        WHEN 'VS' THEN 21
-                        WHEN 'VN' THEN 22
-
-                        -- Agente civil u otros
-                        WHEN 'A/C' THEN 998
-                        ELSE 999
-                      END,
-                      p.nombre_apellido
-                ";
-                $stmtFallback = $pdo->prepare($sqlFallback);
-                $stmtFallback->execute([':sec' => $seccion]);
-                $filasRol = $stmtFallback->fetchAll(PDO::FETCH_ASSOC);
-            }
-        }
-
-    } catch (Throwable $ex) {
-        $listadoError = $ex->getMessage();
-        $filasRol = [];
+    if ($filtroDni !== '') {
+        $conds[] = "p.dni LIKE :dni";
+        $params[':dni'] = '%' . $filtroDni . '%';
     }
-}
 
+    if ($filtroNombre !== '') {
+        // en la tabla es apellido_nombre
+        $conds[] = "p.apellido_nombre LIKE :nom";
+        $params[':nom'] = '%' . $filtroNombre . '%';
+    }
+
+    if ($filtroSeccion !== '' && ctype_digit($filtroSeccion)) {
+        $secNum = (int)$filtroSeccion;
+        if ($secNum >= 1 && $secNum <= 8) {
+            $conds[] = "rc.seccion = :sec";
+            $params[':sec'] = $secNum;
+        }
+    }
+
+    if ($conds) {
+        $sql .= " AND " . implode(" AND ", $conds);
+    }
+
+    $sql .= " ORDER BY p.id ASC";
+
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute($params);
+    $filasRol = $stmt->fetchAll() ?: [];
+
+} catch (Throwable $ex) {
+    $listadoError = $ex->getMessage();
+    $filasRol = [];
+}
 ?>
 <!doctype html>
 <html lang="es">
@@ -395,7 +188,6 @@ if ($seccion > 0) {
   }
   .page-wrap{ padding:18px; }
 
-  /* usar ancho completo de la ventana */
   .container-main{
     max-width:100%;
     margin:0 auto;
@@ -417,7 +209,7 @@ if ($seccion > 0) {
 
   .panel-sub{
     font-size:.86rem;
-    color:#cbd5f5;
+    color:#bfdbfe;
     margin-bottom:14px;
   }
 
@@ -434,7 +226,7 @@ if ($seccion > 0) {
 
   .header-back{
     margin-left:auto;
-    margin-right:20px;
+    margin-right:17px;
     margin-top:4px;
     display:flex;
     gap:8px;
@@ -446,7 +238,11 @@ if ($seccion > 0) {
   }
   .brand-sub{
     font-size:.8rem;
-    color:#9ca3af;
+    color:#bfdbfe;
+  }
+
+  .text-muted{
+    color:#bfdbfe !important;
   }
 
   .table-dark-custom {
@@ -462,40 +258,24 @@ if ($seccion > 0) {
     padding: .30rem .35rem;
   }
 
-  /* columnas con ancho fijo para que no se separen tanto */
   .table-rol-combate col.col-nro      { width: 4%;  }
+  .table-rol-combate col.col-dni      { width: 8%;  }
   .table-rol-combate col.col-grado    { width: 6%;  }
   .table-rol-combate col.col-arma     { width: 7%;  }
-  .table-rol-combate col.col-nombre   { width: 20%; }
-  .table-rol-combate col.col-rol      { width: 10%; }
+  .table-rol-combate col.col-nombre   { width: 18%; }
+  .table-rol-combate col.col-rol      { width: 11%; }
   .table-rol-combate col.col-ap       { width: 9%;  }
   .table-rol-combate col.col-niap     { width: 7%;  }
   .table-rol-combate col.col-as       { width: 9%;  }
   .table-rol-combate col.col-nias     { width: 7%;  }
   .table-rol-combate col.col-roladm   { width: 10%; }
   .table-rol-combate col.col-vehiculo { width: 6%;  }
-  .table-rol-combate col.col-elemento { width: 5%;  }
+  .table-rol-combate col.col-elemento { width: 8%;  }
 
-  .card-section{
-    background:rgba(15,23,42,.96);
-    border-radius:14px;
-    border:1px solid rgba(148,163,184,.35);
-    padding:14px;
-  }
-  .card-section-title{
-    font-weight:700;
-    font-size:.9rem;
-    color:#e2e8f0;
-  }
-  .card-section-sub{
-    font-size:.78rem;
-    color:#94a3b8;
-  }
   .row-resaltada{
     background:rgba(34,197,94,.20)!important;
   }
 
-  /* inputs/select más angostos para que entren sin scroll */
   .rc-input{
     min-width:80px;
     max-width:150px;
@@ -512,83 +292,7 @@ if ($seccion > 0) {
   .search-panel label{
     font-size:.8rem;
     margin-bottom:2px;
-  }
-  .search-results small{
-    font-size:.78rem;
-  }
-
-  /* ====== ESTILO TARJETAS PRINCIPALES ====== */
-  .rc-grid{
-    display:grid;
-    grid-template-columns: repeat(auto-fit,minmax(260px,1fr));
-    gap:16px;
-    margin-top:10px;
-  }
-
-  .rc-card{
-    position:relative;
-    padding:16px 14px 14px;
-    border-radius:16px;
-    border:1px solid rgba(148,163,184,.32);
-    background:
-      radial-gradient(circle at top left, rgba(34,197,94,.14), transparent 55%),
-      radial-gradient(circle at bottom right, rgba(59,130,246,.16), transparent 55%),
-      #020617;
-    box-shadow:0 14px 30px rgba(0,0,0,.7);
-    overflow:hidden;
-    min-height:110px;
-    display:flex;
-    flex-direction:column;
-    justify-content:center;
-    align-items:center;
-    text-align:center;
-    transition:transform .12s ease, box-shadow .12s ease, border-color .12s ease, background .12s ease;
-  }
-
-  .rc-card:hover{
-    transform:translateY(-2px);
-    box-shadow:0 22px 40px rgba(0,0,0,.85);
-    border-color:rgba(96,165,250,.9);
-  }
-
-  .rc-card--hero{
-    grid-column:1 / -1;
-    align-items:center;
-    padding:18px 20px;
-  }
-
-  .rc-pill{
-    display:inline-flex;
-    align-items:center;
-    gap:.35rem;
-    padding:.22rem .75rem;
-    border-radius:999px;
-    background:rgba(15,23,42,.85);
-    border:1px solid rgba(148,163,184,.55);
-    font-size:.7rem;
-    text-transform:uppercase;
-    letter-spacing:.12em;
-    color:#a5b4fc;
-    margin-bottom:.45rem;
-  }
-
-  .rc-btn{
-    display:inline-flex;
-    align-items:center;
-    justify-content:center;
-    padding:.38rem 1rem;
-    border-radius:999px;
-    border:none;
-    font-size:.82rem;
-    font-weight:700;
-    text-decoration:none;
-    background:#38bdf8;
-    color:#02131f;
-    box-shadow:0 10px 24px rgba(56,189,248,.55);
-  }
-  .rc-btn:hover{
-    background:#0ea5e9;
-    color:#02131f;
+    color:#bfdbfe;
   }
 </style>
 </head>
@@ -602,29 +306,24 @@ if ($seccion > 0) {
       <div>
         <div class="brand-title">Batallón de Comunicaciones 602</div>
         <div class="brand-sub">
-          “Hogar de las Comunicaciones Fijas del Ejército”
-          <?php if ($seccion): ?>
-            · <span class="text-warning"><?= e($RC_SECCIONES[$seccion] ?? '') ?></span>
-          <?php endif; ?>
+          “Hogar de las Comunicaciones Fijas del Ejército” · Rol de Combate (tabla única)
         </div>
       </div>
     </div>
     <div class="header-back">
-      <!-- Botón volver a áreas -->
       <?php if (!empty($areasUrl)): ?>
         <button type="button"
-                class="btn btn-outline-light btn-sm"
-                style="font-weight:600; padding:.35rem .9rem;"
+                class="btn btn-success btn-sm"
+                style="font-weight:700; padding:.35rem .9rem;"
                 onclick="window.location.href='<?= e($areasUrl) ?>'">
           Volver a áreas
         </button>
       <?php endif; ?>
 
-      <!-- Botón volver normal (historial) -->
       <button type="button"
-              class="btn btn-secondary btn-sm"
-              style="font-weight:600; padding:.35rem .9rem;"
-              onclick="if (window.history.length > 1) { window.history.back(); } else { window.location.href='index.php'; }">
+              class="btn btn-success btn-sm"
+              style="font-weight:700; padding:.35rem .9rem;"
+              onclick="if (window.history.length > 1) { window.history.back(); } else { window.location.href='elegir_inicio.php'; }">
         Volver
       </button>
     </div>
@@ -635,122 +334,84 @@ if ($seccion > 0) {
   <div class="container-main">
     <div class="panel">
 
-      <!-- ===== BUSCADOR SUPERIOR POR DNI / NOMBRE ===== -->
+      <!-- ===== FILTROS SUPERIORES ===== -->
       <div class="search-panel mb-3">
         <form method="get" class="row g-2 align-items-end">
-          <!-- mantenemos seccion/personaId si estaban -->
-          <?php if ($seccion > 0): ?>
-            <input type="hidden" name="seccion" value="<?= e((string)$seccion) ?>">
-          <?php endif; ?>
-          <?php if ($personaId > 0): ?>
-            <input type="hidden" name="id" value="<?= e((string)$personaId) ?>">
-          <?php endif; ?>
           <input type="hidden" name="from" value="<?= e($from) ?>">
 
           <div class="col-sm-3 col-md-2">
-            <label class="form-label text-muted">DNI</label>
+            <label class="form-label">DNI</label>
             <input type="text"
                    name="dni"
                    class="form-control form-control-sm"
-                   placeholder="Dni sin puntos"
-                   value="<?= e($busqDni) ?>">
+                   placeholder="DNI sin puntos"
+                   value="<?= e($filtroDni) ?>">
           </div>
 
-          <div class="col-sm-5 col-md-4">
-            <label class="form-label text-muted">Nombre y apellido</label>
+          <div class="col-sm-4 col-md-3">
+            <label class="form-label">Nombre y apellido</label>
             <input type="text"
                    name="nombre"
                    class="form-control form-control-sm"
                    placeholder="Nombre o apellido"
-                   value="<?= e($busqNom) ?>">
+                   value="<?= e($filtroNombre) ?>">
           </div>
 
-          <div class="col-sm-3 col-md-2">
+          <div class="col-sm-4 col-md-3">
+            <label class="form-label">Elemento (Rol de Combate)</label>
+            <select name="seccion" class="form-select form-select-sm">
+              <option value="">Todos los elementos</option>
+              <?php foreach ($RC_ELEMENTOS as $num => $label): ?>
+                <option value="<?= e((string)$num) ?>"
+                  <?= ($filtroSeccion !== '' && (int)$filtroSeccion === $num) ? 'selected' : '' ?>>
+                  <?= e($label) ?>
+                </option>
+              <?php endforeach; ?>
+            </select>
+          </div>
+
+          <div class="col-sm-3 col-md-2 d-flex gap-1">
             <button type="submit"
                     class="btn btn-success btn-sm w-100"
                     style="font-weight:700;">
-              Buscar rol
+              Filtrar
             </button>
+            <a href="rol_combate.php?from=<?= e($from) ?>"
+               class="btn btn-outline-success btn-sm"
+               style="font-weight:600;">
+              Limpiar
+            </a>
           </div>
         </form>
-
-        <?php if ($busqDni !== '' || $busqNom !== ''): ?>
-          <div class="search-results mt-2">
-            <?php if (empty($searchResults)): ?>
-              <div class="alert alert-warning py-1 px-2 mb-1" style="font-size:.8rem;">
-                No se encontraron roles asignados para los criterios ingresados.
-              </div>
-            <?php else: ?>
-              <div class="table-responsive">
-                <table class="table table-sm table-dark table-striped align-middle mb-1" style="font-size:.78rem;">
-                  <thead>
-                    <tr>
-                      <th>DNI</th>
-                      <th>Grado</th>
-                      <th>Arma</th>
-                      <th>Nombre y apellido</th>
-                      <th>Elemento</th>
-                      <th>Rol de Combate</th>
-                      <th>Acción</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                  <?php foreach ($searchResults as $r):
-                    $sec = (int)($r['seccion'] ?? 0);
-                    $elem = ($sec >= 1 && $sec <= 8)
-                      ? ($RC_ELEMENTOS[$sec] ?? ('Elemento '.$sec))
-                      : 'Sin sección';
-                    $link = 'rol_combate.php?seccion=' . (int)$sec
-                          . '&id=' . (int)$r['personal_id']
-                          . '&from=' . urlencode($from);
-                  ?>
-                    <tr>
-                      <td><?= e($r['dni'] ?? '') ?></td>
-                      <td><?= e($r['grado'] ?? '') ?></td>
-                      <td><?= e($r['arma'] ?? '') ?></td>
-                      <td><?= e($r['nombre_apellido'] ?? '') ?></td>
-                      <td><?= e($elem) ?></td>
-                      <td><?= e($r['rol_combate'] ?? '') ?></td>
-                      <td>
-                        <?php if ($sec >= 1 && $sec <= 8): ?>
-                          <a href="<?= e($link) ?>" class="btn btn-outline-info btn-sm">
-                            Ver en Rol de Combate
-                          </a>
-                        <?php else: ?>
-                          <span class="text-muted">Sin sección</span>
-                        <?php endif; ?>
-                      </td>
-                    </tr>
-                  <?php endforeach; ?>
-                  </tbody>
-                </table>
-              </div>
-            <?php endif; ?>
-          </div>
-        <?php endif; ?>
       </div>
-      <!-- ===== FIN BUSCADOR SUPERIOR ===== -->
+      <!-- ===== FIN FILTROS ===== -->
 
       <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-2">
         <div>
           <div class="panel-title">Rol de Combate · B Com 602</div>
           <div class="panel-sub mb-0">
-            Vista por secciones (elementos). Cada fila vincula personal de la unidad con su función y medios asignados.
+            Tabla única. Cada fila vincula personal de la unidad con su función y medios asignados.
+          </div>
+          <div class="small text-muted mt-1">
+            Registros mostrados: <?= e((string)count($filasRol)) ?>
+            <?php if ($filtroSeccion !== '' && ctype_digit($filtroSeccion)): ?>
+              · Elemento seleccionado: <?= e($RC_ELEMENTOS[(int)$filtroSeccion] ?? ('Sección ' . $filtroSeccion)) ?>
+            <?php endif; ?>
           </div>
         </div>
 
-        <?php if ($seccion > 0): ?>
         <div class="d-flex flex-column flex-sm-row gap-2">
-          <a href="rol_combate.php?from=<?= e($from) ?>"
-             class="btn btn-sm btn-outline-light"
-             style="font-weight:600; padding:.35rem .9rem;">
-            Volver al menú de secciones
-          </a>
           <a href="s1_personal.php"
              class="btn btn-sm btn-outline-success"
              style="font-weight:600; padding:.35rem .9rem;">
             Agregar persona (S-1)
           </a>
+          <button id="btnExportPdf"
+                  type="button"
+                  class="btn btn-sm btn-outline-light"
+                  style="font-weight:600; padding:.35rem .9rem;">
+            Exportar PDF
+          </button>
           <?php if ($puedeEditar): ?>
           <button id="btnGuardarTodo"
                   type="button"
@@ -760,7 +421,6 @@ if ($seccion > 0) {
           </button>
           <?php endif; ?>
         </div>
-        <?php endif; ?>
       </div>
 
       <?php if ($personaId > 0): ?>
@@ -775,253 +435,299 @@ if ($seccion > 0) {
         </div>
       <?php endif; ?>
 
-<?php if ($seccion === 0): ?>
-  <!-- ===== Grid principal de tarjetas ===== -->
-  <div class="rc-grid">
+      <!-- ==================== TABLA ==================== -->
+      <div class="table-responsive mt-2">
+        <table class="table table-sm table-dark table-striped table-dark-custom table-rol-combate align-middle w-100">
+          <colgroup>
+            <col class="col-nro">
+            <col class="col-dni">
+            <col class="col-grado">
+            <col class="col-arma">
+            <col class="col-nombre">
+            <col class="col-rol">
+            <col class="col-ap">
+            <col class="col-niap">
+            <col class="col-as">
+            <col class="col-nias">
+            <col class="col-roladm">
+            <col class="col-vehiculo">
+            <col class="col-elemento">
+          </colgroup>
+          <thead>
+            <tr>
+              <th scope="col">NRO</th>
+              <th scope="col">DNI</th>
+              <th scope="col">Grado</th>
+              <th scope="col">Arma/Espec</th>
+              <th scope="col">Nombre y Apellido</th>
+              <th scope="col">Rol Combate</th>
+              <th scope="col">Armamento Principal</th>
+              <th scope="col">NI AP</th>
+              <th scope="col">Armamento Secundario</th>
+              <th scope="col">NI AS</th>
+              <th scope="col">Rol Administrativo</th>
+              <th scope="col">Vehículo</th>
+              <th scope="col">Elemento</th>
+            </tr>
+          </thead>
 
-    <!-- Card hero: todos los roles -->
-    <div class="rc-card rc-card--hero">
-      <div class="text-center">
-        <div class="rc-pill">
-          Vista general
-        </div>
-        <div class="card-section-title" style="font-size:1.02rem;">
-          Todos los roles de combate
-        </div>
-        <div class="card-section-sub mt-1">
-          Listado completo de personal y sus roles de combate asignados.
-        </div>
-        <div class="mt-2">
-          <a href="rol_combate.php?seccion=9&from=<?= e($from) ?>" class="rc-btn">
-            Ver todos los roles
-          </a>
-        </div>
-      </div>
-    </div>
+          <tbody>
+          <?php if (!$filasRol): ?>
+            <tr>
+              <td colspan="13" class="text-center text-muted py-4">
+                No hay datos para los filtros seleccionados.
+              </td>
+            </tr>
+          <?php else: ?>
+            <?php
+              $nroReal = 0;
+              foreach ($filasRol as $row):
+                $personalIdRow = (int)($row['personal_id'] ?? 0);
+                if ($personalIdRow === 0) {
+                  continue;
+                }
+                $nroReal++;
 
-    <!-- Tarjetas simples por rol de combate (1–8) -->
-    <?php foreach ($RC_ELEMENTOS as $num => $label): ?>
-      <a href="rol_combate.php?seccion=<?= e($num) ?>&from=<?= e($from) ?>"
-         class="text-decoration-none text-reset">
-        <div class="rc-card">
-          <div class="card-section-title">
-            <?= e($label) ?>
-          </div>
-        </div>
-      </a>
-    <?php endforeach; ?>
+                $esPersonaMarcada = ($personaId > 0 && $personalIdRow === $personaId);
+                $secRow           = isset($row['seccion']) ? (int)$row['seccion'] : 0;
 
-  </div>
+                $ap = trim((string)($row['armamento_principal']   ?? ''));
+                $as = trim((string)($row['armamento_secundario']  ?? ''));
+                $optsArm = ['FAL','PISTOLA','ESCOPETA'];
 
-<?php else: ?>
+                $soloLecturaFila = $soloLectura;
+            ?>
+              <tr
+                class="<?= $esPersonaMarcada ? 'row-resaltada' : '' ?>"
+                data-personal-id="<?= e((string)$personalIdRow) ?>"
+                data-rol-id="<?= e((string)($row['rol_id'] ?? '')) ?>"
+                data-asignacion-id="<?= e((string)($row['asignacion_id'] ?? '')) ?>"
+                data-seccion="<?= $secRow >= 1 && $secRow <= 8 ? e((string)$secRow) : '' ?>"
+              >
+                <td><?= e($nroReal) ?></td>
+                <td><?= e($row['dni'] ?? '') ?></td>
+                <td><?= e($row['grado'] ?? '') ?></td>
+                <td><?= e($row['arma'] ?? '') ?></td>
+                <td><?= e($row['nombre_apellido'] ?? '') ?></td>
 
+                <!-- Rol Combate -->
+                <td>
+                  <input
+                    type="text"
+                    class="form-control form-control-sm rc-input"
+                    data-field="rol_combate"
+                    value="<?= e($row['rol_combate'] ?? '') ?>"
+                    <?= $soloLecturaFila ? 'disabled' : '' ?>>
+                </td>
 
-        <!-- ==================== TABLA DE UNA SECCIÓN ==================== -->
-        <div class="d-flex justify-content-between flex-wrap gap-2 mb-2 mt-2">
-          <div class="small text-muted">
-            <?php if ($seccion === 9): ?>
-              Vista 9: <?= e($RC_SECCIONES[$seccion] ?? '') ?> · Registros: <?= e(count($filasRol)) ?>
-            <?php else: ?>
-              Elemento <?= e($seccion) ?>:
-              <?= e($RC_SECCIONES[$seccion] ?? '') ?>  
-              · Registros: <?= e(count($filasRol)) ?>
-            <?php endif; ?>
-          </div>
-        </div>
+                <!-- Armamento Principal -->
+                <td>
+                  <select
+                    class="form-select form-select-sm rc-input"
+                    data-field="armamento_principal"
+                    <?= $soloLecturaFila ? 'disabled' : '' ?>>
+                    <option value="">(Sin asignar)</option>
+                    <?php foreach ($optsArm as $op): ?>
+                      <option value="<?= e($op) ?>" <?= $ap === $op ? 'selected' : '' ?>>
+                        <?= e($op) ?>
+                      </option>
+                    <?php endforeach; ?>
+                  </select>
+                </td>
 
-        <div class="table-responsive mt-2">
-          <table class="table table-sm table-dark table-striped table-dark-custom table-rol-combate align-middle w-100">
-            <colgroup>
-              <col class="col-nro">
-              <col class="col-grado">
-              <col class="col-arma">
-              <col class="col-nombre">
-              <col class="col-rol">
-              <col class="col-ap">
-              <col class="col-niap">
-              <col class="col-as">
-              <col class="col-nias">
-              <col class="col-roladm">
-              <col class="col-vehiculo">
-              <col class="col-elemento">
-            </colgroup>
-            <thead>
-              <tr>
-                <th scope="col">NRO</th>
-                <th scope="col">Grado</th>
-                <th scope="col">Arma</th>
-                <th scope="col">Nombre y Apellido</th>
-                <th scope="col">Rol Combate</th>
-                <th scope="col">Armamento Principal</th>
-                <th scope="col">NI AP</th>
-                <th scope="col">Armamento Secundario</th>
-                <th scope="col">NI AS</th>
-                <th scope="col">Rol Administrativo</th>
-                <th scope="col">Vehículo</th>
-                <th scope="col">Elemento</th>
-              </tr>
-            </thead>
+                <!-- NI AP -->
+                <td>
+                  <input
+                    type="text"
+                    class="form-control form-control-sm rc-input"
+                    data-field="ni_armamento_principal"
+                    value="<?= e($row['ni_armamento_principal'] ?? '') ?>"
+                    <?= $soloLecturaFila ? 'disabled' : '' ?>>
+                </td>
 
-            <tbody>
-            <?php if (!$filasRol): ?>
-              <tr>
-                <td colspan="12" class="text-center text-muted py-4">
-                  No hay datos cargados para esta vista.
+                <!-- Armamento Secundario -->
+                <td>
+                  <select
+                    class="form-select form-select-sm rc-input"
+                    data-field="armamento_secundario"
+                    <?= $soloLecturaFila ? 'disabled' : '' ?>>
+                    <option value="">(Sin asignar)</option>
+                    <?php foreach ($optsArm as $op): ?>
+                      <option value="<?= e($op) ?>" <?= $as === $op ? 'selected' : '' ?>>
+                        <?= e($op) ?>
+                      </option>
+                    <?php endforeach; ?>
+                  </select>
+                </td>
+
+                <!-- NI AS -->
+                <td>
+                  <input
+                    type="text"
+                    class="form-control form-control-sm rc-input"
+                    data-field="ni_armamento_secundario"
+                    value="<?= e($row['ni_armamento_secundario'] ?? '') ?>"
+                    <?= $soloLecturaFila ? 'disabled' : '' ?>>
+                </td>
+
+                <!-- Rol Administrativo -->
+                <td>
+                  <input
+                    type="text"
+                    class="form-control form-control-sm rc-input"
+                    data-field="rol_administrativo"
+                    value="<?= e($row['rol_administrativo'] ?? '') ?>"
+                    <?= $soloLecturaFila ? 'disabled' : '' ?>>
+                </td>
+
+                <!-- Vehículo -->
+                <td>
+                  <input
+                    type="text"
+                    class="form-control form-control-sm rc-input"
+                    data-field="vehiculo"
+                    value="<?= e($row['vehiculo'] ?? '') ?>"
+                    <?= $soloLecturaFila ? 'disabled' : '' ?>>
+                </td>
+
+                <!-- Elemento -->
+                <td>
+                  <select
+                    class="form-select form-select-sm rc-input"
+                    data-field="seccion"
+                    <?= $soloLecturaFila ? 'disabled' : '' ?>>
+                    <option value="">(Elegir elemento)</option>
+                    <?php foreach ($RC_ELEMENTOS as $num => $label): ?>
+                      <option value="<?= e((string)$num) ?>"
+                        <?= ($secRow === $num ? 'selected' : '') ?>>
+                        <?= e($label) ?>
+                      </option>
+                    <?php endforeach; ?>
+                  </select>
                 </td>
               </tr>
-            <?php else: ?>
-              <?php
-                $nroReal = 0;
-                foreach ($filasRol as $row):
-                  // En secciones 1–8 oculto filas sin persona asignada
-                  $personalIdRow = (int)($row['personal_id'] ?? 0);
-                  if ($seccion !== 9 && $personalIdRow === 0) {
-                      continue;
-                  }
-                  $nroReal++;
-
-                  $esPersonaMarcada = ($personaId > 0 && $personalIdRow === $personaId);
-                  $secRow = isset($row['seccion']) ? (int)$row['seccion'] : 0;
-                  $elementoTexto = ($secRow >= 1 && $secRow <= 8)
-                      ? ($RC_ELEMENTOS[$secRow] ?? ('Elemento '.$secRow))
-                      : 'Sin asignar';
-
-                  $ap = trim((string)($row['armamento_principal']   ?? ''));
-                  $as = trim((string)($row['armamento_secundario']  ?? ''));
-                  $optsArm = ['FAL','PISTOLA','ESCOPETA'];
-              ?>
-                <tr
-                  class="<?= $esPersonaMarcada ? 'row-resaltada' : '' ?>"
-
-                  data-personal-id="<?= e((string)$personalIdRow) ?>"
-                  data-rol-id="<?= e((string)($row['rol_id'] ?? '')) ?>"
-                  data-asignacion-id="<?= e((string)($row['asignacion_id'] ?? '')) ?>"
-                  data-seccion="<?= $secRow >= 1 && $secRow <= 8 ? e((string)$secRow) : '' ?>"
-                >
-                  <td><?= e($nroReal) ?></td>
-                  <td><?= e($row['grado'] ?? '') ?></td>
-                  <td><?= e($row['arma'] ?? '') ?></td>
-                  <td><?= e($row['nombre_apellido'] ?? '') ?></td>
-
-                  <!-- Rol Combate (texto editable) -->
-                  <td>
-                    <input
-                      type="text"
-                      class="form-control form-control-sm rc-input"
-                      data-field="rol_combate"
-                      value="<?= e($row['rol_combate'] ?? '') ?>"
-                      <?= $soloLectura ? 'disabled' : '' ?>>
-                  </td>
-
-                  <!-- Armamento Principal (select) -->
-                  <td>
-                    <select
-                      class="form-select form-select-sm rc-input"
-                      data-field="armamento_principal"
-                      <?= $soloLectura ? 'disabled' : '' ?>>
-                      <option value="">(Sin asignar)</option>
-                      <?php foreach ($optsArm as $op): ?>
-                        <option value="<?= e($op) ?>" <?= $ap === $op ? 'selected' : '' ?>>
-                          <?= e($op) ?>
-                        </option>
-                      <?php endforeach; ?>
-                    </select>
-                  </td>
-
-                  <!-- NI AP (texto editable) -->
-                  <td>
-                    <input
-                      type="text"
-                      class="form-control form-control-sm rc-input"
-                      data-field="ni_armamento_principal"
-                      value="<?= e($row['ni_armamento_principal'] ?? '') ?>"
-                      <?= $soloLectura ? 'disabled' : '' ?>>
-                  </td>
-
-                  <!-- Armamento Secundario (select como AP) -->
-                  <td>
-                    <select
-                      class="form-select form-select-sm rc-input"
-                      data-field="armamento_secundario"
-                      <?= $soloLectura ? 'disabled' : '' ?>>
-                      <option value="">(Sin asignar)</option>
-                      <?php foreach ($optsArm as $op): ?>
-                        <option value="<?= e($op) ?>" <?= $as === $op ? 'selected' : '' ?>>
-                          <?= e($op) ?>
-                        </option>
-                      <?php endforeach; ?>
-                    </select>
-                  </td>
-
-                  <!-- NI AS (texto editable) -->
-                  <td>
-                    <input
-                      type="text"
-                      class="form-control form-control-sm rc-input"
-                      data-field="ni_armamento_secundario"
-                      value="<?= e($row['ni_armamento_secundario'] ?? '') ?>"
-                      <?= $soloLectura ? 'disabled' : '' ?>>
-                  </td>
-
-                  <!-- Rol Administrativo (texto editable) -->
-                  <td>
-                    <input
-                      type="text"
-                      class="form-control form-control-sm rc-input"
-                      data-field="rol_administrativo"
-                      value="<?= e($row['rol_administrativo'] ?? '') ?>"
-                      <?= $soloLectura ? 'disabled' : '' ?>>
-                  </td>
-
-                  <!-- Vehículo (texto editable) -->
-                  <td>
-                    <input
-                      type="text"
-                      class="form-control form-control-sm rc-input"
-                      data-field="vehiculo"
-                      value="<?= e($row['vehiculo'] ?? '') ?>"
-                      <?= $soloLectura ? 'disabled' : '' ?>>
-                  </td>
-
-                  <!-- Elemento (select 1–8) -->
-                  <td>
-                    <select
-                      class="form-select form-select-sm rc-input"
-                      data-field="seccion"
-                      <?= $soloLectura ? 'disabled' : '' ?>>
-                      <option value="">(Elegir elemento)</option>
-                      <?php foreach ($RC_ELEMENTOS as $num => $label): ?>
-                        <option value="<?= e((string)$num) ?>"
-                          <?= ($secRow === $num ? 'selected' : '') ?>>
-                          <?= e($label) ?>
-                        </option>
-                      <?php endforeach; ?>
-                    </select>
-                  </td>
-                </tr>
-              <?php endforeach; ?>
-            <?php endif; ?>
-            </tbody>
-          </table>
-        </div>
-
-      <?php endif; ?>
+            <?php endforeach; ?>
+          <?php endif; ?>
+          </tbody>
+        </table>
+      </div>
 
     </div>
   </div>
 </div>
+
 <script>
 const PUEDE_EDITAR = <?= $puedeEditar ? 'true' : 'false' ?>;
+const LOGO_URL     = '<?= e($ESCUDO) ?>';
 
-// Guardar cambios por AJAX
+// ===== Exportar tabla a PDF (impresión) =====
+function exportTablaPDF() {
+  const tabla = document.querySelector('.table-rol-combate');
+  if (!tabla) {
+    alert('No se encontró la tabla para exportar.');
+    return;
+  }
+
+  const win = window.open('', '_blank');
+  if (!win) {
+    alert('El navegador bloqueó la ventana emergente.');
+    return;
+  }
+
+  const titulo = 'Rol de Combate · B Com 602';
+
+  const html = `
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>${titulo}</title>
+<style>
+  @page {
+    size: A4 landscape;
+    margin: 15mm 15mm 15mm 20mm;
+  }
+  body{
+    font-family:"Times New Roman", serif;
+    font-size:10px;
+    margin:0;
+    color:#111;
+  }
+  h1{
+    font-size:14pt;
+    text-align:center;
+    margin:6px 0 2px;
+  }
+  .sub{
+    font-size:11pt;
+    text-align:center;
+    margin-bottom:8px;
+  }
+  table{
+    width:100%;
+    border-collapse:collapse;
+  }
+  th,td{
+    border:1px solid #000;
+    padding:2px 3px;
+  }
+  th{
+    background:#e5e7eb;
+  }
+  .enc-cab td{
+    border:none !important;
+    padding:0;
+  }
+</style>
+</head>
+<body>
+
+<div style="margin:0; padding:0; line-height:1;">
+  <table width="100%" style="border:none; border-collapse:collapse; border-spacing:0;">
+    <tr class="enc-cab">
+      <td style="text-align:left;">
+        <p style="font-family:'Times New Roman',serif; font-size:16pt; margin:0 0 0 40px;">
+          Ejército Argentino
+        </p>
+        <p style="font-family:'Times New Roman',serif; font-size:14pt; margin:0;">
+          Batallón de Comunicaciones 602
+        </p>
+      </td>
+      <td style="text-align:right; vertical-align:middle;">
+        <img src="${LOGO_URL}" style="height:70px;">
+      </td>
+    </tr>
+  </table>
+</div>
+
+<h1>Rol de Combate</h1>
+<div class="sub">Batallón de Comunicaciones 602</div>
+
+<table>
+  ${tabla.tHead.outerHTML}
+  ${tabla.tBodies[0].outerHTML}
+</table>
+
+</body>
+</html>`;
+
+  win.document.open();
+  win.document.write(html);
+  win.document.close();
+  win.focus();
+  win.print();
+}
+
 document.addEventListener('DOMContentLoaded', () => {
+  const btnPdf = document.getElementById('btnExportPdf');
+  if (btnPdf) {
+    btnPdf.addEventListener('click', exportTablaPDF);
+  }
 
-  // Si no puede editar (no admin / no GRAL / no S3), no enganchamos nada
   if (!PUEDE_EDITAR) {
     return;
   }
 
-  // ahora acepta un 3er parámetro: desdeBoton = true/false
   async function saveCampo(row, ctrl, desdeBoton = false) {
     const campo = ctrl.dataset.field;
     if (!campo) return;
@@ -1033,30 +739,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (!personalId) return;
 
-    // si NO tiene sección:
     if (campo !== 'seccion' && (!seccion || seccion === '')) {
-      // si viene del botón "Guardar cambios", simplemente la salteamos
-      if (desdeBoton) {
-        return;
-      }
-      // si viene de editar un campo puntual, sí obligamos a elegir elemento
-      alert('Primero seleccione un Elemento para esta persona.');
+      if (!desdeBoton) showToast('Primero seleccione un Elemento para esta persona.', 'error');
       return;
     }
 
     if (campo === 'seccion') {
       seccion = ctrl.value;
       if (!seccion) {
-        // sólo mostramos alerta cuando el usuario toca el select directamente
-        if (!desdeBoton) {
-          alert('Debe seleccionar un Elemento (1 a 8).');
-        }
+        if (!desdeBoton) showToast('Debe seleccionar un Elemento (1 a 8).', 'error');
         return;
       }
     }
 
     const valor = ctrl.value;
-
     const fd = new FormData();
     fd.append('personal_id', personalId);
     fd.append('rol_id', rolId);
@@ -1071,27 +767,26 @@ document.addEventListener('DOMContentLoaded', () => {
         body: fd,
         headers: { 'X-Requested-With': 'XMLHttpRequest' }
       });
-
       const data = await resp.json();
 
       if (data && data.ok) {
-        if (data.rol_id)        row.dataset.rolId = data.rol_id;
+        if (data.rol_id)        row.dataset.rolId        = data.rol_id;
         if (data.asignacion_id) row.dataset.asignacionId = data.asignacion_id;
-        if (data.seccion)       row.dataset.seccion = data.seccion;
+        if (data.seccion)       row.dataset.seccion      = data.seccion;
+        if (!desdeBoton) showToast('Cambios guardados correctamente.', 'success');
       } else {
-        console.error(data);
-        alert('No se pudo guardar el cambio: ' + (data && data.error ? data.error : 'Error desconocido'));
+        const msg = (data && data.error) ? data.error : 'Error desconocido';
+        showToast('No se pudo guardar el cambio: ' + msg, 'error');
       }
     } catch (err) {
       console.error(err);
-      alert('Error de comunicación al guardar el dato.');
+      showToast('Error de comunicación al guardar el dato.', 'error');
     }
   }
 
-  // autosave por campo
-  document.querySelectorAll('table tbody tr').forEach(row => {
+  document.querySelectorAll('table.table-rol-combate tbody tr').forEach(row => {
     const personalId = row.dataset.personalId;
-    if (!personalId) return; // sin personal no editamos
+    if (!personalId) return;
 
     row.querySelectorAll('.rc-input').forEach(ctrl => {
       const handler = () => saveCampo(row, ctrl, false);
@@ -1102,25 +797,49 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
-  // Botón "Guardar cambios" ahora saltea filas sin elemento
   const btnGuardar = document.getElementById('btnGuardarTodo');
   if (btnGuardar) {
     btnGuardar.addEventListener('click', async () => {
-      const filas = Array.from(document.querySelectorAll('table tbody tr'));
-
+      const filas = Array.from(document.querySelectorAll('table.table-rol-combate tbody tr'));
       for (const row of filas) {
         const ctrls = row.querySelectorAll('.rc-input');
         for (const ctrl of ctrls) {
-          // acá pasamos true para que no tire el alerta y saltee filas sin sección
           await saveCampo(row, ctrl, true);
         }
       }
-
-      alert('Se enviaron los cambios del listado (solo filas con Elemento asignado).');
+      showToast('Se enviaron los cambios del listado (solo filas con Elemento asignado).', 'success');
     });
   }
-
 });
+</script>
+
+<!-- Toast notificaciones -->
+<div class="position-fixed bottom-0 end-0 p-3" style="z-index: 1080;">
+  <div id="liveToast" class="toast align-items-center text-bg-success border-0" role="alert" aria-live="assertive" aria-atomic="true">
+    <div class="d-flex">
+      <div class="toast-body" id="toastMsg"></div>
+      <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+<script>
+  let toastEl   = document.getElementById('liveToast');
+  let toastMsg  = document.getElementById('toastMsg');
+  let toastInst = toastEl ? new bootstrap.Toast(toastEl) : null;
+
+  function showToast(message, tipo = 'success') {
+    if (!toastEl || !toastInst) {
+      alert(message);
+      return;
+    }
+    toastMsg.textContent = message;
+    toastEl.classList.remove('text-bg-success', 'text-bg-danger');
+    toastEl.classList.add(tipo === 'error' ? 'text-bg-danger' : 'text-bg-success');
+    toastInst.show();
+  }
 </script>
 
 </body>

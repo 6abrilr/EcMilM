@@ -13,6 +13,7 @@ if (!$OFFLINE_MODE) {
 require_once __DIR__ . '/../config/db.php';
 require_once __DIR__ . '/s3_educacion_tables_helper.php';
 
+/** @var PDO $pdo */
 s3_ensure_tables($pdo);
 
 function e($v){ return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'); }
@@ -30,6 +31,52 @@ if (!function_exists('user_display_name')) {
     }
 }
 
+/* ===== Procesar altas / bajas rápidas (POST local a este mismo archivo) ===== */
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $accion = $_POST['accion'] ?? '';
+
+    /* Alta rápida de nueva clase */
+    if ($accion === 'nueva_clase') {
+        $semana           = trim((string)($_POST['nueva_semana'] ?? ''));
+        $fecha            = trim((string)($_POST['nueva_fecha'] ?? ''));
+        $claseTrabajo     = trim((string)($_POST['nueva_clase_trabajo'] ?? ''));
+        $temaNuevo        = trim((string)($_POST['nueva_tema'] ?? ''));
+        $responsableNuevo = trim((string)($_POST['nueva_responsable'] ?? ''));
+        $lugarNuevo       = trim((string)($_POST['nueva_lugar'] ?? ''));
+
+        // Si hay algo cargado, damos de alta
+        if ($temaNuevo !== '' || $claseTrabajo !== '' || $responsableNuevo !== '') {
+            $sqlIns = "
+                INSERT INTO s3_clases (semana, fecha, clase_trabajo, tema, responsable, lugar)
+                VALUES (:semana, :fecha, :clase_trabajo, :tema, :responsable, :lugar)
+            ";
+            $stmtIns = $pdo->prepare($sqlIns);
+            $stmtIns->execute([
+                ':semana'        => $semana !== '' ? $semana : null,
+                ':fecha'         => ($fecha !== '' ? $fecha : null),
+                ':clase_trabajo' => $claseTrabajo !== '' ? $claseTrabajo : null,
+                ':tema'          => $temaNuevo !== '' ? $temaNuevo : null,
+                ':responsable'   => $responsableNuevo !== '' ? $responsableNuevo : null,
+                ':lugar'         => $lugarNuevo !== '' ? $lugarNuevo : null,
+            ]);
+        }
+
+        header('Location: s3_educacion_clases.php?saved=1');
+        exit;
+    }
+
+    /* Borrar clase seleccionada */
+    if ($accion === 'borrar_clase') {
+        $delId = isset($_POST['clase_id']) ? (int)$_POST['clase_id'] : 0;
+        if ($delId > 0) {
+            $stmtDel = $pdo->prepare("DELETE FROM s3_clases WHERE id = :id");
+            $stmtDel->execute([':id' => $delId]);
+        }
+        header('Location: s3_educacion_clases.php?saved=1');
+        exit;
+    }
+}
+
 /* ===== Assets ===== */
 $PUBLIC_URL = rtrim(str_replace('\\','/', dirname($_SERVER['SCRIPT_NAME'] ?? $_SERVER['PHP_SELF'])), '/');
 $APP_URL    = rtrim(str_replace('\\','/', dirname($PUBLIC_URL)), '/');
@@ -37,10 +84,39 @@ $ASSETS_URL = ($APP_URL === '' ? '' : $APP_URL) . '/assets';
 $IMG_BG     = $ASSETS_URL . '/img/fondo.png';
 $ESCUDO     = $ASSETS_URL . '/img/escudo_bcom602.png';
 
-/* ===== Datos de clases ===== */
-$clases = $pdo->query("SELECT * FROM s3_clases ORDER BY semana, id")->fetchAll(PDO::FETCH_ASSOC);
+/* ===== Base de storage para evidencias (clases) ===== */
+$BASE_REL   = 'storage/s3_educacion';
+$DOC_SUBDIR = 'clases_docs';
+$PDF_SUBDIR = 'clases_participantes';
+$BASE_DIR   = realpath(__DIR__ . '/../' . $BASE_REL);
+if ($BASE_DIR === false) {
+    $BASE_DIR = __DIR__ . '/../' . $BASE_REL;
+}
 
-/* ===== KPI simple de clases ===== */
+/* ===== Filtros por Tema / Responsable (GET) ===== */
+$filtroTema = trim((string)($_GET['tema'] ?? ''));
+$filtroResp = trim((string)($_GET['responsable'] ?? ''));
+
+/* ===== Datos de clases (aplicando filtros) ===== */
+$sqlClases = "SELECT * FROM s3_clases WHERE 1=1";
+$params    = [];
+
+if ($filtroTema !== '') {
+    $sqlClases .= " AND tema LIKE :tema";
+    $params[':tema'] = '%' . $filtroTema . '%';
+}
+if ($filtroResp !== '') {
+    $sqlClases .= " AND responsable LIKE :resp";
+    $params[':resp'] = '%' . $filtroResp . '%';
+}
+
+$sqlClases .= " ORDER BY semana, id";
+
+$stmtCl = $pdo->prepare($sqlClases);
+$stmtCl->execute($params);
+$clases = $stmtCl->fetchAll(PDO::FETCH_ASSOC);
+
+/* ===== KPI simple de clases (general, sin filtros) ===== */
 $row = $pdo->query("
     SELECT
       COUNT(*) AS total,
@@ -55,43 +131,15 @@ $porcClases       = $totalClases > 0 ? round($clasesCumplidas * 100.0 / $totalCl
 
 $savedFlag = ($_GET['saved'] ?? '') === '1';
 
-/* ===== Listado de personal (para Responsable) ===== */
+/* ===== Listado de personal (para campo Responsable) ===== */
 $personal = $pdo->query("
-    SELECT grado, arma, nombre_apellido
+    SELECT
+      grado,
+      arma_espec      AS arma,
+      apellido_nombre AS nombre_apellido
     FROM personal_unidad
-    WHERE nombre_apellido IS NOT NULL AND nombre_apellido <> ''
-    ORDER BY
-      CASE grado
-        -- Oficiales
-        WHEN 'TG' THEN 1
-        WHEN 'GD' THEN 2
-        WHEN 'GB' THEN 3
-        WHEN 'CY' THEN 4
-        WHEN 'CR' THEN 5
-        WHEN 'TC' THEN 6
-        WHEN 'MY' THEN 7
-        WHEN 'CT' THEN 8
-        WHEN 'TP' THEN 9
-        WHEN 'TT' THEN 10
-        WHEN 'ST' THEN 11
-        -- Suboficiales
-        WHEN 'SM' THEN 12
-        WHEN 'SP' THEN 13
-        WHEN 'SA' THEN 14
-        WHEN 'SI' THEN 15
-        WHEN 'SG' THEN 16
-        WHEN 'CI' THEN 17
-        WHEN 'CB' THEN 18
-        -- Soldados
-        WHEN 'SV' THEN 19
-        WHEN 'VP' THEN 20
-        WHEN 'VS' THEN 21
-        WHEN 'VN' THEN 22
-        -- Agente civil
-        WHEN 'A/C' THEN 23
-        ELSE 999
-      END,
-      nombre_apellido
+    WHERE apellido_nombre IS NOT NULL AND apellido_nombre <> ''
+    ORDER BY apellido_nombre
 ")->fetchAll(PDO::FETCH_ASSOC);
 ?>
 <!doctype html>
@@ -114,7 +162,7 @@ $personal = $pdo->query("
     margin:0; padding:0;
   }
   .page-wrap{ padding:18px; }
-  .container-main{ max-width:1400px; margin:auto; }
+  .container-main{ max_width:1400px; margin:auto; }
 
   .panel{
     background:rgba(15,17,23,.94);
@@ -202,14 +250,34 @@ $personal = $pdo->query("
     font-size:.8rem;
   }
 
-  .badge-si{ background:#16a34a; }
-  .badge-no{ background:#dc2626; }
-  .badge-ejec{ background:#0ea5e9; }
-  .badge-pend{ background:#6b7280; }
-
   .doc-actual{
     font-size:.75rem;
-    color:#9ca3af;
+    color:#bfdbfe;
+  }
+
+  .search-panel label{
+    font-size:.8rem;
+    color:#bfdbfe;
+    margin-bottom:2px;
+  }
+
+  .text-muted{
+    color:#bfdbfe !important;
+  }
+  .text-secondary{
+    color:#bfdbfe !important;
+  }
+  label.form-label{
+    color:#bfdbfe;
+  }
+
+  .col-sel-header,
+  .col-sel-cell{
+    display:none;
+  }
+  .modo-eliminar .col-sel-header,
+  .modo-eliminar .col-sel-cell{
+    display:table-cell;
   }
 </style>
 </head>
@@ -241,9 +309,6 @@ $personal = $pdo->query("
     <div class="header-back">
       <a href="s3_educacion_cuadros.php" class="btn btn-outline-light btn-sm" style="font-weight:700; padding:.35rem .9rem;">
         ⬅ Volver a Educación de cuadros
-      </a>
-      <a href="areas_s3.php" class="btn btn-secondary btn-sm" style="font-weight:700; padding:.35rem .9rem;">
-        Volver a S-3
       </a>
       <a href="areas.php" class="btn btn-secondary btn-sm" style="font-weight:700; padding:.35rem .9rem;">
         Volver a Áreas
@@ -281,20 +346,130 @@ $personal = $pdo->query("
     </div>
 
     <div class="panel">
-      <div class="panel-title">Clases · Programa de educación de la unidad</div>
+      <div class="panel-title">Buscar Clases</div>
+     
+
+      <!-- Filtros Tema / Responsable + botón Eliminar -->
+      <div class="search-panel mb-3">
+        <form method="get" class="row g-2 align-items-end">
+          <div class="col-sm-4 col-md-4">
+            <label class="form-label">Buscar por tema</label>
+            <input type="text"
+                   name="tema"
+                   class="form-control form-control-sm"
+                   placeholder="Tema de la clase"
+                   value="<?= e($filtroTema) ?>">
+          </div>
+          <div class="col-sm-4 col-md-4">
+            <label class="form-label">Responsable</label>
+            <input type="text"
+                   name="responsable"
+                   class="form-control form-control-sm"
+                   list="responsablesList"
+                   autocomplete="off"
+                   placeholder="Responsable..."
+                   value="<?= e($filtroResp) ?>">
+          </div>
+          <div class="col-sm-4 col-md-4 d-flex gap-1">
+            <button type="submit"
+                    class="btn btn-success btn-sm w-100"
+                    style="font-weight:700;">
+              Filtrar
+            </button>
+            <a href="s3_educacion_clases.php"
+               class="btn btn-outline-success btn-sm w-100"
+               style="font-weight:600;">
+              Limpiar
+            </a>
+            <button type="button"
+                    id="btnEliminarClase"
+                    class="btn btn-outline-danger btn-sm w-100"
+                    style="font-weight:700;">
+              Eliminar clase
+            </button>
+          </div>
+        </form>
+      </div>
+
+         <div class="panel-title">Crear nuevas Clases · Programa de educación de la unidad</div>
       <div class="panel-sub">
         Registro de las clases planificadas para cuadros. Podés actualizar todos los campos,
         marcar si se cumplió y adjuntar la evidencia (orden, PE, listado de asistencia, informe, etc.).
       </div>
 
+      <!-- Alta rápida de nueva clase -->
+      <form method="post" class="row g-2 align-items-end mb-3">
+        <?php if (function_exists('csrf_input')) { echo csrf_input(); } ?>
+        <input type="hidden" name="accion" value="nueva_clase">
+
+        <div class="col-sm-2 col-md-1">
+          <label class="form-label text-muted" style="font-size:.78rem;">Sem</label>
+          <input type="text"
+                 name="nueva_semana"
+                 class="form-control form-control-sm"
+                 placeholder="#">
+        </div>
+
+        <div class="col-sm-3 col-md-2">
+          <label class="form-label text-muted" style="font-size:.78rem;">Fecha</label>
+          <input type="date"
+                 name="nueva_fecha"
+                 class="form-control form-control-sm">
+        </div>
+
+        <div class="col-sm-3 col-md-2">
+          <label class="form-label text-muted" style="font-size:.78rem;">Clase de trabajo</label>
+          <input type="text"
+                 name="nueva_clase_trabajo"
+                 class="form-control form-control-sm"
+                 placeholder="Clase...">
+        </div>
+
+        <div class="col-sm-6 col-md-2">
+          <label class="form-label text-muted" style="font-size:.78rem;">Tema</label>
+          <input type="text"
+                 name="nueva_tema"
+                 class="form-control form-control-sm"
+                 placeholder="Tema de la clase">
+        </div>
+
+        <div class="col-sm-6 col-md-2">
+          <label class="form-label text-muted" style="font-size:.78rem;">Responsable</label>
+          <input type="text"
+                 name="nueva_responsable"
+                 class="form-control form-control-sm"
+                 list="responsablesList"
+                 autocomplete="off"
+                 placeholder="Responsable...">
+        </div>
+
+        <div class="col-sm-4 col-md-2">
+          <label class="form-label text-muted" style="font-size:.78rem;">Lugar</label>
+          <input type="text"
+                 name="nueva_lugar"
+                 class="form-control form-control-sm"
+                 placeholder="Lugar">
+        </div>
+
+        <div class="col-sm-3 col-md-1 d-flex align-items-end">
+          <button type="submit"
+                  class="btn btn-primary btn-sm w-100"
+                  style="font-weight:700;">
+            + Agregar
+          </button>
+        </div>
+      </form>
+
+      <!-- Form principal de edición -->
       <form id="clasesForm" action="save_s3_educacion.php" method="post" enctype="multipart/form-data">
         <?php if (function_exists('csrf_input')) { echo csrf_input(); } ?>
         <input type="hidden" name="section" value="clases">
 
         <div class="table-responsive">
-          <table class="table table-sm table-dark align-middle">
+          <table id="clasesTable" class="table table-sm table-dark align-middle">
             <thead>
               <tr>
+                <th class="col-sel-header" style="width:40px;">Sel</th>
                 <th style="width:50px;">Sem</th>
                 <th style="width:80px;">Fecha</th>
                 <th style="width:110px;">Clase de trabajo</th>
@@ -308,7 +483,7 @@ $personal = $pdo->query("
             </thead>
             <tbody>
             <?php if (empty($clases)): ?>
-              <tr><td colspan="9" class="text-center text-muted">Sin registros de clases.</td></tr>
+              <tr><td colspan="10" class="text-center text-muted">Sin registros de clases.</td></tr>
             <?php else: ?>
               <?php foreach ($clases as $c): ?>
                 <?php
@@ -316,8 +491,27 @@ $personal = $pdo->query("
                   $cumplio = (string)$c['cumplio'];
                   $doc     = isset($c['documento']) ? (string)$c['documento'] : '';
                   $pdf     = isset($c['participantes_pdf']) ? (string)$c['participantes_pdf'] : '';
+
+                  // Buscar TODA la evidencia de la clase en el storage (múltiples archivos)
+                  $evFiles = [];
+                  if (is_dir($BASE_DIR . '/' . $DOC_SUBDIR)) {
+                      $pattern = $BASE_DIR . '/' . $DOC_SUBDIR . '/clase_' . $id . '_doc_*';
+                      $found = glob($pattern) ?: [];
+                      foreach ($found as $absFile) {
+                          if (!is_file($absFile)) continue;
+                          $relPath = $BASE_REL . '/' . $DOC_SUBDIR . '/' . basename($absFile);
+                          $evFiles[] = $relPath;
+                      }
+                  }
                 ?>
                 <tr>
+                  <!-- Selección para borrar -->
+                  <td class="text-center col-sel-cell">
+                    <input type="radio"
+                           name="clase_sel"
+                           value="<?= e($id) ?>">
+                  </td>
+
                   <!-- Semana -->
                   <td>
                     <input type="text"
@@ -350,7 +544,7 @@ $personal = $pdo->query("
                            value="<?= e($c['tema']) ?>">
                   </td>
 
-                  <!-- Responsable (datalist basado en personal_unidad, placeholder en el input) -->
+                  <!-- Responsable -->
                   <td>
                     <input type="text"
                            name="clases_responsable[<?= $id ?>]"
@@ -400,30 +594,56 @@ $personal = $pdo->query("
                     </select>
                   </td>
 
-                  <!-- Evidencia (solo 1 bloque, documento principal) -->
+                  <!-- Evidencia (múltiples docs) -->
                   <td>
+                    <!-- Valor actual en BD (compatibilidad con save_s3_educacion.php) -->
                     <input type="hidden"
                            name="clases_doc_actual[<?= $id ?>]"
                            value="<?= e($doc) ?>">
 
-                    <?php if ($doc !== ''): ?>
-                      <div class="doc-actual mb-1">
-                        <a href="../<?= e($doc) ?>" target="_blank" class="link-light">
-                          <?= e(basename($doc)) ?>
-                        </a>
-                      </div>
-                    <?php else: ?>
-                      <div class="doc-actual mb-1">
-                        <span class="text-secondary">Sin documento</span>
-                      </div>
-                    <?php endif; ?>
+                    <!-- Archivos ya cargados en el storage -->
+                    <div class="ev-current small mb-1" id="ev-current-<?= $id ?>">
+                      <?php if (!empty($evFiles)): ?>
+                        <div class="d-flex flex-wrap gap-1">
+                          <?php foreach ($evFiles as $idx => $path): ?>
+                            <?php $label = basename($path); ?>
+                            <?php
+                              $delUrl = 's3_educacion_delete_doc.php?tipo=clase&id='
+                                        . $id . '&file=' . urlencode(basename($path));
+                            ?>
+                            <div class="btn-group btn-group-sm mb-1" role="group">
+                              <a class="btn btn-outline-info"
+                                 href="../<?= e($path) ?>"
+                                 target="_blank">
+                                <?= e($label) ?>
+                              </a>
+                              <a
+                                href="#"
+                                class="btn btn-outline-danger btn-sm btn-ev-del"
+                                data-delete-url="<?= e($delUrl) ?>"
+                                data-file-name="<?= e($label) ?>"
+                              >
+                                &times;
+                              </a>
+                            </div>
+                          <?php endforeach; ?>
+                        </div>
+                      <?php else: ?>
+                        <span class="text-secondary">Sin documentos</span>
+                      <?php endif; ?>
+                    </div>
 
+                    <!-- Archivo nuevo -->
                     <input type="file"
                            name="clases_file[<?= $id ?>]"
-                           class="form-control form-control-sm">
+                           class="form-control form-control-sm ev-input"
+                           data-row="clase-<?= $id ?>">
                     <small class="text-secondary d-block mt-1" style="font-size:.72rem;">
-                      Orden, PE, informe u otra evidencia (reemplaza al actual).
+                      Orden, PE, informe u otra evidencia. Podés subir más de un archivo en guardados sucesivos.
                     </small>
+
+                    <!-- Archivos recién seleccionados (sin guardar aún) -->
+                    <div class="ev-selected small text-info mt-1" id="ev-selected-clase-<?= $id ?>"></div>
                   </td>
 
                 </tr>
@@ -441,6 +661,92 @@ $personal = $pdo->query("
       </form>
     </div>
 
+  </div>
+</div>
+
+<!-- Form oculto para borrar clase -->
+<form id="deleteClassForm" method="post" class="d-none">
+  <?php if (function_exists('csrf_input')) { echo csrf_input(); } ?>
+  <input type="hidden" name="accion" value="borrar_clase">
+  <input type="hidden" name="clase_id" id="deleteClassId" value="">
+</form>
+
+<!-- Modal tipo tarjeta para confirmar eliminación de clase -->
+<div class="modal fade" id="modalConfirmDelete" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content"
+         style="background:rgba(15,17,23,.95);
+                border-radius:18px;
+                border:1px solid rgba(148,163,184,.45);
+                box-shadow:0 18px 40px rgba(0,0,0,.8);">
+      <div class="modal-header border-0">
+        <h5 class="modal-title" style="font-weight:800; font-size:.95rem;">
+          Eliminar clase
+        </h5>
+        <button type="button" class="btn-close btn-close-white"
+                data-bs-dismiss="modal" aria-label="Cerrar"></button>
+      </div>
+      <div class="modal-body">
+        <p id="modalDeleteText" class="mb-0" style="font-size:.9rem; color:#bfdbfe;">
+          ¿Seguro que desea eliminar la clase seleccionada?
+        </p>
+      </div>
+      <div class="modal-footer border-0">
+        <button type="button"
+                class="btn btn-outline-light btn-sm"
+                data-bs-dismiss="modal"
+                style="font-weight:600; padding:.3rem .9rem;">
+          Cancelar
+        </button>
+        <button type="button"
+                id="btnConfirmDeleteModal"
+                class="btn btn-danger btn-sm"
+                style="font-weight:700; padding:.3rem .9rem;">
+          Eliminar
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal para eliminar archivo de evidencia -->
+<div class="modal fade" id="modalDeleteEvid" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content"
+         style="background:rgba(15,17,23,.95);
+                border-radius:18px;
+                border:1px solid rgba(148,163,184,.45);
+                box-shadow:0 18px 40px rgba(0,0,0,.8);">
+      <div class="modal-header border-0">
+        <h5 class="modal-title" style="font-weight:800; font-size:.95rem;">
+          Eliminar archivo de evidencia
+        </h5>
+        <button type="button" class="btn-close btn-close-white"
+                data-bs-dismiss="modal" aria-label="Cerrar"></button>
+      </div>
+      <div class="modal-body">
+        <p class="mb-1" style="font-size:.9rem; color:#bfdbfe;">
+          ¿Seguro que desea eliminar el siguiente archivo?
+        </p>
+        <p id="deleteEvidFileName"
+           class="fw-bold mb-0"
+           style="font-size:.9rem; color:#e5e7eb;"></p>
+      </div>
+      <div class="modal-footer border-0">
+        <button type="button"
+                class="btn btn-outline-light btn-sm"
+                data-bs-dismiss="modal"
+                style="font-weight:600; padding:.3rem .9rem;">
+          Cancelar
+        </button>
+        <button type="button"
+                id="btnConfirmDeleteEvid"
+                class="btn btn-danger btn-sm"
+                style="font-weight:700; padding:.3rem .9rem;">
+          Eliminar
+        </button>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -483,7 +789,7 @@ $personal = $pdo->query("
   const form = document.getElementById('clasesForm');
   if (!form) return;
 
-  const AUTOSAVE_MS = 8000; // 8 segundos desde el último cambio
+  const AUTOSAVE_MS = 8000;
   let timer = null;
   let lastPayload = '';
 
@@ -494,39 +800,150 @@ $personal = $pdo->query("
 
   function runAutosave() {
     const fd = new FormData(form);
-
-    // Marcamos que es autosave para que el PHP NO toque los archivos
     fd.append('autosave', '1');
 
-    // Generamos una huella simple de los datos para no mandar si no cambió nada
     const plain = [];
     fd.forEach((v, k) => {
-      // No nos importa csrf ni section para la huella
       if (k === 'section' || k === 'csrf_token' || k === 'autosave') return;
-      // No incluimos archivos en la huella
       if (v instanceof File) return;
       plain.push(k + '=' + v);
     });
     const payload = plain.sort().join('&');
-    if (payload === lastPayload) {
-      return;
-    }
+    if (payload === lastPayload) return;
     lastPayload = payload;
 
     fetch('save_s3_educacion.php', {
       method: 'POST',
       body: fd,
       headers: { 'X-Requested-With': 'XMLHttpRequest' }
-    }).catch(function(){ /* silencioso */ });
+    }).catch(function(){});
   }
 
-  // Disparamos autosave ante cambios en inputs (excepto archivos) y selects
   form.querySelectorAll('input:not([type="file"]), select, textarea')
       .forEach(function(el){
         el.addEventListener('input', scheduleAutosave);
         el.addEventListener('change', scheduleAutosave);
       });
 })();
+
+// ===== Eliminar clase seleccionada (modo selección + modal) =====
+document.addEventListener('DOMContentLoaded', function(){
+  const btnDel   = document.getElementById('btnEliminarClase');
+  const formDel  = document.getElementById('deleteClassForm');
+  const inputId  = document.getElementById('deleteClassId');
+  const table    = document.getElementById('clasesTable');
+
+  const modalEl  = document.getElementById('modalConfirmDelete');
+  const modalTxt = document.getElementById('modalDeleteText');
+  const btnModal = document.getElementById('btnConfirmDeleteModal');
+  const bsModal  = modalEl && window.bootstrap
+                   ? new bootstrap.Modal(modalEl)
+                   : null;
+
+  if (!btnDel || !formDel || !inputId || !table || !bsModal) return;
+
+  let deleteMode = false;
+
+  btnDel.addEventListener('click', function(){
+    if (!deleteMode) {
+      // 1er click: activamos modo selección y mostramos la columna "Sel"
+      deleteMode = true;
+      table.classList.add('modo-eliminar');
+      btnDel.classList.remove('btn-outline-danger');
+      btnDel.classList.add('btn-danger');
+      btnDel.textContent = 'Confirmar eliminar';
+      return;
+    }
+
+    // 2do click: abrimos el modal
+    const sel = document.querySelector('input[name="clase_sel"]:checked');
+
+    if (!sel) {
+      modalTxt.textContent = 'Primero seleccione una clase en la columna "Sel".';
+      btnModal.style.display = 'none';
+      bsModal.show();
+      return;
+    }
+
+    modalTxt.textContent = '¿Seguro que desea eliminar la clase seleccionada?';
+    btnModal.style.display = '';
+    inputId.value = sel.value;   // dejamos listo el id para borrar
+    bsModal.show();
+  });
+
+  // Confirmar eliminación desde el modal
+  btnModal.addEventListener('click', function(){
+    if (!inputId.value) return;
+    formDel.submit();
+  });
+});
+
+// === Mostrar nombres de archivos seleccionados (sin guardar aún) ===
+(function(){
+  function escapeHtml(str){
+    return String(str).replace(/[&<>"']/g, function(m){
+      return ({
+        '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+      })[m] || m;
+    });
+  }
+
+  document.querySelectorAll('.ev-input').forEach(function(input){
+    input.addEventListener('change', function(){
+      var rowKey = this.getAttribute('data-row') || '';
+      if (!rowKey) return;
+
+      var box = document.getElementById('ev-selected-' + rowKey);
+      if (!box) return;
+
+      var files = Array.from(this.files || []);
+      if (!files.length) {
+        box.innerHTML = '';
+        return;
+      }
+
+      var html = '<div class="text-info">Archivos seleccionados (pendiente de guardar):</div>';
+      html += '<ul class="mb-0 ps-3">';
+      files.forEach(function(f){
+        html += '<li>' + escapeHtml(f.name) + '</li>';
+      });
+      html += '</ul>';
+      html += '<div class="text-muted mt-1" style="font-size:.75rem;">Recordá presionar "Guardar" para subirlos.</div>';
+
+      box.innerHTML = html;
+    });
+  });
+})();
+
+// ===== Modal para borrar archivos de evidencia (.btn-ev-del) =====
+document.addEventListener('DOMContentLoaded', function () {
+  const btns = document.querySelectorAll('.btn-ev-del');
+  const modalEl = document.getElementById('modalDeleteEvid');
+  const fileNameEl = document.getElementById('deleteEvidFileName');
+  const btnConfirm = document.getElementById('btnConfirmDeleteEvid');
+
+  if (!btns.length || !modalEl || !fileNameEl || !btnConfirm || !window.bootstrap) {
+    return;
+  }
+
+  const bsModal = new bootstrap.Modal(modalEl);
+  let currentUrl = null;
+
+  btns.forEach(function (btn) {
+    btn.addEventListener('click', function (e) {
+      e.preventDefault();
+      currentUrl = this.getAttribute('data-delete-url') || '#';
+      const fname = this.getAttribute('data-file-name') || '';
+      fileNameEl.textContent = fname;
+      bsModal.show();
+    });
+  });
+
+  btnConfirm.addEventListener('click', function () {
+    if (!currentUrl || currentUrl === '#') return;
+    window.location.href = currentUrl;
+  });
+});
 </script>
 </body>
 </html>

@@ -13,8 +13,9 @@ if (!function_exists('user_display_name')) {
   function user_display_name(): string {
     $u = $_SESSION['user'] ?? [];
 
+    // ← ACÁ ESTABA EL ERROR (espacio entre $ y u)
     if (isset($u['grado'], $u['arma'], $u['nombre_completo'])) {
-      return trim($u['grado'].' '.$u['arma'].' '.$u['nombre_completo']); // ST SCD Néstor Gabriel Rojas
+      return trim($u['grado'].' '.$u['arma'].' '.$u['nombre_completo']);
     }
     if (isset($u['display_name']))    return trim((string)$u['display_name']);
     if (isset($u['nombre_completo'])) return trim((string)$u['nombre_completo']);
@@ -42,7 +43,7 @@ $showcolor = ($_POST['showcolor'] ?? '0') === '1';
 $perPage   = isset($_POST['pp'])   ? (int)$_POST['pp'] : 20;
 $page      = isset($_POST['page']) ? (int)$_POST['page'] : 1;
 $fmt       = $_POST['fmt'] ?? '';
-$area      = $_POST['area'] ?? '';   // <-- área/subcarpeta para volver con el mismo contexto
+$area      = $_POST['area'] ?? '';
 
 if ($file_rel === '') {
   http_response_code(400);
@@ -94,7 +95,7 @@ $criticidadArr  = isset($_POST['criticidad'])  && is_array($_POST['criticidad'])
 $formKeyArr     = isset($_POST['form_key'])    && is_array($_POST['form_key'])    ? $_POST['form_key']    : [];
 $formValArr     = isset($_POST['form_val'])    && is_array($_POST['form_val'])    ? $_POST['form_val']    : [];
 
-/* ===== Archivos de evidencia ===== */
+/* ===== Archivos de evidencia (múltiples por fila) ===== */
 $files = $_FILES['evidencia'] ?? null;
 
 /* ===== Asegurar tablas necesarias ===== */
@@ -114,7 +115,6 @@ $pdo->exec("CREATE TABLE IF NOT EXISTS checklist (
   UNIQUE KEY uq_file_row (file_rel,row_idx)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
 
-/* Migración suave */
 try { $pdo->exec("ALTER TABLE checklist ADD COLUMN caracter VARCHAR(100) NULL"); } catch (Throwable $e) { /* ignore */ }
 try { $pdo->exec("ALTER TABLE checklist ADD COLUMN updated_by VARCHAR(100) NULL"); } catch (Throwable $e) { /* ignore */ }
 
@@ -127,6 +127,39 @@ $pdo->exec("CREATE TABLE IF NOT EXISTS checklist_form (
   updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   UNIQUE KEY uq_file_row_field (file_rel,row_idx,field_key)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+
+/* ===== Helpers ===== */
+function evidencia_to_array($ev): array {
+  $files = [];
+  if ($ev === null || $ev === '') return $files;
+
+  $decoded = json_decode((string)$ev, true);
+  if (is_array($decoded)) {
+    foreach ($decoded as $p) {
+      $p = trim((string)$p);
+      if ($p !== '') $files[] = $p;
+    }
+    return $files;
+  }
+
+  $ev = (string)$ev;
+  $sep = null;
+  if (strpos($ev,'|') !== false)      $sep = '|';
+  elseif (strpos($ev,';') !== false) $sep = ';';
+  elseif (strpos($ev,',') !== false) $sep = ',';
+
+  if ($sep !== null) {
+    foreach (explode($sep,$ev) as $p) {
+      $p = trim($p);
+      if ($p !== '') $files[] = $p;
+    }
+  } else {
+    $p = trim($ev);
+    if ($p !== '') $files[] = $p;
+  }
+
+  return $files;
+}
 
 /* Prepared statements */
 $stSelChecklist = $pdo->prepare("SELECT evidencia_path FROM checklist WHERE file_rel=? AND row_idx=?");
@@ -157,26 +190,47 @@ $stUpsertForm = $pdo->prepare("
 
 /* ===== Determinar todos los row_idx a procesar ===== */
 $rowIds = [];
+
 foreach ([$estadoArr, $obsArr, $criticidadArr, $formKeyArr, $formValArr] as $arr) {
   foreach ($arr as $k => $_) {
     $k = (int)$k;
     if ($k > 0) $rowIds[$k] = true;
   }
 }
+
 if ($files && isset($files['name']) && is_array($files['name'])) {
-  foreach ($files['name'] as $k => $_name) {
+  foreach ($files['name'] as $k => $_sub) {   // $_sub es array de múltiples archivos
     $k = (int)$k;
     if ($k > 0) $rowIds[$k] = true;
   }
 }
+
 $rowIds = array_keys($rowIds);
 sort($rowIds);
 
-/* ===== Directorio de evidencias ===== */
-$evidBase = $projectBase . '/storage/evidencias';
+/* ===== Directorio de evidencias (AÑO / MES) ===== */
+/* Base: /storage/evidencias */
+$evidBaseRoot = $projectBase . '/storage/evidencias';
+if (!is_dir($evidBaseRoot)) {
+  @mkdir($evidBaseRoot, 0775, true);
+}
+
+/* Subcarpetas por año y mes: /storage/evidencias/AAAA/MM */
+$year  = date('Y');
+$month = date('m');
+
+$evidBaseYear = $evidBaseRoot . '/' . $year;
+if (!is_dir($evidBaseYear)) {
+  @mkdir($evidBaseYear, 0775, true);
+}
+
+$evidBase = $evidBaseYear . '/' . $month;
 if (!is_dir($evidBase)) {
   @mkdir($evidBase, 0775, true);
 }
+
+/* Ruta relativa base que se guarda en BD */
+$relBaseEvid = 'storage/evidencias/' . $year . '/' . $month . '/';
 
 /* ===== Procesar cada fila ===== */
 foreach ($rowIds as $idx) {
@@ -186,53 +240,81 @@ foreach ($rowIds as $idx) {
   // Criticidad
   $criticidad = $criticidadArr[$rowIdx] ?? '';
   $criticidad = trim((string)$criticidad);
-  if ($criticidad === '') {
-    $criticidad = null;
-  }
+  if ($criticidad === '') $criticidad = null;
 
   // Estado
   $estado = $estadoArr[$rowIdx] ?? '';
   $estado = trim((string)$estado);
-  if ($estado !== 'si' && $estado !== 'no') {
-    $estado = null;
-  }
+  if ($estado !== 'si' && $estado !== 'no') $estado = null;
 
   // Observación
   $obs = isset($obsArr[$rowIdx]) ? trim((string)$obsArr[$rowIdx]) : '';
 
-  // Evidencia: mantener anterior si no se sube una nueva
+  // Evidencia: traer lo que ya había
   $stSelChecklist->execute([$file_rel, $rowIdx]);
   $rowDb = $stSelChecklist->fetch(PDO::FETCH_ASSOC);
-  $currentEv = $rowDb['evidencia_path'] ?? null;
+  $currentFiles = evidencia_to_array($rowDb['evidencia_path'] ?? null);
 
-  $newEvPath = null;
+  // Procesar archivos nuevos para ESTA fila (múltiples)
+  if ($files && isset($files['name'][$rowIdx]) && is_array($files['name'][$rowIdx])) {
+    foreach ($files['name'][$rowIdx] as $i => $origName) {
+      $origName = (string)$origName;
+      if ($origName === '') continue;
 
-  if ($files && isset($files['error'][$rowIdx]) && $files['error'][$rowIdx] !== UPLOAD_ERR_NO_FILE) {
-    if ($files['error'][$rowIdx] === UPLOAD_ERR_OK) {
-      $tmpName  = $files['tmp_name'][$rowIdx];
-      $origName = $files['name'][$rowIdx];
+      $err = $files['error'][$rowIdx][$i] ?? UPLOAD_ERR_NO_FILE;
+      if ($err === UPLOAD_ERR_NO_FILE) continue;
+      if ($err !== UPLOAD_ERR_OK) continue;
+
+      $tmpName = $files['tmp_name'][$rowIdx][$i] ?? '';
+      if ($tmpName === '' || !is_uploaded_file($tmpName)) continue;
+
       $ext      = pathinfo($origName, PATHINFO_EXTENSION);
       $safeName = preg_replace('/[^A-Za-z0-9_\-\.]/','_', pathinfo($origName, PATHINFO_FILENAME));
       if ($safeName === '') $safeName = 'evidencia';
-      $finalName = $safeName . '_' . date('Ymd_His') . '_' . $rowIdx . ($ext ? '.'.$ext : '');
-      $destAbs  = $evidBase . '/' . $finalName;
 
-      if (is_uploaded_file($tmpName) && @move_uploaded_file($tmpName, $destAbs)) {
-        $newEvPath = 'storage/evidencias/' . $finalName;
+      // nombre único
+      $finalName = $safeName . '_' . date('Ymd_His') . '_' . $rowIdx . '_' . sprintf('%03d',$i);
+      if ($ext) $finalName .= '.'.$ext;
+
+      // Ruta física dentro de /storage/evidencias/AAAA/MM
+      $destAbs = $evidBase . '/' . $finalName;
+
+      if (@move_uploaded_file($tmpName, $destAbs)) {
+        // Ruta relativa que se guarda en BD
+        $relPath = $relBaseEvid . $finalName;
+        $currentFiles[] = $relPath;
       }
     }
   }
 
-  $evToSave = $currentEv;
-  if ($newEvPath !== null && $newEvPath !== '') {
-    $evToSave = $newEvPath;
+  // Convertir a JSON o NULL
+  $evToSave = null;
+  if (!empty($currentFiles)) {
+    $currentFiles = array_values(array_unique($currentFiles));
+    $evToSave = json_encode($currentFiles, JSON_UNESCAPED_SLASHES);
   }
 
   // Insertar o actualizar checklist
   if ($rowDb) {
-    $stUpdateChecklist->execute([$criticidad, $estado, $obs, $evToSave, $updatedBy, $file_rel, $rowIdx]);
+    $stUpdateChecklist->execute([
+      $criticidad,
+      $estado,
+      $obs,
+      $evToSave,
+      $updatedBy,
+      $file_rel,
+      $rowIdx
+    ]);
   } else {
-    $stInsertChecklist->execute([$file_rel, $rowIdx, $criticidad, $estado, $obs, $evToSave, $updatedBy]);
+    $stInsertChecklist->execute([
+      $file_rel,
+      $rowIdx,
+      $criticidad,
+      $estado,
+      $obs,
+      $evToSave,
+      $updatedBy
+    ]);
   }
 
   // Campos formulario (si vienen)
@@ -245,8 +327,7 @@ foreach ($rowIds as $idx) {
   }
 }
 
-/* ===== Volver a ver_tabla con mismo contexto y flag de guardado ===== */
-/* ===== Volver a ver_tabla con mismo contexto ===== */
+/* ===== Volver a ver_tabla con el mismo contexto + flag de guardado ===== */
 $qs = 'p=' . rawurlencode($file_rel)
     . '&s=' . (int)$sheet
     . '&pp=' . (int)$perPage
@@ -254,14 +335,8 @@ $qs = 'p=' . rawurlencode($file_rel)
 
 if ($showcolor) $qs .= '&showcolor=1';
 if ($fmt !== '') $qs .= '&fmt=' . rawurlencode($fmt);
+if ($area !== '') $qs .= '&area=' . rawurlencode($area);
 
-// arrastrar área si vino en el POST
-$areaPost = $_POST['area'] ?? '';
-if ($areaPost !== '') {
-    $qs .= '&area=' . rawurlencode($areaPost);
-}
-
-// flag para mostrar el toast
 $qs .= '&saved=1';
 
 header('Location: ver_tabla.php?' . $qs);

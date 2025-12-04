@@ -469,20 +469,56 @@ $manualTipoLabel = ($tipoSel !== 'todos' && isset($SOURCES[$tipoSel])) ? $SOURCE
     margin:0 0 4px 1.1rem;
     padding:0;
   }
+    .brand-hero{
+    padding-top:10px;
+    padding-bottom:10px;
+  }
+
+  .brand-hero .hero-inner{
+    align-items:center;
+    display:flex;
+    justify-content:space-between;
+    gap:12px;
+  }
+
+  .brand-title{
+    font-weight:800;
+    font-size:1rem;
+  }
+
+  .brand-sub{
+    font-size:.8rem;
+    color:#9ca3af;
+  }
+
+  .header-back{
+    margin-left:auto;
+    margin-right:17px;
+    margin-top:4px;
+    display:flex;
+    gap:8px;
+  }
+
 </style>
 </head>
 <body>
 
 <header class="brand-hero">
   <div class="hero-inner container-main">
-    <img class="brand-logo" src="<?= e($ESCUDO) ?>" alt="Escudo 602">
-    <div>
-      <div class="brand-title">Batallón de Comunicaciones 602</div>
-      <div class="brand-sub">“Hogar de las Comunicaciones Fijas del Ejército”</div>
+    <div class="d-flex align-items-center gap-3">
+      <img class="brand-logo" src="<?= e($ESCUDO) ?>" alt="Escudo 602" style="height:52px; width:auto;">
+      <div>
+        <div class="brand-title">Batallón de Comunicaciones 602</div>
+        <div class="brand-sub">“Hogar de las Comunicaciones Fijas del Ejército”</div>
+      </div>
     </div>
-    <div class="ms-auto">
-      <a href="gestiones.php" class="btn btn-warning btn-sm" style="font-weight:700; margin-right:4px;">Gestiones</a>
-      <a href="index.php" class="btn btn-success btn-sm" style="font-weight:700;">Volver al dashboard</a>
+
+    <div class="header-back">
+      <a href="gestiones.php"
+         class="btn btn-success btn-sm"
+         style="font-weight:700; padding:.35rem .9rem;">
+        Volver
+      </a>
     </div>
   </div>
 </header>

@@ -261,7 +261,7 @@ ui_header('Gestión de usuarios', ['container'=>'xl', 'show_brand'=>false]);
 <div class="container mt-3">
   <div class="d-flex align-items-center justify-content-between">
     <h2 class="h5 mb-0">Gestión de usuarios</h2>
-    <a href="elegir_inicio.php" class="btn btn-sm btn-outline-light">← Volver</a>
+    <a href="gestiones.php" class="btn btn-sm btn-outline-light">← Volver</a>
   </div>
 
   <?php if ($mensaje !== ''): ?>

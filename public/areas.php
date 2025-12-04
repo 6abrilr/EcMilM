@@ -221,6 +221,7 @@ $ESCUDO     = $ASSETS_URL . '/img/escudo_bcom602.png';
 
   .header-back{
     margin-left:auto;
+    margin-right:17px;
     margin-top:4px;
   }
 

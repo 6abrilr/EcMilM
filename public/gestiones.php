@@ -144,9 +144,11 @@ $ESCUDO     = $ASSETS_URL . '/img/escudo_bcom602.png';
     align-items:center;
   }
   .header-back{
-    margin-left:auto;
-    margin-top:4px;
-  }
+  margin-left:auto;
+  margin-right:17px; /* esto mueve el voton volver */
+  margin-top:4px;
+}
+
 </style>
 </head>
 <body>
@@ -187,7 +189,7 @@ $ESCUDO     = $ASSETS_URL . '/img/escudo_bcom602.png';
 
         <!-- Gestión de tablas / archivos -->
         <div class="gest-card gest-card--tables">
-          <div class="gest-title">Gestión de tablas / archivos</div>
+          <div class="gest-title">Gestión de documentación IGE</div>
           <div class="gest-sub">XLSX · CSV · PDF</div>
           <div class="gest-text">
             Explorar y administrar los documentos dentro de la carpeta <code>/storage</code>.

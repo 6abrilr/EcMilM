@@ -21,16 +21,25 @@ $ESCUDO     = $ASSETS.'/img/escudo_bcom602.png';
 
 /* ===== KPIs ===== */
 function kpi(PDO $p, string $tbl): float {
-    $row = $p->query("SELECT SUM(cumplio='si') ok, COUNT(*) tot FROM {$tbl}")
-             ->fetch(PDO::FETCH_ASSOC) ?: ['ok'=>0,'tot'=>0];
-    if ((int)$row['tot'] === 0) return 0.0;
-    return round(((int)$row['ok'] * 100) / (int)$row['tot'], 1);
+    try {
+        $sql = "SELECT SUM(cumplio = 'si') AS ok, COUNT(*) AS tot FROM {$tbl}";
+        $row = $p->query($sql)->fetch(PDO::FETCH_ASSOC);
+        if (!$row) {
+            return 0.0;
+        }
+        if ((int)$row['tot'] === 0) return 0.0;
+        return round(((int)$row['ok'] * 100) / (int)$row['tot'], 1);
+    } catch (Throwable $e) {
+        // Si la tabla no existe o hay cualquier error, no rompemos la página.
+        return 0.0;
+    }
 }
 
-$pctClases   = kpi($pdo, 's3_clases');
-$pctGabinete = kpi($pdo, 's3_trabajos_gabinete');
-$pctAloc     = kpi($pdo, 's3_alocuciones');
-$pctCursos   = kpi($pdo, 's3_cursos_regulares');
+$pctClases       = kpi($pdo, 's3_clases');
+$pctGabinete     = kpi($pdo, 's3_trabajos_gabinete');
+$pctAloc         = kpi($pdo, 's3_alocuciones');
+$pctCursos       = kpi($pdo, 's3_cursos_regulares');
+$pctCursosCompl  = kpi($pdo, 's3_cursos_complementarios'); // NUEVO KPI
 
 ?>
 <!doctype html>
@@ -367,8 +376,9 @@ $pctCursos   = kpi($pdo, 's3_cursos_regulares');
       </div>
       <div class="section-title">Educación operacional de cuadros</div>
       <p class="section-sub mb-0">
-        Visión rápida del avance en clases, trabajos de gabinete, alocuciones y cursos regulares.
-        Seleccione un módulo para editar el detalle y adjuntar evidencias.
+        Visión rápida del avance en clases, trabajos de gabinete, alocuciones,
+        cursos regulares y cursos complementarios. Seleccione un módulo para
+        editar el detalle y adjuntar evidencias.
       </p>
     </div>
 
@@ -469,7 +479,6 @@ $pctCursos   = kpi($pdo, 's3_cursos_regulares');
               </div>
               <div class="d-flex flex-column align-items-end gap-1">
                 <div class="card-icon">🎓</div>
-                <span class="card-pill">CEM / IESE</span>
               </div>
             </div>
             <div class="card-footer">
@@ -479,6 +488,33 @@ $pctCursos   = kpi($pdo, 's3_cursos_regulares');
               </div>
               <div class="kpi-progress">
                 <span style="width: <?= e(max(0,min(100,$pctCursos))) ?>%;"></span>
+              </div>
+              <div class="kpi-tag">Ver detalle</div>
+            </div>
+          </article>
+        </a>
+      </div>
+
+      <!-- Cursos complementarios -->
+      <div>
+        <a href="s3_educacion_cursos_complementarios.php" class="card-link">
+          <article class="card-s3">
+            <div class="card-topline">
+              <div>
+                <div class="card-title">Cursos complementarios</div>
+                <div class="card-sub">Seminarios, cursos externos y capacitación adicional.</div>
+              </div>
+              <div class="d-flex flex-column align-items-end gap-1">
+                <div class="card-icon">🎓</div>
+              </div>
+            </div>
+            <div class="card-footer">
+              <div>
+                <div class="kpi-label">Cumplimiento</div>
+                <div class="kpi-num"><?= e($pctCursosCompl) ?>%</div>
+              </div>
+              <div class="kpi-progress">
+                <span style="width: <?= e(max(0,min(100,$pctCursosCompl))) ?>%;"></span>
               </div>
               <div class="kpi-tag">Ver detalle</div>
             </div>

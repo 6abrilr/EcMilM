@@ -17,22 +17,44 @@ $ASSETS     = ($APP_URL === '' ? '' : $APP_URL) . '/assets';
 $IMG_BG     = $ASSETS . '/img/fondo.png';
 $ESCUDO     = $ASSETS . '/img/escudo_bcom602.png';
 
-/*
- *  MODO DEMO — usamos los mismos datos que tenías,
- *  asumiendo que son 2023 / 2024 / 2025.
- */
+/* ===== Detectar años disponibles según archivos s3_adiestramiento_YYYY.php ===== */
+$files  = glob(__DIR__ . '/s3_adiestramiento_*.php') ?: [];
+$yearsMap = [];
 
-$anio2025_total = 60;
-$anio2025_aprob = 43;
-$anio2025_porc  = $anio2025_total > 0 ? round($anio2025_aprob * 100 / $anio2025_total, 1) : 0;
+foreach ($files as $f) {
+    $base = basename($f);
+    if (preg_match('/^s3_adiestramiento_(\d{4})\.php$/', $base, $m)) {
+        $y = (int)$m[1];
+        $yearsMap[$y] = true;
+    }
+}
 
-$anio2024_total = 58;
-$anio2024_aprob = 37;
-$anio2024_porc  = $anio2024_total > 0 ? round($anio2024_aprob * 100 / $anio2024_total, 1) : 0;
+if (empty($yearsMap)) {
+    // fallback: si por algún motivo no hay archivos, usamos el año actual
+    $yearsMap[(int)date('Y')] = true;
+}
 
-$anio2023_total = 55;
-$anio2023_aprob = 29;
-$anio2023_porc  = $anio2023_total > 0 ? round($anio2023_aprob * 100 / $anio2023_total, 1) : 0;
+$allYears = array_keys($yearsMap);
+rsort($allYears);                       // más recientes primero
+$yearsToShow = array_slice($allYears, 0, 3);   // máximo 3 años
+
+/* ===== Datos demo de PAFB conocidos (podés después pasarlos a BD) ===== */
+$statsDemo = [
+    2025 => ['total' => 60, 'aprob' => 43],
+    2024 => ['total' => 58, 'aprob' => 37],
+    2023 => ['total' => 55, 'aprob' => 29],
+];
+
+function kpi_for_year(int $year, array $statsDemo): array {
+    if (isset($statsDemo[$year])) {
+        $t = (int)$statsDemo[$year]['total'];
+        $a = (int)$statsDemo[$year]['aprob'];
+        $p = $t > 0 ? round($a * 100 / $t, 1) : 0.0;
+        return [$t, $a, $p];
+    }
+    // si no hay datos, todo 0
+    return [0, 0, 0.0];
+}
 ?>
 <!doctype html>
 <html lang="es">
@@ -358,98 +380,69 @@ $anio2023_porc  = $anio2023_total > 0 ? round($anio2023_aprob * 100 / $anio2023_
 
     <div class="modules-grid">
 
-      <!-- 2025 -->
-      <div>
-        <a href="s3_adiestramiento_2025.php" class="card-link">
-          <article class="card-s3">
-            <div class="card-topline">
-              <div>
-                <div class="card-title">Año 2025</div>
-                <div class="card-sub">PAFB en ejecución.</div>
-              </div>
-              <div class="d-flex flex-column align-items-end gap-1">
-                <div class="card-icon">📈</div>
-                <span class="card-pill">Actual</span>
-              </div>
-            </div>
-            <div class="card-footer">
-              <div>
-                <div class="kpi-label">Aprobados</div>
-                <div class="kpi-num"><?= e($anio2025_porc) ?>%</div>
-              </div>
-              <div class="kpi-progress">
-                <span style="width: <?= e(max(0,min(100,$anio2025_porc))) ?>%;"></span>
-              </div>
-              <div class="kpi-tag">Ver año</div>
-            </div>
-          </article>
-        </a>
-      </div>
+      <?php
+      $currentYear = (int)date('Y');
 
-      <!-- 2024 -->
-      <div>
-        <a href="s3_adiestramiento_2024.php" class="card-link">
-          <article class="card-s3">
-            <div class="card-topline">
-              <div>
-                <div class="card-title">Año 2024</div>
-                <div class="card-sub">Resultados consolidados del año anterior.</div>
-              </div>
-              <div class="d-flex flex-column align-items-end gap-1">
-                <div class="card-icon">📊</div>
-                <span class="card-pill">Histórico</span>
-              </div>
-            </div>
-            <div class="card-footer">
-              <div>
-                <div class="kpi-label">Aprobados</div>
-                <div class="kpi-num"><?= e($anio2024_porc) ?>%</div>
-              </div>
-              <div class="kpi-progress">
-                <span style="width: <?= e(max(0,min(100,$anio2024_porc))) ?>%;"></span>
-              </div>
-              <div class="kpi-tag">Ver año</div>
-            </div>
-          </article>
-        </a>
-      </div>
+      foreach ($yearsToShow as $year):
+        [$total, $aprob, $porc] = kpi_for_year($year, $statsDemo);
 
-      <!-- 2023 -->
-      <div>
-        <a href="s3_adiestramiento_2023.php" class="card-link">
-          <article class="card-s3">
-            <div class="card-topline">
-              <div>
-                <div class="card-title">Año 2023</div>
-                <div class="card-sub">Referencias y antecedentes de PAFB.</div>
-              </div>
-              <div class="d-flex flex-column align-items-end gap-1">
-                <div class="card-icon">📚</div>
-                <span class="card-pill">Histórico</span>
-              </div>
-            </div>
-            <div class="card-footer">
-              <div>
-                <div class="kpi-label">Aprobados</div>
-                <div class="kpi-num"><?= e($anio2023_porc) ?>%</div>
-              </div>
-              <div class="kpi-progress">
-                <span style="width: <?= e(max(0,min(100,$anio2023_porc))) ?>%;"></span>
-              </div>
-              <div class="kpi-tag">Ver año</div>
-            </div>
-          </article>
-        </a>
-      </div>
+        // Texto/icono según el año
+        if ($year === $currentYear) {
+          $sub  = 'PAFB en ejecución.';
+          $pill = 'Actual';
+          $icon = '📈';
+        } elseif ($year === $currentYear - 1) {
+          $sub  = 'Resultados consolidados del año anterior.';
+          $pill = 'Histórico';
+          $icon = '📊';
+        } elseif ($year < $currentYear - 1) {
+          $sub  = 'Referencias y antecedentes de PAFB.';
+          $pill = 'Histórico';
+          $icon = '📚';
+        } else { // futuro
+          $sub  = 'Configurado a futuro (sin datos cargados).';
+          $pill = 'Programado';
+          $icon = '🗓️';
+        }
 
-      <!-- Nuevo año -->
+        $porc_clamped = max(0, min(100, $porc));
+      ?>
+        <div>
+          <a href="s3_adiestramiento_<?= e($year) ?>.php" class="card-link">
+            <article class="card-s3">
+              <div class="card-topline">
+                <div>
+                  <div class="card-title">Año <?= e($year) ?></div>
+                  <div class="card-sub"><?= e($sub) ?></div>
+                </div>
+                <div class="d-flex flex-column align-items-end gap-1">
+                  <div class="card-icon"><?= e($icon) ?></div>
+                  <span class="card-pill"><?= e($pill) ?></span>
+                </div>
+              </div>
+              <div class="card-footer">
+                <div>
+                  <div class="kpi-label">Aprobados</div>
+                  <div class="kpi-num"><?= e($porc) ?>%</div>
+                </div>
+                <div class="kpi-progress">
+                  <span style="width: <?= e($porc_clamped) ?>%;"></span>
+                </div>
+                <div class="kpi-tag">Ver año</div>
+              </div>
+            </article>
+          </a>
+        </div>
+      <?php endforeach; ?>
+
+      <!-- Tarjeta: Nuevo año -->
       <div>
         <a href="s3_adiestramiento_nuevo.php" class="card-link">
           <article class="card-s3">
             <div class="card-topline">
               <div>
                 <div class="card-title">Agregar nuevo año</div>
-                <div class="card-sub">Configurar PAFB para 2026 y siguientes.</div>
+                <div class="card-sub">Configurar PAFB para el próximo período.</div>
               </div>
               <div class="d-flex flex-column align-items-end gap-1">
                 <div class="card-icon">➕</div>

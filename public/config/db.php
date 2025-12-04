@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 $dsn  = 'mysql:host=127.0.0.1;dbname=inspecciones;charset=utf8mb4';
 $user = 'root';
-$pass = ''; // cambiá si tu XAMPP tiene otra clave
+$pass = ''; // cambiá si tu MariaDB tiene clave
 
 $pdo = new PDO($dsn, $user, $pass, [
     PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,

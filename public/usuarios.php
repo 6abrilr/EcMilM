@@ -33,9 +33,12 @@ try {
 } catch (Exception $ex) {
     // Fallback si la tabla areas no existe o falla
     $areasDisponibles = [
-        ['codigo'=>'S1','nombre'=>'S1'], ['codigo'=>'S2','nombre'=>'S2'],
-        ['codigo'=>'S3','nombre'=>'S3'], ['codigo'=>'S4','nombre'=>'S4'],
-        ['codigo'=>'S5','nombre'=>'S5'], ['codigo'=>'GRAL','nombre'=>'Gral']
+        ['codigo'=>'S1','nombre'=>'S1'],
+        ['codigo'=>'S2','nombre'=>'S2'],
+        ['codigo'=>'S3','nombre'=>'S3'],
+        ['codigo'=>'S4','nombre'=>'S4'],
+        ['codigo'=>'S5','nombre'=>'S5'],
+        ['codigo'=>'GRAL','nombre'=>'Gral']
     ];
 }
 
@@ -92,7 +95,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           $misAreas = $arrAreas[$id] ?? []; 
           $areasJson = json_encode($misAreas);
 
-          // Guardar nulos si están vacíos para ahorrar espacio (opcional)
           $stmt->execute([
             $rolComb !== '' ? $rolComb : null,
             $rolAdm  !== '' ? $rolAdm  : null,
@@ -162,6 +164,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 $searchDni = trim((string)($_GET['dni'] ?? ''));
 $searchNom = trim((string)($_GET['nombre'] ?? ''));
 
+// NUEVO: filtro por áreas (S1, S2, S3, GRAL, etc.)
+$filterAreas = $_GET['f_areas'] ?? [];
+if (!is_array($filterAreas)) {
+    $filterAreas = $filterAreas !== '' ? [$filterAreas] : [];
+}
+$filterAreas = array_values(array_filter(array_map('strval', $filterAreas), 'strlen'));
+
 // 4. TRAER REGISTROS PARA LA TABLA (con filtros)
 $rows   = [];
 $sql    = "SELECT * FROM roles_locales";
@@ -176,6 +185,15 @@ if ($searchDni !== '') {
 if ($searchNom !== '') {
     $conds[]  = "nombre_apellido LIKE ?";
     $params[] = '%' . $searchNom . '%';
+}
+
+// Aplico filtros de área usando el JSON de areas_acceso
+if (!empty($filterAreas)) {
+    foreach ($filterAreas as $fa) {
+        // Busca el código de área dentro del JSON, por ejemplo: "S3"
+        $conds[]  = "areas_acceso LIKE ?";
+        $params[] = '%"'. $fa .'"%';
+    }
 }
 
 if ($conds) {
@@ -229,12 +247,12 @@ ui_header('Gestión de usuarios', ['container'=>'xl', 'show_brand'=>false]);
   }
   .tbl input[type="text"]:focus{ outline:none; border-color:#22c55e; }
 
-  /* Checkboxes de Áreas */
+  /* Checkboxes de Áreas / chips */
   .areas-container {
       display: flex;
       flex-wrap: wrap;
       gap: 4px;
-      max-width: 300px;
+      max-width: 100%;
   }
   .area-check-label {
       font-size: 0.7rem;
@@ -256,12 +274,25 @@ ui_header('Gestión de usuarios', ['container'=>'xl', 'show_brand'=>false]);
   .role-select.role-admin{ border-color:#16a34a; color:#16a34a; }
   
   .btn-icon { padding: 2px 6px; font-size: 0.8rem; }
+
+  /* Botón Volver estándar */
+  .header-back {
+      margin-left:auto;
+      margin-right:17px;
+      margin-top:4px;
+  }
 </style>
 
 <div class="container mt-3">
-  <div class="d-flex align-items-center justify-content-between">
+  <div class="d-flex align-items-center">
     <h2 class="h5 mb-0">Gestión de usuarios</h2>
-    <a href="gestiones.php" class="btn btn-sm btn-outline-light">← Volver</a>
+    <div class="header-back">
+      <a href="gestiones.php"
+         class="btn btn-success btn-sm"
+         style="font-weight:700; padding:.35rem .9rem;">
+        Volver
+      </a>
+    </div>
   </div>
 
   <?php if ($mensaje !== ''): ?>
@@ -270,7 +301,7 @@ ui_header('Gestión de usuarios', ['container'=>'xl', 'show_brand'=>false]);
     </div>
   <?php endif; ?>
 
-  <!-- Buscador por DNI y Nombre -->
+  <!-- Buscador por DNI, Nombre y Áreas -->
   <form method="get" class="row g-2 align-items-end mt-3 mb-2">
     <div class="col-md-3">
       <label class="form-label">Buscar por DNI</label>
@@ -299,6 +330,28 @@ ui_header('Gestión de usuarios', ['container'=>'xl', 'show_brand'=>false]);
       <a href="usuarios.php" class="btn btn-outline-light btn-sm">
         ✖ Limpiar
       </a>
+    </div>
+
+    <div class="col-12 mt-2">
+      <label class="form-label">Filtrar por áreas (permisos)</label>
+      <div class="areas-container">
+        <?php foreach ($areasDisponibles as $area): 
+            $codigo = $area['codigo'];
+            $checkId = 'farea_' . $codigo;
+            $isChecked = in_array($codigo, $filterAreas, true);
+        ?>
+          <label class="area-check-label" for="<?= e($checkId) ?>">
+            <input
+              type="checkbox"
+              id="<?= e($checkId) ?>"
+              name="f_areas[]"
+              value="<?= e($codigo) ?>"
+              <?= $isChecked ? 'checked' : '' ?>
+            >
+            <?= e($codigo) ?>
+          </label>
+        <?php endforeach; ?>
+      </div>
     </div>
   </form>
 
@@ -387,6 +440,13 @@ ui_header('Gestión de usuarios', ['container'=>'xl', 'show_brand'=>false]);
         </table>
         <input type="hidden" name="delete_id" value="">
       </div>
+
+      <!-- Botones acomodados abajo de la tabla -->
+      <div class="mt-3 text-end">
+        <button type="submit" name="save_existing" class="btn btn-success btn-sm">
+          💾 Guardar Cambios
+        </button>
+      </div>
     </form>
   </div>
 
@@ -405,7 +465,7 @@ ui_header('Gestión de usuarios', ['container'=>'xl', 'show_brand'=>false]);
         </div>
 
         <div class="col-md-2">
-          <label classform-label">Grado</label>
+          <label class="form-label">Grado</label>
           <input type="text" name="new_grado" class="form-control form-control-sm">
         </div>
         

@@ -307,40 +307,69 @@ try {
      * =======================================================*/
     if ($section === 'cursos') {
 
-        $cursoSigla   = $_POST['curso_sigla']         ?? [];
-        $cursoDenom   = $_POST['curso_denominacion']  ?? [];
-        $cursoDesde   = $_POST['curso_desde']         ?? [];
-        $cursoHasta   = $_POST['curso_hasta']         ?? [];
-        $cursoCumplio = $_POST['curso_cumplio']       ?? [];
-        $cursoDoc     = $_POST['curso_doc']           ?? [];
-        $pdfActual    = $_POST['cursos_pdf_actual']   ?? [];
+        // === Datos que vienen del formulario (coinciden con s3_educacion_cursos.php) ===
+        $cursosSigla        = $_POST['cursos_sigla']         ?? [];
+        $cursosDenom        = $_POST['cursos_denominacion']  ?? [];
+        $cursosPart         = $_POST['cursos_participantes'] ?? [];
+        $cursosDesde        = $_POST['cursos_desde']         ?? [];
+        $cursosHasta        = $_POST['cursos_hasta']         ?? [];
+        $cursosCumplio      = $_POST['cursos_cumplio']       ?? [];
+        $cursosDocActual    = $_POST['cursos_doc_actual']    ?? [];
+        // Opcionales: por si más adelante agregás PDF de participantes
+        $cursosPdfActual    = $_POST['cursos_pdf_actual']    ?? [];
 
-        $ids = array_keys($cursoCumplio);
+        // Archivos de evidencia
+        $docFiles = $_FILES['cursos_file'] ?? null;   // documentos generales del curso
+        $pdfFiles = $_FILES['cursos_pdf']  ?? null;   // PDF de participantes (opcional futuro)
 
-        $sqlCurso = "UPDATE s3_cursos_regulares
-                     SET sigla             = :sigla,
-                         denominacion      = :denominacion,
-                         desde             = :desde,
-                         hasta             = :hasta,
-                         cumplio           = :cumplio,
-                         documento         = :documento,
-                         participantes_pdf = :participantes_pdf
-                     WHERE id = :id";
+        // Armar lista de IDs a partir de cualquier array
+        $ids = array_unique(array_merge(
+            array_keys($cursosSigla),
+            array_keys($cursosDenom),
+            array_keys($cursosPart),
+            array_keys($cursosDesde),
+            array_keys($cursosHasta),
+            array_keys($cursosCumplio),
+            array_keys($cursosDocActual),
+            array_keys($cursosPdfActual)
+        ));
+
+        $sqlCurso = "
+            UPDATE s3_cursos_regulares
+               SET sigla             = :sigla,
+                   denominacion      = :denominacion,
+                   participantes     = :participantes,
+                   desde             = :desde,
+                   hasta             = :hasta,
+                   cumplio           = :cumplio,
+                   documento         = :documento,
+                   participantes_pdf = :participantes_pdf
+             WHERE id = :id
+        ";
 
         $stmtCurso = $pdo->prepare($sqlCurso);
 
         foreach ($ids as $id) {
             $idInt = (int)$id;
-            if ($idInt <= 0) continue;
+            if ($idInt <= 0) {
+                continue;
+            }
 
-            $sigla  = trim((string)($cursoSigla[$id]        ?? ''));
-            $denom  = trim((string)($cursoDenom[$id]        ?? ''));
-            $desdeS = trim((string)($cursoDesde[$id]        ?? ''));
-            $hastaS = trim((string)($cursoHasta[$id]        ?? ''));
-            $cum    = trim((string)($cursoCumplio[$id]      ?? ''));
-            $docStr = trim((string)($cursoDoc[$id]          ?? ''));
-            $pdfStr = trim((string)($pdfActual[$id]         ?? ''));
+            $sigla        = trim((string)($cursosSigla[$id]         ?? ''));
+            $denom        = trim((string)($cursosDenom[$id]         ?? ''));
+            $partTxt      = (string)($cursosPart[$id]               ?? '');
+            $desdeS       = trim((string)($cursosDesde[$id]         ?? ''));
+            $hastaS       = trim((string)($cursosHasta[$id]         ?? ''));
+            $cum          = trim((string)($cursosCumplio[$id]       ?? ''));
+            $docStr       = trim((string)($cursosDocActual[$id]     ?? ''));
+            $pdfStr       = trim((string)($cursosPdfActual[$id]     ?? ''));
 
+            // Normalizar valor de cumplio (solo estos 3 estados)
+            if ($cum !== 'si' && $cum !== 'no' && $cum !== 'en_ejecucion') {
+                $cum = null;
+            }
+
+            // Normalizar fechas
             $desdeDb = null;
             if ($desdeS !== '') {
                 $ts = strtotime(str_replace(['/','.'], '-', $desdeS));
@@ -357,55 +386,63 @@ try {
                 }
             }
 
+            // Rutas actuales
             $docPath = $docStr;
             $pdfPath = $pdfStr;
 
             if ($handleFiles) {
                 // Documento general del curso
-                if (isset($_FILES['curso_doc_file']['error'][$id]) &&
-                    $_FILES['curso_doc_file']['error'][$id] === UPLOAD_ERR_OK) {
+                if ($docFiles &&
+                    isset($docFiles['error'][$id]) &&
+                    $docFiles['error'][$id] === UPLOAD_ERR_OK) {
 
-                    $origName = (string)$_FILES['curso_doc_file']['name'][$id];
-                    $tmpName  = (string)$_FILES['curso_doc_file']['tmp_name'][$id];
+                    $origName = (string)$docFiles['name'][$id];
+                    $tmpName  = (string)$docFiles['tmp_name'][$id];
 
-                    $safeName = 'curso_'.$idInt.'_doc_'.time().'_'.
-                        preg_replace('/[^A-Za-z0-9_.-]/','_', basename($origName));
+                    if (is_uploaded_file($tmpName)) {
+                        $safeName = 'curso_'.$idInt.'_doc_'.time().'_'.
+                            preg_replace('/[^A-Za-z0-9_.-]/','_', basename($origName));
 
-                    $destRel = $BASE_REL . '/' . $CURSOS_DOC_SUBDIR . '/' . $safeName;
-                    $destAbs = $BASE_DIR . '/' . $CURSOS_DOC_SUBDIR . '/' . $safeName;
+                        $destRel = $BASE_REL . '/' . $CURSOS_DOC_SUBDIR . '/' . $safeName;
+                        $destAbs = $BASE_DIR . '/' . $CURSOS_DOC_SUBDIR . '/' . $safeName;
 
-                    if (move_uploaded_file($tmpName, $destAbs)) {
-                        $docPath = $destRel;
+                        if (@move_uploaded_file($tmpName, $destAbs)) {
+                            $docPath = $destRel;
+                        }
                     }
                 }
 
-                // PDF de participantes
-                if (isset($_FILES['cursos_pdf']['error'][$id]) &&
-                    $_FILES['cursos_pdf']['error'][$id] === UPLOAD_ERR_OK) {
+                // PDF de participantes (opcional, por si lo agregás después)
+                if ($pdfFiles &&
+                    isset($pdfFiles['error'][$id]) &&
+                    $pdfFiles['error'][$id] === UPLOAD_ERR_OK) {
 
-                    $origName = (string)$_FILES['cursos_pdf']['name'][$id];
-                    $tmpName  = (string)$_FILES['cursos_pdf']['tmp_name'][$id];
+                    $origName = (string)$pdfFiles['name'][$id];
+                    $tmpName  = (string)$pdfFiles['tmp_name'][$id];
 
-                    $safeName = 'curso_'.$idInt.'_part_'.time().'_'.
-                        preg_replace('/[^A-Za-z0-9_.-]/','_', basename($origName));
+                    if (is_uploaded_file($tmpName)) {
+                        $safeName = 'curso_'.$idInt.'_part_'.time().'_'.
+                            preg_replace('/[^A-Za-z0-9_.-]/','_', basename($origName));
 
-                    $destRel = $BASE_REL . '/' . $CURSOS_PDF_SUBDIR . '/' . $safeName;
-                    $destAbs = $BASE_DIR . '/' . $CURSOS_PDF_SUBDIR . '/' . $safeName;
+                        $destRel = $BASE_REL . '/' . $CURSOS_PDF_SUBDIR . '/' . $safeName;
+                        $destAbs = $BASE_DIR . '/' . $CURSOS_PDF_SUBDIR . '/' . $safeName;
 
-                    if (move_uploaded_file($tmpName, $destAbs)) {
-                        $pdfPath = $destRel;
+                        if (@move_uploaded_file($tmpName, $destAbs)) {
+                            $pdfPath = $destRel;
+                        }
                     }
                 }
             }
 
             $stmtCurso->execute([
-                ':sigla'             => $sigla !== '' ? $sigla : null,
-                ':denominacion'      => $denom !== '' ? $denom : null,
+                ':sigla'             => $sigla        !== '' ? $sigla        : null,
+                ':denominacion'      => $denom        !== '' ? $denom        : null,
+                ':participantes'     => $partTxt      !== '' ? $partTxt      : null,
                 ':desde'             => $desdeDb,
                 ':hasta'             => $hastaDb,
-                ':cumplio'           => $cum !== '' ? $cum : null,
-                ':documento'         => $docPath !== '' ? $docPath : null,
-                ':participantes_pdf' => $pdfPath !== '' ? $pdfPath : null,
+                ':cumplio'           => $cum,
+                ':documento'         => $docPath      !== '' ? $docPath      : null,
+                ':participantes_pdf' => $pdfPath      !== '' ? $pdfPath      : null,
                 ':id'                => $idInt,
             ]);
         }

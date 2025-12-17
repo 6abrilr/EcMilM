@@ -16,6 +16,23 @@ function e($v){ return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'); }
 
 $user = function_exists('current_user') ? current_user() : null;
 
+/** @var PDO $pdo */
+// Igual que en S-1: si por algún motivo no hay $pdo, lo armamos de respaldo
+if (!isset($pdo) || !($pdo instanceof PDO)) {
+    if (function_exists('getDB')) {
+        $pdo = getDB();
+    } else {
+        $dsn    = 'mysql:host=127.0.0.1;dbname=inspecciones;charset=utf8mb4';
+        $userDb = 'root';
+        $passDb = '';
+        $pdo = new PDO($dsn, $userDb, $passDb, [
+            PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
+            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+            PDO::ATTR_EMULATE_PREPARES   => false,
+        ]);
+    }
+}
+
 /* ===== Assets ===== */
 $PUBLIC_URL = rtrim(str_replace('\\','/', dirname($_SERVER['SCRIPT_NAME'] ?? $_SERVER['PHP_SELF'])), '/');
 $APP_URL    = rtrim(str_replace('\\','/', dirname($PUBLIC_URL)), '/');
@@ -24,35 +41,46 @@ $IMG_BG     = $ASSETS_URL . '/img/fondo.png';
 $ESCUDO     = $ASSETS_URL . '/img/escudo_bcom602.png';
 
 /*
- * Resumen S-3 (MODO DEMO)
- * Estos valores después pueden venir de la BD sumando:
- * - educación de cuadros
- * - educación de tropa
- * - adiestramiento físico-militar
- * - tiro
+ * Resumen S-3
+ * Por ahora NO tenemos todavía un modelo real de:
+ *   - total de actividades de cuadros
+ *   - total de actividades de tropa
+ *   - total de adiestramiento físico-militar
+ *   - total de tiro
+ *
+ * Para no “inventar” datos, dejamos todos los totales y cumplidas en 0,
+ * hasta que los vinculemos con las tablas reales (s3_educacion_*, s3_adiestramiento, s3_tiro, etc.).
  */
-$totalCuadros = 20;
-$hechasCuadros = 10;
 
-$totalTropa = 30;
-$hechasTropa = 15;
+// Cuadros
+$totalCuadros  = 0;
+$hechasCuadros = 0;
 
-$totalAdies = 60;
-$hechasAdies = 43;
+// Tropa
+$totalTropa  = 0;
+$hechasTropa = 0;
 
-$totalTiro = 70;
-$hechasTiro = 52;
+// Adiestramiento físico-militar
+$totalAdies  = 0;
+$hechasAdies = 0;
 
-$totalActiv = $totalCuadros + $totalTropa + $totalAdies + $totalTiro;
+// Tiro
+$totalTiro  = 0;
+$hechasTiro = 0;
+
+// Totales globales
+$totalActiv  = $totalCuadros + $totalTropa + $totalAdies + $totalTiro;
 $hechasActiv = $hechasCuadros + $hechasTropa + $hechasAdies + $hechasTiro;
 
-$porcCuadros = $totalCuadros > 0 ? round($hechasCuadros * 100 / $totalCuadros, 1) : 0;
-$porcTropa   = $totalTropa   > 0 ? round($hechasTropa   * 100 / $totalTropa,   1) : 0;
-$porcAdies   = $totalAdies   > 0 ? round($hechasAdies   * 100 / $totalAdies,   1) : 0;
-$porcTiro    = $totalTiro    > 0 ? round($hechasTiro    * 100 / $totalTiro,    1) : 0;
+// Porcentajes (quedan todos en 0 hasta que tengamos datos reales)
+$porcCuadros = $totalCuadros > 0 ? round($hechasCuadros * 100 / $totalCuadros, 1) : 0.0;
+$porcTropa   = $totalTropa   > 0 ? round($hechasTropa   * 100 / $totalTropa,   1) : 0.0;
+$porcAdies   = $totalAdies   > 0 ? round($hechasAdies   * 100 / $totalAdies,   1) : 0.0;
+$porcTiro    = $totalTiro    > 0 ? round($hechasTiro    * 100 / $totalTiro,    1) : 0.0;
 
-$porcGlobal  = $totalActiv   > 0 ? round($hechasActiv   * 100 / $totalActiv,   1) : 0;
+$porcGlobal  = $totalActiv   > 0 ? round($hechasActiv   * 100 / $totalActiv,   1) : 0.0;
 ?>
+
 <!doctype html>
 <html lang="es">
 <head>

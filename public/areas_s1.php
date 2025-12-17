@@ -16,6 +16,23 @@ function e($v){ return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'); }
 
 $user = function_exists('current_user') ? current_user() : null;
 
+/** @var PDO $pdo */
+// Igual que en s1_personal.php: si por algún motivo no hay $pdo, lo armamos
+if (!isset($pdo) || !($pdo instanceof PDO)) {
+    if (function_exists('getDB')) {
+        $pdo = getDB();
+    } else {
+        $dsn    = 'mysql:host=127.0.0.1;dbname=inspecciones;charset=utf8mb4';
+        $userDb = 'root';
+        $passDb = '';
+        $pdo = new PDO($dsn, $userDb, $passDb, [
+            PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
+            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+            PDO::ATTR_EMULATE_PREPARES   => false,
+        ]);
+    }
+}
+
 /* ===== Assets ===== */
 $PUBLIC_URL = rtrim(str_replace('\\','/', dirname($_SERVER['SCRIPT_NAME'] ?? $_SERVER['PHP_SELF'])), '/');
 $APP_URL    = rtrim(str_replace('\\','/', dirname($PUBLIC_URL)), '/');
@@ -24,23 +41,38 @@ $IMG_BG     = $ASSETS_URL . '/img/fondo.png';
 $ESCUDO     = $ASSETS_URL . '/img/escudo_bcom602.png';
 
 /*
- * Resumen S-1 (MODO DEMO)
- * Después podemos reemplazar estos valores por consultas reales a:
- *  - personal_bcom602
- *  - otros módulos de S-1
+ * Resumen S-1
+ *  - totalPersonal: se calcula desde la tabla real `personal_unidad`
+ *  - en servicio / licencia / bajas: por ahora 0 hasta que tengamos columnas reales
  */
-$totalPersonal      = 200;  // personal total
-$personalActivo     = 180;  // en servicio
-$personalLicencia   = 15;   // en LIC
-$personalBaja       = 5;    // baja
-$personalOtros      = $totalPersonal - ($personalActivo + $personalLicencia + $personalBaja);
 
-$porcActivo   = $totalPersonal > 0 ? round($personalActivo   * 100 / $totalPersonal, 1) : 0;
-$porcLicencia = $totalPersonal > 0 ? round($personalLicencia * 100 / $totalPersonal, 1) : 0;
-$porcBaja     = $totalPersonal > 0 ? round($personalBaja     * 100 / $totalPersonal, 1) : 0;
+$totalPersonal = 0;
 
-$porcGlobal   = $totalPersonal > 0 ? round($personalActivo * 100 / $totalPersonal, 1) : 0;
+try {
+    // Cuenta directa sobre la tabla que usa s1_personal.php
+    $stmt = $pdo->query("SELECT COUNT(*) FROM personal_unidad");
+    $totalPersonal = (int)($stmt->fetchColumn() ?: 0);
+} catch (Throwable $e) {
+    // Si algo falla, no rompemos la página; queda en 0
+    $totalPersonal = 0;
+}
+
+// Por ahora NO tenemos columnas para discriminar servicio / licencia / baja
+$personalActivo   = 0;
+$personalLicencia = 0;
+$personalBaja     = 0;
+$personalOtros    = max($totalPersonal - ($personalActivo + $personalLicencia + $personalBaja), 0);
+
+$porcActivo   = $totalPersonal > 0 ? round($personalActivo   * 100 / $totalPersonal, 1) : 0.0;
+$porcLicencia = $totalPersonal > 0 ? round($personalLicencia * 100 / $totalPersonal, 1) : 0.0;
+$porcBaja     = $totalPersonal > 0 ? round($personalBaja     * 100 / $totalPersonal, 1) : 0.0;
+
+// El donut del centro muestra "personal en servicio".
+// Como todavía no tenemos ese dato, lo dejamos en 0% aunque haya personal cargado.
+$porcGlobal   = $totalPersonal > 0 ? round($personalActivo * 100 / $totalPersonal, 1) : 0.0;
 ?>
+
+
 <!doctype html>
 <html lang="es">
 <head>
@@ -326,7 +358,6 @@ $porcGlobal   = $totalPersonal > 0 ? round($personalActivo * 100 / $totalPersona
                   <div class="accordion-body">
                     Base de datos centralizada del personal (grado, arma, destino, situación, etc.).
                     <div class="mt-2">
-                      <!-- después apuntamos al CRUD real de personal -->
                       <a href="s1_personal.php" class="gest-btn">Entrar</a>
                     </div>
                   </div>
@@ -390,9 +421,10 @@ $porcGlobal   = $totalPersonal > 0 ? round($personalActivo * 100 / $totalPersona
                   en servicio, en licencia, baja u otras situaciones.
                 </p>
                 <p>
-                  Los valores mostrados se encuentran en <strong>modo demostración</strong>.
-                  Más adelante se reemplazarán por datos reales provenientes de la base
-                  <code>personal_bcom602</code> y otros registros del área <strong>S-1 Personal</strong>.
+                  El <strong>total de personal</strong> ya se obtiene desde la tabla
+                  <code>personal_unidad</code>. La distribución por situación (servicio,
+                  licencia, bajas) continuará en modo demostración hasta que definamos
+                  los campos reales en la base.
                 </p>
               </div>
 

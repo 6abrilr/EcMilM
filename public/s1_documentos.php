@@ -84,7 +84,6 @@ if ($id <= 0) {
     <link rel="stylesheet" href="../assets/css/theme-602.css">
     <link rel="icon" type="image/png" href="../assets/img/bcom602.png">
     <style>
-      
       body{
         background: url("<?= e($IMG_BG) ?>") no-repeat center center fixed;
         background-size: cover;
@@ -124,7 +123,6 @@ if ($id <= 0) {
         --bs-table-border-color: rgba(148,163,184,.4);
         color:#e5e7eb;
       }
-      
     </style>
     </head>
     <body>
@@ -222,8 +220,10 @@ if ($id <= 0) {
 $persona        = null;
 $sanidadResumen = ['cant'=>0,'ult_parte'=>null];
 $docsPartes     = [];
-$partesEnfermo  = [];   // ⬅️ NUEVO
+$docsAlta       = [];
+$partesEnfermo  = [];
 $fotoPerfilUrl  = '';
+$tieneParteActivo = false; // NUEVO: indica si hay parte abierto
 
 try {
     /** @var PDO $pdo */
@@ -455,8 +455,128 @@ try {
             ]);
 
             $mensajeOk = 'Documento de parte de enfermo cargado correctamente.';
-                    } elseif ($accion === 'eliminar_parte_enfermo') {
-            // Eliminar un parte de enfermo existente
+
+        } elseif ($accion === 'agregar_doc_alta_parte') {
+
+            // Verificamos que la persona tenga al menos un parte de enfermo
+            $cntPartesStmt = $pdo->prepare(
+                "SELECT COUNT(*) AS c FROM sanidad_partes_enfermo WHERE personal_id = :pid"
+            );
+            $cntPartesStmt->execute([':pid' => $id]);
+            $rowCnt = $cntPartesStmt->fetch(PDO::FETCH_ASSOC);
+            $tienePartesActual = isset($rowCnt['c']) ? (int)$rowCnt['c'] : 0;
+
+            if ($tienePartesActual <= 0) {
+                throw new RuntimeException(
+                    'No se puede cargar un alta de parte de enfermo porque este legajo aún no tiene partes de enfermo cargados.'
+                );
+            }
+
+            // Sanidad: ALTA de parte de enfermo (uno o varios archivos)
+            if (!isset($_FILES['archivo_alta'])) {
+                throw new RuntimeException('Debe seleccionar al menos un archivo de alta de parte de enfermo.');
+            }
+
+            $nombres = $_FILES['archivo_alta']['name'];
+            $tmpNames= $_FILES['archivo_alta']['tmp_name'];
+            $errores = $_FILES['archivo_alta']['error'];
+
+            if (!is_array($nombres)) {
+                // Por seguridad, lo tratamos como un único archivo igual
+                $nombres = [$nombres];
+                $tmpNames= [$tmpNames];
+                $errores = [$errores];
+            }
+
+            // Datos comunes para todos los archivos
+            $descDoc  = trim((string)($_POST['descripcion_doc_alta'] ?? 'Alta de parte de enfermo'));
+            $fechaDoc = trim((string)($_POST['fecha_doc_alta'] ?? ''));
+
+            $fechaDocumento = null;
+            if ($fechaDoc !== '') {
+                $txt = str_replace(['/','.'], '-', $fechaDoc);
+                $ts  = strtotime($txt);
+                if ($ts !== false) {
+                    $fechaDocumento = date('Y-m-d', $ts);
+                }
+            }
+
+            $uploadRel = 'storage/personal_sanidad';
+            $uploadDir = $PROJECT_BASE . '/' . $uploadRel;
+            if (!is_dir($uploadDir)) {
+                @mkdir($uploadDir, 0775, true);
+            }
+
+            $subidos = 0;
+
+            foreach ($nombres as $idx => $nombreOriginal) {
+                if ($nombreOriginal === '' && ($errores[$idx] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_NO_FILE) {
+                    continue; // nada en esta posición
+                }
+
+                if (($errores[$idx] ?? UPLOAD_ERR_OK) !== UPLOAD_ERR_OK) {
+                    throw new RuntimeException('Error al subir uno de los archivos de alta (código ' . $errores[$idx] . ').');
+                }
+
+                $tmpName = $tmpNames[$idx];
+
+                // Nombre seguro
+                $safeName = preg_replace('/[^A-Za-z0-9_\.-]/', '_', (string)$nombreOriginal);
+                if ($safeName === '') {
+                    $safeName = 'alta_parte_enfermo.pdf';
+                }
+
+                $destRel  = $uploadRel . '/' . time() . '_' . $id . '_' . $safeName;
+                $destPath = $PROJECT_BASE . '/' . $destRel;
+
+                if (!move_uploaded_file($tmpName, $destPath)) {
+                    throw new RuntimeException('No se pudo mover uno de los archivos de alta subidos.');
+                }
+
+                $hash = @sha1_file($destPath) ?: null;
+
+                $ins = $pdo->prepare(
+                    "INSERT INTO personal_documentos
+                     (personal_id, tipo, descripcion, nombre_archivo, ruta, hash_sha1, fecha_documento,
+                      creado_en, creado_por)
+                     VALUES (:pid, :tipo, :desc, :nombre, :ruta, :hash, :fecha_doc, NOW(), :creado_por)"
+                );
+                $ins->execute([
+                    ':pid'        => $id,
+                    ':tipo'       => 'alta_parte_enfermo',
+                    ':desc'       => $descDoc !== '' ? $descDoc : 'Alta de parte de enfermo',
+                    ':nombre'     => $nombreOriginal,
+                    ':ruta'       => $destRel,
+                    ':hash'       => $hash,
+                    ':fecha_doc'  => $fechaDocumento,
+                    ':creado_por' => $userAudit,
+                ]);
+
+                $subidos++;
+            }
+
+            if ($subidos === 0) {
+                throw new RuntimeException('No se cargó ningún archivo de alta de parte de enfermo.');
+            }
+
+            // >>> NUEVO: cerrar automáticamente los partes abiertos de este personal
+            // Lógica: cualquier parte con fecha_fin NULL pasa a "cerrado" con la fecha del alta (si la hay)
+            $fechaCierre = $fechaDocumento ?: date('Y-m-d');
+            $updCierre = $pdo->prepare(
+                "UPDATE sanidad_partes_enfermo
+                 SET fecha_fin = :fecha_cierre
+                 WHERE personal_id = :pid AND fecha_fin IS NULL"
+            );
+            $updCierre->execute([
+                ':fecha_cierre' => $fechaCierre,
+                ':pid'          => $id,
+            ]);
+            // <<< FIN NUEVO
+
+            $mensajeOk = "Se cargaron {$subidos} archivo(s) de alta de parte de enfermo correctamente.";
+
+        } elseif ($accion === 'eliminar_parte_enfermo') {
+            // Eliminar un parte de enfermo existente (solo manualmente, no automático)
             $parteId = isset($_POST['parte_id']) ? (int)$_POST['parte_id'] : 0;
 
             if ($parteId <= 0) {
@@ -541,7 +661,6 @@ try {
             $stmt = $pdo->prepare("SELECT * FROM personal_unidad WHERE id = :id");
             $stmt->execute([':id' => $id]);
             $persona = $stmt->fetch(PDO::FETCH_ASSOC);
-            
         }
     }
 
@@ -555,7 +674,18 @@ try {
     $stmt->execute([':pid' => $id]);
     $sanidadResumen = $stmt->fetch(PDO::FETCH_ASSOC) ?: ['cant'=>0,'ult_parte'=>null];
     $tieneParte = ($sanidadResumen['cant'] ?? 0) > 0;
-        /* ===== Sanidad: listado de partes de enfermo ===== */
+
+    // NUEVO: verificar si hay al menos un parte ABIERTO (fecha_fin IS NULL)
+    $abiertosStmt = $pdo->prepare(
+        "SELECT COUNT(*) AS abiertos
+         FROM sanidad_partes_enfermo
+         WHERE personal_id = :pid AND fecha_fin IS NULL"
+    );
+    $abiertosStmt->execute([':pid' => $id]);
+    $rowAbiertos = $abiertosStmt->fetch(PDO::FETCH_ASSOC);
+    $tieneParteActivo = isset($rowAbiertos['abiertos']) && (int)$rowAbiertos['abiertos'] > 0;
+
+    /* ===== Sanidad: listado de partes de enfermo ===== */
     $partesStmt = $pdo->prepare(
         "SELECT id, fecha_inicio, fecha_fin, diagnostico, detalle, creado_en
          FROM sanidad_partes_enfermo
@@ -565,7 +695,7 @@ try {
     $partesStmt->execute([':pid' => $id]);
     $partesEnfermo = $partesStmt->fetchAll(PDO::FETCH_ASSOC);
 
-    /* ===== Documentos de sanidad ===== */
+    /* ===== Documentos de sanidad (PARTES) ===== */
     $docsStmt = $pdo->prepare(
         "SELECT id, descripcion, nombre_archivo, ruta, fecha_documento, creado_en
          FROM personal_documentos
@@ -574,6 +704,16 @@ try {
     );
     $docsStmt->execute([':pid' => $id]);
     $docsPartes = $docsStmt->fetchAll(PDO::FETCH_ASSOC);
+
+    /* ===== Documentos de ALTA de partes de enfermo ===== */
+    $docsAltaStmt = $pdo->prepare(
+        "SELECT id, descripcion, nombre_archivo, ruta, fecha_documento, creado_en
+         FROM personal_documentos
+         WHERE personal_id = :pid AND tipo = 'alta_parte_enfermo'
+         ORDER BY fecha_documento DESC, id DESC"
+    );
+    $docsAltaStmt->execute([':pid' => $id]);
+    $docsAlta = $docsAltaStmt->fetchAll(PDO::FETCH_ASSOC);
 
     /* ===== Foto de perfil ===== */
     $fotoStmt = $pdo->prepare(
@@ -933,10 +1073,12 @@ try {
                 <div class="col-md-4">
                   <label class="form-label form-label-sm d-block">Tiene parte de enfermo</label>
                   <div class="small">
-                    <?php if ($tieneParte): ?>
-                      <span class="badge bg-success badge-pill">Sí</span>
-                    <?php else: ?>
+                    <?php if (!$tieneParte): ?>
                       <span class="badge bg-secondary badge-pill">No</span>
+                    <?php elseif ($tieneParteActivo): ?>
+                      <span class="badge bg-warning text-dark badge-pill">Sí, con parte activo</span>
+                    <?php else: ?>
+                      <span class="badge bg-success badge-pill">Sí, todos cerrados</span>
                     <?php endif; ?>
                   </div>
                 </div>
@@ -994,10 +1136,12 @@ try {
             <div class="d-flex flex-wrap gap-2 mb-2 small">
               <div>
                 <span class="text-white">Tiene parte de enfermo:</span>
-                <?php if ($tieneParte): ?>
-                  <span class="badge bg-success badge-pill">Sí</span>
-                <?php else: ?>
+                <?php if (!$tieneParte): ?>
                   <span class="badge bg-secondary badge-pill">No</span>
+                <?php elseif ($tieneParteActivo): ?>
+                  <span class="badge bg-warning text-dark badge-pill">Sí, con parte activo</span>
+                <?php else: ?>
+                  <span class="badge bg-success badge-pill">Sí, todos cerrados</span>
                 <?php endif; ?>
               </div>
               <div>
@@ -1063,63 +1207,71 @@ try {
             <div class="section-title">Sanidad · Documentos de partes</div>
             <div class="section-sub">
               Subir documentos asociados a partes de enfermo (certificados, Anexo 27, etc.).
-</div>
+            </div>
 
-<?php if ($partesEnfermo): ?>
-  <hr class="border-secondary-subtle my-3">
+            <?php if ($partesEnfermo): ?>
+              <hr class="border-secondary-subtle my-3">
 
-  <div class="section-title">Partes cargados</div>
+              <div class="section-title">Partes cargados</div>
 
-  <ul class="list-group list-group-flush small">
-    <?php foreach ($partesEnfermo as $p): ?>
-      <li class="list-group-item bg-transparent text-light border-secondary-subtle py-1 px-2">
-        <div class="d-flex justify-content-between align-items-start">
-          <div>
-            <strong>
-              <?php if (!empty($p['fecha_inicio'])): ?>
-                <?= date('d/m/Y', strtotime($p['fecha_inicio'])) ?>
-              <?php endif; ?>
-              <?php if (!empty($p['fecha_fin'])): ?>
-                &nbsp;-&nbsp;<?= date('d/m/Y', strtotime($p['fecha_fin'])) ?>
-              <?php endif; ?>
-            </strong><br>
+              <ul class="list-group list-group-flush small">
+                <?php foreach ($partesEnfermo as $p): ?>
+                  <?php $estaCerrado = !empty($p['fecha_fin']); ?>
+                  <li class="list-group-item bg-transparent text-light border-secondary-subtle py-1 px-2">
+                    <div class="d-flex justify-content-between align-items-start">
+                      <div>
+                        <strong>
+                          <?php if (!empty($p['fecha_inicio'])): ?>
+                            <?= date('d/m/Y', strtotime($p['fecha_inicio'])) ?>
+                          <?php endif; ?>
+                          <?php if (!empty($p['fecha_fin'])): ?>
+                            &nbsp;-&nbsp;<?= date('d/m/Y', strtotime($p['fecha_fin'])) ?>
+                          <?php endif; ?>
+                        </strong>
+                        <?php if ($estaCerrado): ?>
+                          &nbsp;<span class="badge bg-success badge-pill">Cerrado</span>
+                        <?php else: ?>
+                          &nbsp;<span class="badge bg-warning text-dark badge-pill">Abierto</span>
+                        <?php endif; ?>
+                        <br>
 
-            <?php if (!empty($p['diagnostico'])): ?>
-              <span>Motivo: <?= e($p['diagnostico']) ?></span><br>
+                        <?php if (!empty($p['diagnostico'])): ?>
+                          <span>Motivo: <?= e($p['diagnostico']) ?></span><br>
+                        <?php endif; ?>
+
+                        <?php if (!empty($p['detalle'])): ?>
+                          <span class="text-break">Obs: <?= e($p['detalle']) ?></span><br>
+                        <?php endif; ?>
+
+                        <?php if (!empty($p['creado_en'])): ?>
+                          <span class="small">Cargado: <?= e($p['creado_en']) ?></span>
+                        <?php endif; ?>
+                      </div>
+
+                      <div class="ms-2">
+                        <form method="post" class="form-eliminar-parte d-inline">
+                          <?php if (function_exists('csrf_input')) csrf_input(); ?>
+                          <input type="hidden" name="accion" value="eliminar_parte_enfermo">
+                          <input type="hidden" name="parte_id" value="<?= e($p['id']) ?>">
+                          <button type="button"
+                                  class="btn btn-outline-danger btn-sm py-0 px-2 btn-delete-parte">
+                            Borrar
+                          </button>
+                        </form>
+                      </div>
+                    </div>
+                  </li>
+                <?php endforeach; ?>
+              </ul>
+            <?php else: ?>
+              <div class="small text-white mb-2">
+                Aún no hay partes de enfermo cargados para esta persona.
+              </div>
             <?php endif; ?>
 
-            <?php if (!empty($p['detalle'])): ?>
-              <span class="text-break">Obs: <?= e($p['detalle']) ?></span><br>
-            <?php endif; ?>
+            <hr class="border-secondary-subtle my-3">
 
-            <?php if (!empty($p['creado_en'])): ?>
-              <span class="small">Cargado: <?= e($p['creado_en']) ?></span>
-            <?php endif; ?>
-          </div>
-
-          <div class="ms-2">
-            <form method="post" class="form-eliminar-parte d-inline">
-              <?php if (function_exists('csrf_input')) csrf_input(); ?>
-              <input type="hidden" name="accion" value="eliminar_parte_enfermo">
-              <input type="hidden" name="parte_id" value="<?= e($p['id']) ?>">
-              <button type="button"
-                      class="btn btn-outline-danger btn-sm py-0 px-2 btn-delete-parte">
-                Borrar
-              </button>
-            </form>
-          </div>
-        </div>
-      </li>
-    <?php endforeach; ?>
-  </ul>
-<?php else: ?>
-  <div class="small">
-    Aún no hay partes de enfermo cargados para esta persona.
-  </div>
-<?php endif; ?>
-
-
-            <!-- Subir documento -->
+            <!-- Formularios y documentos de PARTES -->
             <form method="post" enctype="multipart/form-data" class="mb-3">
               <?php if (function_exists('csrf_input')) csrf_input(); ?>
               <input type="hidden" name="accion" value="agregar_doc_parte">
@@ -1154,7 +1306,7 @@ try {
             </form>
 
             <?php if ($docsPartes): ?>
-              <div class="small text-white mb-1">Documentos cargados:</div>
+              <div class="small text-white mb-1">Documentos de partes cargados:</div>
               <ul class="list-group list-group-flush small">
                 <?php foreach ($docsPartes as $d): ?>
                   <li class="list-group-item bg-transparent text-light border-secondary-subtle py-1 px-2">
@@ -1188,6 +1340,96 @@ try {
                 Aún no hay documentos de partes de enfermo cargados para esta persona.
               </div>
             <?php endif; ?>
+
+            <hr class="border-secondary-subtle my-3">
+
+            <!-- ALTA de parte de enfermo: sólo si tiene partes -->
+            <?php if ($tieneParte): ?>
+
+              <div class="section-title">Alta de parte de enfermo</div>
+              <div class="section-sub">
+                Cargar los documentos de alta médica correspondientes a los partes de enfermo.
+                Al subir el alta se cierran automáticamente los partes abiertos.
+              </div>
+
+              <form method="post" enctype="multipart/form-data" class="mb-3">
+                <?php if (function_exists('csrf_input')) csrf_input(); ?>
+                <input type="hidden" name="accion" value="agregar_doc_alta_parte">
+
+                <div class="row g-2 mb-2">
+                  <div class="col-md-6">
+                    <label class="form-label form-label-sm">Fecha del alta</label>
+                    <input type="date" name="fecha_doc_alta"
+                           class="form-control form-control-sm">
+                  </div>
+                  <div class="col-md-6">
+                    <label class="form-label form-label-sm">Descripción</label>
+                    <input type="text" name="descripcion_doc_alta"
+                           class="form-control form-control-sm"
+                           placeholder="Ej: Alta médica, Alta Anexo 27">
+                  </div>
+                </div>
+
+                <div class="mb-2">
+                  <label class="form-label form-label-sm">Archivo(s) de alta</label>
+                  <input type="file" name="archivo_alta[]" class="form-control form-control-sm" multiple required>
+                  <div class="form-text text-white">
+                    Podés seleccionar uno o varios archivos (PDF o imágenes). Se guardan en el legajo de sanidad del personal.
+                  </div>
+                </div>
+
+                <div class="text-end">
+                  <button type="submit" class="btn btn-outline-success btn-sm">
+                    Subir alta(s)
+                  </button>
+                </div>
+              </form>
+
+              <?php if ($docsAlta): ?>
+                <div class="small text-white mb-1">Altas de partes de enfermo cargadas:</div>
+                <ul class="list-group list-group-flush small">
+                  <?php foreach ($docsAlta as $d): ?>
+                    <li class="list-group-item bg-transparent text-light border-secondary-subtle py-1 px-2">
+                      <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                          <strong><?= e($d['descripcion'] ?? $d['nombre_archivo']) ?></strong><br>
+                          <span class="text-white">
+                            <?= isset($d['fecha_documento']) && $d['fecha_documento']
+                                ? 'Fecha alta: ' . date('d/m/Y', strtotime($d['fecha_documento']))
+                                : 'Fecha alta: —' ?>
+                            &nbsp; · &nbsp;
+                            <?= isset($d['creado_en']) && $d['creado_en']
+                                ? 'Cargado: ' . e($d['creado_en'])
+                                : '' ?>
+                          </span>
+                        </div>
+                        <?php if (!empty($d['ruta'])): ?>
+                          <div>
+                            <a href="../<?= e($d['ruta']) ?>" target="_blank"
+                               class="btn btn-sm btn-outline-light py-0 px-2">
+                              Ver
+                            </a>
+                          </div>
+                        <?php endif; ?>
+                      </div>
+                    </li>
+                  <?php endforeach; ?>
+                </ul>
+              <?php else: ?>
+                <div class="small text-white">
+                  Aún no hay documentos de alta de parte de enfermo cargados para esta persona.
+                </div>
+              <?php endif; ?>
+
+            <?php else: ?>
+
+              <div class="small text-white">
+                Para habilitar el alta de parte de enfermo primero debe registrarse al menos
+                un parte de enfermo para este personal.
+              </div>
+
+            <?php endif; ?>
+
           </div>
         </div>
       </div>
@@ -1199,11 +1441,7 @@ try {
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-</body>
-</html>
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-
 <script>
 document.addEventListener('DOMContentLoaded', function () {
   document.querySelectorAll('.form-eliminar-parte').forEach(function (form) {
@@ -1231,3 +1469,5 @@ document.addEventListener('DOMContentLoaded', function () {
   });
 });
 </script>
+</body>
+</html>

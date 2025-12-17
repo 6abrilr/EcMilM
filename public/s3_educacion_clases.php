@@ -1,5 +1,5 @@
 <?php
-// public/s3_educacion_clases.php — Clases (Programa anual) · S-3
+// public/s3_educacion_cursos.php — S-3 Educación · Cursos regulares
 declare(strict_types=1);
 
 // ========= MODO PRODUCCIÓN / EJÉRCITO =========
@@ -18,6 +18,7 @@ s3_ensure_tables($pdo);
 
 function e($v){ return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'); }
 
+/* ===== Usuario ===== */
 if (!function_exists('user_display_name')) {
     function user_display_name(): string {
         $u = $_SESSION['user'] ?? [];
@@ -31,48 +32,95 @@ if (!function_exists('user_display_name')) {
     }
 }
 
+/* ===== Base de storage para evidencias (cursos) ===== */
+$BASE_REL      = 'storage/s3_educacion';
+$DOC_SUBDIR    = 'cursos_docs';
+$PDF_SUBDIR    = 'cursos_participantes';
+$BASE_DIR      = realpath(__DIR__ . '/../' . $BASE_REL);
+if ($BASE_DIR === false) {
+    $BASE_DIR = __DIR__ . '/../' . $BASE_REL;
+}
+if (!is_dir($BASE_DIR)) {
+    @mkdir($BASE_DIR, 0775, true);
+}
+if (!is_dir($BASE_DIR . '/' . $DOC_SUBDIR)) {
+    @mkdir($BASE_DIR . '/' . $DOC_SUBDIR, 0775, true);
+}
+if (!is_dir($BASE_DIR . '/' . $PDF_SUBDIR)) {
+    @mkdir($BASE_DIR . '/' . $PDF_SUBDIR, 0775, true);
+}
+
 /* ===== Procesar altas / bajas rápidas (POST local a este mismo archivo) ===== */
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $accion = $_POST['accion'] ?? '';
 
-    /* Alta rápida de nueva clase */
-    if ($accion === 'nueva_clase') {
-        $semana           = trim((string)($_POST['nueva_semana'] ?? ''));
-        $fecha            = trim((string)($_POST['nueva_fecha'] ?? ''));
-        $claseTrabajo     = trim((string)($_POST['nueva_clase_trabajo'] ?? ''));
-        $temaNuevo        = trim((string)($_POST['nueva_tema'] ?? ''));
-        $responsableNuevo = trim((string)($_POST['nueva_responsable'] ?? ''));
-        $lugarNuevo       = trim((string)($_POST['nueva_lugar'] ?? ''));
+    /* Alta rápida de nuevo curso regular */
+    if ($accion === 'nuevo_curso') {
+        $sigla        = trim((string)($_POST['nueva_sigla'] ?? ''));
+        $denominacion = trim((string)($_POST['nueva_denominacion'] ?? ''));
+        $desde        = trim((string)($_POST['nuevo_desde'] ?? ''));
+        $hasta        = trim((string)($_POST['nuevo_hasta'] ?? ''));
 
-        // Si hay algo cargado, damos de alta
-        if ($temaNuevo !== '' || $claseTrabajo !== '' || $responsableNuevo !== '') {
+        // Participantes: vienen como array participantes_nombres[]
+        $participantesArr = [];
+        if (isset($_POST['participantes_nombres']) && is_array($_POST['participantes_nombres'])) {
+            foreach ($_POST['participantes_nombres'] as $pNombre) {
+                $pNombre = trim((string)$pNombre);
+                if ($pNombre !== '') {
+                    $participantesArr[] = $pNombre;
+                }
+            }
+        }
+        $participantes = implode("\n", $participantesArr);
+
+        // Normalizar fechas (YYYY-MM-DD o null)
+        $desdeDb = null;
+        if ($desde !== '') {
+            $ts = strtotime(str_replace(['/','.'], '-', $desde));
+            if ($ts !== false) {
+                $desdeDb = date('Y-m-d', $ts);
+            }
+        }
+        $hastaDb = null;
+        if ($hasta !== '') {
+            $ts = strtotime(str_replace(['/','.'], '-', $hasta));
+            if ($ts !== false) {
+                $hastaDb = date('Y-m-d', $ts);
+            }
+        }
+
+        // Solo inserto si tiene algo cargado
+        if ($sigla !== '' || $denominacion !== '' || !empty($participantesArr)) {
+
+            // Inserto el curso (sin PDF de participantes; esta página no lo usa)
             $sqlIns = "
-                INSERT INTO s3_clases (semana, fecha, clase_trabajo, tema, responsable, lugar)
-                VALUES (:semana, :fecha, :clase_trabajo, :tema, :responsable, :lugar)
+                INSERT INTO s3_cursos_regulares
+                    (sigla, denominacion, participantes, desde, hasta, participantes_pdf)
+                VALUES
+                    (:sigla, :denominacion, :participantes, :desde, :hasta, NULL)
             ";
             $stmtIns = $pdo->prepare($sqlIns);
             $stmtIns->execute([
-                ':semana'        => $semana !== '' ? $semana : null,
-                ':fecha'         => ($fecha !== '' ? $fecha : null),
-                ':clase_trabajo' => $claseTrabajo !== '' ? $claseTrabajo : null,
-                ':tema'          => $temaNuevo !== '' ? $temaNuevo : null,
-                ':responsable'   => $responsableNuevo !== '' ? $responsableNuevo : null,
-                ':lugar'         => $lugarNuevo !== '' ? $lugarNuevo : null,
+                ':sigla'         => $sigla !== '' ? $sigla : null,
+                ':denominacion'  => $denominacion !== '' ? $denominacion : null,
+                ':participantes' => $participantes !== '' ? $participantes : null,
+                ':desde'         => $desdeDb,
+                ':hasta'         => $hastaDb,
             ]);
         }
 
-        header('Location: s3_educacion_clases.php?saved=1');
+        header('Location: s3_educacion_cursos.php?saved=1');
         exit;
     }
 
-    /* Borrar clase seleccionada */
-    if ($accion === 'borrar_clase') {
-        $delId = isset($_POST['clase_id']) ? (int)$_POST['clase_id'] : 0;
+    /* Borrar curso seleccionado */
+    if ($accion === 'borrar_curso') {
+        $delId = isset($_POST['curso_id']) ? (int)$_POST['curso_id'] : 0;
         if ($delId > 0) {
-            $stmtDel = $pdo->prepare("DELETE FROM s3_clases WHERE id = :id");
+            $stmtDel = $pdo->prepare("DELETE FROM s3_cursos_regulares WHERE id = :id");
             $stmtDel->execute([':id' => $delId]);
         }
-        header('Location: s3_educacion_clases.php?saved=1');
+        header('Location: s3_educacion_cursos.php?saved=1');
         exit;
     }
 }
@@ -84,69 +132,70 @@ $ASSETS_URL = ($APP_URL === '' ? '' : $APP_URL) . '/assets';
 $IMG_BG     = $ASSETS_URL . '/img/fondo.png';
 $ESCUDO     = $ASSETS_URL . '/img/escudo_bcom602.png';
 
-/* ===== Base de storage para evidencias (clases) ===== */
-$BASE_REL   = 'storage/s3_educacion';
-$DOC_SUBDIR = 'clases_docs';
-$PDF_SUBDIR = 'clases_participantes';
-$BASE_DIR   = realpath(__DIR__ . '/../' . $BASE_REL);
-if ($BASE_DIR === false) {
-    $BASE_DIR = __DIR__ . '/../' . $BASE_REL;
-}
+/* ===== Filtros por Sigla / Denominación / Participantes (GET) ===== */
+$filtroSigla        = trim((string)($_GET['sigla'] ?? ''));
+$filtroDenominacion = trim((string)($_GET['denominacion'] ?? ''));
+$filtroParticip     = trim((string)($_GET['participantes'] ?? ''));
 
-/* ===== Filtros por Tema / Responsable (GET) ===== */
-$filtroTema = trim((string)($_GET['tema'] ?? ''));
-$filtroResp = trim((string)($_GET['responsable'] ?? ''));
-
-/* ===== Datos de clases (aplicando filtros) ===== */
-$sqlClases = "SELECT * FROM s3_clases WHERE 1=1";
+/* ===== Datos de cursos (aplicando filtros) ===== */
+$sqlCursos = "SELECT * FROM s3_cursos_regulares WHERE 1=1";
 $params    = [];
 
-if ($filtroTema !== '') {
-    $sqlClases .= " AND tema LIKE :tema";
-    $params[':tema'] = '%' . $filtroTema . '%';
+if ($filtroSigla !== '') {
+    $sqlCursos .= " AND sigla LIKE :sigla";
+    $params[':sigla'] = '%' . $filtroSigla . '%';
 }
-if ($filtroResp !== '') {
-    $sqlClases .= " AND responsable LIKE :resp";
-    $params[':resp'] = '%' . $filtroResp . '%';
+if ($filtroDenominacion !== '') {
+    $sqlCursos .= " AND denominacion LIKE :denom";
+    $params[':denom'] = '%' . $filtroDenominacion . '%';
+}
+if ($filtroParticip !== '') {
+    $sqlCursos .= " AND participantes LIKE :part";
+    $params[':part'] = '%' . $filtroParticip . '%';
 }
 
-$sqlClases .= " ORDER BY semana, id";
+$sqlCursos .= " ORDER BY sigla, id";
 
-$stmtCl = $pdo->prepare($sqlClases);
-$stmtCl->execute($params);
-$clases = $stmtCl->fetchAll(PDO::FETCH_ASSOC);
+$stmtCur = $pdo->prepare($sqlCursos);
+$stmtCur->execute($params);
+$cursosRegulares = $stmtCur->fetchAll(PDO::FETCH_ASSOC);
 
-/* ===== KPI simple de clases (general, sin filtros) ===== */
+/* ===== KPI simple de cursos (general, sin filtros) ===== */
 $row = $pdo->query("
     SELECT
       COUNT(*) AS total,
       SUM(cumplio = 'si') AS ok
-    FROM s3_clases
+    FROM s3_cursos_regulares
 ")->fetch(PDO::FETCH_ASSOC) ?: ['total'=>0,'ok'=>0];
 
-$totalClases      = (int)$row['total'];
-$clasesCumplidas  = (int)$row['ok'];
-$clasesPendientes = max($totalClases - $clasesCumplidas, 0);
-$porcClases       = $totalClases > 0 ? round($clasesCumplidas * 100.0 / $totalClases, 1) : 0.0;
+$totalCursos      = (int)$row['total'];
+$cursosCumplidos  = (int)$row['ok'];
+$cursosPendientes = max($totalCursos - $cursosCumplidos, 0);
+$porcCursos       = $totalCursos > 0 ? round($cursosCumplidos * 100.0 / $totalCursos, 1) : 0.0;
+
+/* ===== Listado de personal para autocomplete (igual que en s3_educacion_clases.php) ===== */
+$personalUnidad = [];
+try {
+    $personalUnidad = $pdo->query("
+        SELECT
+          grado,
+          arma_espec      AS arma,
+          apellido_nombre AS nombre_apellido
+        FROM personal_unidad
+        WHERE apellido_nombre IS NOT NULL AND apellido_nombre <> ''
+        ORDER BY apellido_nombre
+    ")->fetchAll(PDO::FETCH_ASSOC) ?: [];
+} catch (Throwable $e) {
+    $personalUnidad = [];
+}
 
 $savedFlag = ($_GET['saved'] ?? '') === '1';
-
-/* ===== Listado de personal (para campo Responsable) ===== */
-$personal = $pdo->query("
-    SELECT
-      grado,
-      arma_espec      AS arma,
-      apellido_nombre AS nombre_apellido
-    FROM personal_unidad
-    WHERE apellido_nombre IS NOT NULL AND apellido_nombre <> ''
-    ORDER BY apellido_nombre
-")->fetchAll(PDO::FETCH_ASSOC);
 ?>
 <!doctype html>
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<title>Clases · Educación operacional de cuadros · S-3 · B Com 602</title>
+<title>Cursos regulares · Educación operacional · S-3 · B Com 602</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 <link rel="stylesheet" href="../assets/css/theme-602.css">
@@ -325,130 +374,137 @@ $personal = $pdo->query("
         Editor: <strong><?= e(user_display_name()) ?></strong>
       </div>
       <div>
-        <button form="clasesForm" class="btn btn-success btn-sm" style="font-weight:700;">
+        <button form="cursosForm" class="btn btn-success btn-sm" style="font-weight:700;">
           💾 Guardar cambios
         </button>
       </div>
     </div>
 
-    <!-- KPI Clases -->
+    <!-- KPI Cursos regulares -->
     <div class="kpi-card">
-      <div class="kpi-title">Clases · Programa anual</div>
+      <div class="kpi-title">Cursos regulares</div>
       <div class="kpi-main">
-        <?= e($clasesCumplidas) ?>/<?= e($totalClases) ?> clases cumplidas
+        <?= e($cursosCumplidos) ?>/<?= e($totalCursos) ?> cursos cumplidos
       </div>
       <div class="kpi-sub">
-        Cumplimiento: <?= e($porcClases) ?>% · Pendientes: <?= e($clasesPendientes) ?>
+        Cumplimiento: <?= e($porcCursos) ?>% · Pendientes: <?= e($cursosPendientes) ?>
       </div>
       <div class="progress mt-2" style="height:6px;">
-        <div class="progress-bar bg-success" role="progressbar" style="width: <?= e($porcClases) ?>%;"></div>
+        <div class="progress-bar bg-success" role="progressbar" style="width: <?= e($porcCursos) ?>%;"></div>
       </div>
     </div>
 
     <div class="panel">
-      <div class="panel-title">Buscar Clases</div>
-     
+      <div class="panel-title">Buscar Cursos regulares</div>
 
-      <!-- Filtros Tema / Responsable + botón Eliminar -->
+      <!-- Datalist con el personal de la unidad (mismo formato que RESPONSABLE en clases) -->
+      <datalist id="responsablesList">
+        <?php foreach ($personalUnidad as $p): ?>
+          <?php
+            $grado = trim((string)($p['grado'] ?? ''));
+            $arma  = trim((string)($p['arma'] ?? ''));
+            $nom   = trim((string)($p['nombre_apellido'] ?? ''));
+            $label = trim($grado.' '.$arma.' '.$nom);
+          ?>
+          <?php if ($label !== ''): ?>
+            <option value="<?= e($label) ?>"></option>
+          <?php endif; ?>
+        <?php endforeach; ?>
+      </datalist>
+
+      <!-- Filtros Sigla / Denominación + botón Eliminar -->
       <div class="search-panel mb-3">
         <form method="get" class="row g-2 align-items-end">
-          <div class="col-sm-4 col-md-4">
-            <label class="form-label">Buscar por tema</label>
+          <div class="col-sm-3 col-md-3">
+            <label class="form-label">Sigla</label>
             <input type="text"
-                   name="tema"
+                   name="sigla"
                    class="form-control form-control-sm"
-                   placeholder="Tema de la clase"
-                   value="<?= e($filtroTema) ?>">
+                   placeholder="SIGLA"
+                   value="<?= e($filtroSigla) ?>">
           </div>
-          <div class="col-sm-4 col-md-4">
-            <label class="form-label">Responsable</label>
+          <div class="col-sm-5 col-md-5">
+            <label class="form-label">Denominación</label>
             <input type="text"
-                   name="responsable"
+                   name="denominacion"
                    class="form-control form-control-sm"
-                   list="responsablesList"
-                   autocomplete="off"
-                   placeholder="Responsable..."
-                   value="<?= e($filtroResp) ?>">
+                   placeholder="Nombre del curso"
+                   value="<?= e($filtroDenominacion) ?>">
           </div>
-          <div class="col-sm-4 col-md-4 d-flex gap-1">
+          <div class="col-12 d-flex gap-1 mt-2">
             <button type="submit"
                     class="btn btn-success btn-sm w-100"
                     style="font-weight:700;">
               Filtrar
             </button>
-            <a href="s3_educacion_clases.php"
+            <a href="s3_educacion_cursos.php"
                class="btn btn-outline-success btn-sm w-100"
                style="font-weight:600;">
               Limpiar
             </a>
             <button type="button"
-                    id="btnEliminarClase"
+                    id="btnEliminarCurso"
                     class="btn btn-outline-danger btn-sm w-100"
                     style="font-weight:700;">
-              Eliminar clase
+              Eliminar curso
             </button>
           </div>
         </form>
       </div>
 
-         <div class="panel-title">Crear nuevas Clases · Programa de educación de la unidad</div>
+      <div class="panel-title">Crear Cursos regulares · Educación operacional de cuadros</div>
       <div class="panel-sub">
-        Registro de las clases planificadas para cuadros. Podés actualizar todos los campos,
-        marcar si se cumplió y adjuntar la evidencia (orden, PE, listado de asistencia, informe, etc.).
+        Registro de los cursos regulares que impactan en la educación del personal de la unidad.
+        Podés actualizar los datos, listar los participantes y adjuntar la evidencia (orden, plan de curso,
+        certificados, etc.).
       </div>
 
-      <!-- Alta rápida de nueva clase -->
+      <!-- Alta rápida de nuevo curso (con cantidad + participantes dinámicos, sin PDF) -->
       <form method="post" class="row g-2 align-items-end mb-3">
         <?php if (function_exists('csrf_input')) { echo csrf_input(); } ?>
-        <input type="hidden" name="accion" value="nueva_clase">
+        <input type="hidden" name="accion" value="nuevo_curso">
 
-        <div class="col-sm-2 col-md-1">
-          <label class="form-label text-muted" style="font-size:.78rem;">Sem</label>
+        <!-- Primera fila: Sigla, Denominación, Cantidad -->
+        <div class="col-sm-2 col-md-2">
+          <label class="form-label text-muted" style="font-size:.78rem;">Sigla</label>
           <input type="text"
-                 name="nueva_semana"
+                 name="nueva_sigla"
                  class="form-control form-control-sm"
-                 placeholder="#">
+                 placeholder="SIGLA">
+        </div>
+
+        <div class="col-sm-5 col-md-5">
+          <label class="form-label text-muted" style="font-size:.78rem;">Denominación</label>
+          <input type="text"
+                 name="nueva_denominacion"
+                 class="form-control form-control-sm"
+                 placeholder="Nombre del curso">
         </div>
 
         <div class="col-sm-3 col-md-2">
-          <label class="form-label text-muted" style="font-size:.78rem;">Fecha</label>
+          <label class="form-label text-muted" style="font-size:.78rem;">Cant. participantes</label>
+          <input type="number"
+                 id="nuevo_cant_participantes"
+                 name="nuevo_cant_participantes"
+                 class="form-control form-control-sm"
+                 min="0"
+                 max="50"
+                 placeholder="0">
+        </div>
+
+        <!-- Desde / Hasta / Botón -->
+        <div class="col-sm-3 col-md-1">
+          <label class="form-label text-muted" style="font-size:.78rem;">Desde</label>
           <input type="date"
-                 name="nueva_fecha"
+                 name="nuevo_desde"
                  class="form-control form-control-sm">
         </div>
 
-        <div class="col-sm-3 col-md-2">
-          <label class="form-label text-muted" style="font-size:.78rem;">Clase de trabajo</label>
-          <input type="text"
-                 name="nueva_clase_trabajo"
-                 class="form-control form-control-sm"
-                 placeholder="Clase...">
-        </div>
-
-        <div class="col-sm-6 col-md-2">
-          <label class="form-label text-muted" style="font-size:.78rem;">Tema</label>
-          <input type="text"
-                 name="nueva_tema"
-                 class="form-control form-control-sm"
-                 placeholder="Tema de la clase">
-        </div>
-
-        <div class="col-sm-6 col-md-2">
-          <label class="form-label text-muted" style="font-size:.78rem;">Responsable</label>
-          <input type="text"
-                 name="nueva_responsable"
-                 class="form-control form-control-sm"
-                 list="responsablesList"
-                 autocomplete="off"
-                 placeholder="Responsable...">
-        </div>
-
-        <div class="col-sm-4 col-md-2">
-          <label class="form-label text-muted" style="font-size:.78rem;">Lugar</label>
-          <input type="text"
-                 name="nueva_lugar"
-                 class="form-control form-control-sm"
-                 placeholder="Lugar">
+        <div class="col-sm-3 col-md-1">
+          <label class="form-label text-muted" style="font-size:.78rem;">Hasta</label>
+          <input type="date"
+                 name="nuevo_hasta"
+                 class="form-control form-control-sm">
         </div>
 
         <div class="col-sm-3 col-md-1 d-flex align-items-end">
@@ -458,48 +514,56 @@ $personal = $pdo->query("
             + Agregar
           </button>
         </div>
+
+        <!-- Campos dinámicos de participantes -->
+        <div class="col-12 mt-2">
+          <label class="form-label text-muted" style="font-size:.78rem;">Participantes</label>
+          <div class="row g-2" id="nuevo_participantes_campos">
+            <!-- JS genera los inputs acá -->
+          </div>
+          <small class="text-secondary d-block mt-1" style="font-size:.72rem;">
+            Ingrese el apellido y seleccione del listado sugerido del personal de la unidad.
+          </small>
+        </div>
       </form>
 
       <!-- Form principal de edición -->
-      <form id="clasesForm" action="save_s3_educacion.php" method="post" enctype="multipart/form-data">
+      <form id="cursosForm" action="save_s3_educacion.php" method="post" enctype="multipart/form-data">
         <?php if (function_exists('csrf_input')) { echo csrf_input(); } ?>
-        <input type="hidden" name="section" value="clases">
+        <input type="hidden" name="section" value="cursos">
 
         <div class="table-responsive">
-          <table id="clasesTable" class="table table-sm table-dark align-middle">
+          <table id="cursosTable" class="table table-sm table-dark align-middle">
             <thead>
               <tr>
                 <th class="col-sel-header" style="width:40px;">Sel</th>
-                <th style="width:50px;">Sem</th>
-                <th style="width:80px;">Fecha</th>
-                <th style="width:110px;">Clase de trabajo</th>
-                <th>Tema</th>
-                <th style="width:170px;">Responsable</th>
-                <th style="width:150px;">Participantes (PDF)</th>
-                <th style="width:110px;">Lugar</th>
+                <th style="width:80px;">Sigla</th>
+                <th>Denominación</th>
+                <th style="width:220px;">Participantes / PDF</th>
+                <th style="width:90px;">Desde</th>
+                <th style="width:90px;">Hasta</th>
                 <th style="width:120px;">Se cumplió</th>
-                <th style="width:240px;">Evidencia</th>
+                <th style="width:260px;">Evidencia</th>
               </tr>
             </thead>
             <tbody>
-            <?php if (empty($clases)): ?>
-              <tr><td colspan="10" class="text-center text-muted">Sin registros de clases.</td></tr>
+            <?php if (empty($cursosRegulares)): ?>
+              <tr><td colspan="8" class="text-center text-muted">Sin registros de cursos regulares.</td></tr>
             <?php else: ?>
-              <?php foreach ($clases as $c): ?>
+              <?php foreach ($cursosRegulares as $c): ?>
                 <?php
                   $id      = (int)$c['id'];
                   $cumplio = (string)$c['cumplio'];
                   $doc     = isset($c['documento']) ? (string)$c['documento'] : '';
-                  $pdf     = isset($c['participantes_pdf']) ? (string)$c['participantes_pdf'] : '';
 
-                  // Buscar TODA la evidencia de la clase en el storage (múltiples archivos)
+                  // Buscar TODA la evidencia del curso en el storage (múltiples archivos)
                   $evFiles = [];
                   if (is_dir($BASE_DIR . '/' . $DOC_SUBDIR)) {
-                      $pattern = $BASE_DIR . '/' . $DOC_SUBDIR . '/clase_' . $id . '_doc_*';
-                      $found = glob($pattern) ?: [];
+                      $pattern = $BASE_DIR . '/' . $DOC_SUBDIR . '/curso_' . $id . '_doc_*';
+                      $found   = glob($pattern) ?: [];
                       foreach ($found as $absFile) {
                           if (!is_file($absFile)) continue;
-                          $relPath = $BASE_REL . '/' . $DOC_SUBDIR . '/' . basename($absFile);
+                          $relPath   = $BASE_REL . '/' . $DOC_SUBDIR . '/' . basename($absFile);
                           $evFiles[] = $relPath;
                       }
                   }
@@ -508,84 +572,78 @@ $personal = $pdo->query("
                   <!-- Selección para borrar -->
                   <td class="text-center col-sel-cell">
                     <input type="radio"
-                           name="clase_sel"
+                           name="curso_sel"
                            value="<?= e($id) ?>">
                   </td>
 
-                  <!-- Semana -->
+                  <!-- Sigla -->
                   <td>
                     <input type="text"
-                           name="clases_semana[<?= $id ?>]"
+                           name="cursos_sigla[<?= $id ?>]"
                            class="form-control form-control-sm"
-                           value="<?= e($c['semana']) ?>">
+                           value="<?= e($c['sigla']) ?>">
                   </td>
 
-                  <!-- Fecha -->
-                  <td>
-                    <input type="date"
-                           name="clases_fecha[<?= $id ?>]"
-                           class="form-control form-control-sm"
-                           value="<?= e($c['fecha']) ?>">
-                  </td>
-
-                  <!-- Clase de trabajo -->
+                  <!-- Denominación -->
                   <td>
                     <input type="text"
-                           name="clases_clase_trabajo[<?= $id ?>]"
+                           name="cursos_denominacion[<?= $id ?>]"
                            class="form-control form-control-sm"
-                           value="<?= e($c['clase_trabajo']) ?>">
+                           value="<?= e($c['denominacion']) ?>">
                   </td>
 
-                  <!-- Tema -->
+                  <!-- Participantes (texto + PDF opcional) -->
                   <td>
-                    <input type="text"
-                           name="clases_tema[<?= $id ?>]"
-                           class="form-control form-control-sm"
-                           value="<?= e($c['tema']) ?>">
-                  </td>
+                    <!-- Texto libre -->
+                    <textarea
+                           name="cursos_participantes[<?= $id ?>]"
+                           class="form-control form-control-sm mb-1"
+                           rows="2"
+                           placeholder="Apellidos, grados, cantidad, etc."><?= e($c['participantes']) ?></textarea>
 
-                  <!-- Responsable -->
-                  <td>
-                    <input type="text"
-                           name="clases_responsable[<?= $id ?>]"
-                           class="form-control form-control-sm"
-                           list="responsablesList"
-                           autocomplete="off"
-                           placeholder="Responsable..."
-                           value="<?= e($c['responsable']) ?>">
-                  </td>
-
-                  <!-- Participantes (PDF) -->
-                  <td>
+                    <?php
+                      $pdfPart = isset($c['participantes_pdf']) ? (string)$c['participantes_pdf'] : '';
+                    ?>
                     <input type="hidden"
-                           name="clases_pdf_actual[<?= $id ?>]"
-                           value="<?= e($pdf) ?>">
+                           name="cursos_pdf_actual[<?= $id ?>]"
+                           value="<?= e($pdfPart) ?>">
 
-                    <?php if ($pdf !== ''): ?>
+                    <?php if ($pdfPart !== ''): ?>
                       <div class="doc-actual mb-1">
-                        <a href="../<?= e($pdf) ?>" target="_blank" class="link-light">
-                          <?= e(basename($pdf)) ?>
+                        <a href="../<?= e($pdfPart) ?>" target="_blank" class="link-light">
+                          <?= e(basename($pdfPart)) ?>
                         </a>
                       </div>
                     <?php endif; ?>
 
                     <input type="file"
-                           name="clases_pdf[<?= $id ?>]"
+                           name="cursos_pdf[<?= $id ?>]"
                            accept="application/pdf"
                            class="form-control form-control-sm">
+                    <small class="text-secondary d-block mt-1" style="font-size:.72rem;">
+                      Listado de participantes (PDF). Podés subir versiones nuevas en guardados sucesivos.
+                    </small>
                   </td>
 
-                  <!-- Lugar -->
+                  <!-- Desde -->
                   <td>
-                    <input type="text"
-                           name="clases_lugar[<?= $id ?>]"
+                    <input type="date"
+                           name="cursos_desde[<?= $id ?>]"
                            class="form-control form-control-sm"
-                           value="<?= e($c['lugar']) ?>">
+                           value="<?= e($c['desde']) ?>">
+                  </td>
+
+                  <!-- Hasta -->
+                  <td>
+                    <input type="date"
+                           name="cursos_hasta[<?= $id ?>]"
+                           class="form-control form-control-sm"
+                           value="<?= e($c['hasta']) ?>">
                   </td>
 
                   <!-- Se cumplió -->
                   <td>
-                    <select name="clases_cumplio[<?= $id ?>]"
+                    <select name="cursos_cumplio[<?= $id ?>]"
                             class="form-select form-select-sm">
                       <option value="" <?= $cumplio===''?'selected':'' ?>>—</option>
                       <option value="si" <?= $cumplio==='si'?'selected':'' ?>>Sí</option>
@@ -596,19 +654,17 @@ $personal = $pdo->query("
 
                   <!-- Evidencia (múltiples docs) -->
                   <td>
-                    <!-- Valor actual en BD (compatibilidad con save_s3_educacion.php) -->
                     <input type="hidden"
-                           name="clases_doc_actual[<?= $id ?>]"
+                           name="cursos_doc_actual[<?= $id ?>]"
                            value="<?= e($doc) ?>">
 
-                    <!-- Archivos ya cargados en el storage -->
                     <div class="ev-current small mb-1" id="ev-current-<?= $id ?>">
                       <?php if (!empty($evFiles)): ?>
                         <div class="d-flex flex-wrap gap-1">
                           <?php foreach ($evFiles as $idx => $path): ?>
                             <?php $label = basename($path); ?>
                             <?php
-                              $delUrl = 's3_educacion_delete_doc.php?tipo=clase&id='
+                              $delUrl = 's3_educacion_delete_doc.php?tipo=curso&id='
                                         . $id . '&file=' . urlencode(basename($path));
                             ?>
                             <div class="btn-group btn-group-sm mb-1" role="group">
@@ -617,12 +673,10 @@ $personal = $pdo->query("
                                  target="_blank">
                                 <?= e($label) ?>
                               </a>
-                              <a
-                                href="#"
-                                class="btn btn-outline-danger btn-sm btn-ev-del"
-                                data-delete-url="<?= e($delUrl) ?>"
-                                data-file-name="<?= e($label) ?>"
-                              >
+                              <a href="#"
+                                 class="btn btn-outline-danger btn-sm btn-ev-del"
+                                 data-delete-url="<?= e($delUrl) ?>"
+                                 data-file-name="<?= e($label) ?>">
                                 &times;
                               </a>
                             </div>
@@ -633,17 +687,15 @@ $personal = $pdo->query("
                       <?php endif; ?>
                     </div>
 
-                    <!-- Archivo nuevo -->
                     <input type="file"
-                           name="clases_file[<?= $id ?>]"
+                           name="cursos_file[<?= $id ?>]"
                            class="form-control form-control-sm ev-input"
-                           data-row="clase-<?= $id ?>">
+                           data-row="curso-<?= $id ?>">
                     <small class="text-secondary d-block mt-1" style="font-size:.72rem;">
-                      Orden, PE, informe u otra evidencia. Podés subir más de un archivo en guardados sucesivos.
+                      Orden, plan de curso, certificados u otra evidencia. Podés subir más de un archivo en guardados sucesivos.
                     </small>
 
-                    <!-- Archivos recién seleccionados (sin guardar aún) -->
-                    <div class="ev-selected small text-info mt-1" id="ev-selected-clase-<?= $id ?>"></div>
+                    <div class="ev-selected small text-info mt-1" id="ev-selected-curso-<?= $id ?>"></div>
                   </td>
 
                 </tr>
@@ -664,14 +716,14 @@ $personal = $pdo->query("
   </div>
 </div>
 
-<!-- Form oculto para borrar clase -->
-<form id="deleteClassForm" method="post" class="d-none">
+<!-- Form oculto para borrar curso -->
+<form id="deleteCursoForm" method="post" class="d-none">
   <?php if (function_exists('csrf_input')) { echo csrf_input(); } ?>
-  <input type="hidden" name="accion" value="borrar_clase">
-  <input type="hidden" name="clase_id" id="deleteClassId" value="">
+  <input type="hidden" name="accion" value="borrar_curso">
+  <input type="hidden" name="curso_id" id="deleteCursoId" value="">
 </form>
 
-<!-- Modal tipo tarjeta para confirmar eliminación de clase -->
+<!-- Modal tipo tarjeta para confirmar eliminación de curso -->
 <div class="modal fade" id="modalConfirmDelete" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content"
@@ -681,14 +733,14 @@ $personal = $pdo->query("
                 box-shadow:0 18px 40px rgba(0,0,0,.8);">
       <div class="modal-header border-0">
         <h5 class="modal-title" style="font-weight:800; font-size:.95rem;">
-          Eliminar clase
+          Eliminar curso
         </h5>
         <button type="button" class="btn-close btn-close-white"
                 data-bs-dismiss="modal" aria-label="Cerrar"></button>
       </div>
       <div class="modal-body">
         <p id="modalDeleteText" class="mb-0" style="font-size:.9rem; color:#bfdbfe;">
-          ¿Seguro que desea eliminar la clase seleccionada?
+          ¿Seguro que desea eliminar el curso seleccionado?
         </p>
       </div>
       <div class="modal-footer border-0">
@@ -750,21 +802,6 @@ $personal = $pdo->query("
   </div>
 </div>
 
-<!-- Datalist con el personal de la unidad para el campo Responsable -->
-<datalist id="responsablesList">
-  <?php foreach ($personal as $p): ?>
-    <?php
-      $grado = trim((string)($p['grado'] ?? ''));
-      $arma  = trim((string)($p['arma'] ?? ''));
-      $nom   = trim((string)($p['nombre_apellido'] ?? ''));
-      $label = trim($grado.' '.$arma.' '.$nom);
-    ?>
-    <?php if ($label !== ''): ?>
-      <option value="<?= e($label) ?>"></option>
-    <?php endif; ?>
-  <?php endforeach; ?>
-</datalist>
-
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
 // Toast de "guardado correcto" cuando volvés de un POST normal
@@ -786,7 +823,7 @@ $personal = $pdo->query("
 
 // ===== AUTOGUARDADO (solo campos de texto / selects) =====
 (function(){
-  const form = document.getElementById('clasesForm');
+  const form = document.getElementById('cursosForm');
   if (!form) return;
 
   const AUTOSAVE_MS = 8000;
@@ -826,12 +863,12 @@ $personal = $pdo->query("
       });
 })();
 
-// ===== Eliminar clase seleccionada (modo selección + modal) =====
+// ===== Eliminar curso seleccionado (modo selección + modal) =====
 document.addEventListener('DOMContentLoaded', function(){
-  const btnDel   = document.getElementById('btnEliminarClase');
-  const formDel  = document.getElementById('deleteClassForm');
-  const inputId  = document.getElementById('deleteClassId');
-  const table    = document.getElementById('clasesTable');
+  const btnDel   = document.getElementById('btnEliminarCurso');
+  const formDel  = document.getElementById('deleteCursoForm');
+  const inputId  = document.getElementById('deleteCursoId');
+  const table    = document.getElementById('cursosTable');
 
   const modalEl  = document.getElementById('modalConfirmDelete');
   const modalTxt = document.getElementById('modalDeleteText');
@@ -856,16 +893,16 @@ document.addEventListener('DOMContentLoaded', function(){
     }
 
     // 2do click: abrimos el modal
-    const sel = document.querySelector('input[name="clase_sel"]:checked');
+    const sel = document.querySelector('input[name="curso_sel"]:checked');
 
     if (!sel) {
-      modalTxt.textContent = 'Primero seleccione una clase en la columna "Sel".';
+      modalTxt.textContent = 'Primero seleccione un curso en la columna "Sel".';
       btnModal.style.display = 'none';
       bsModal.show();
       return;
     }
 
-    modalTxt.textContent = '¿Seguro que desea eliminar la clase seleccionada?';
+    modalTxt.textContent = '¿Seguro que desea eliminar el curso seleccionado?';
     btnModal.style.display = '';
     inputId.value = sel.value;   // dejamos listo el id para borrar
     bsModal.show();
@@ -944,6 +981,52 @@ document.addEventListener('DOMContentLoaded', function () {
     window.location.href = currentUrl;
   });
 });
+
+// ===== Campos dinámicos de participantes (según cantidad) =====
+(function(){
+  const inputCant = document.getElementById('nuevo_cant_participantes');
+  const cont      = document.getElementById('nuevo_participantes_campos');
+  if (!inputCant || !cont) return;
+
+  function renderCampos() {
+    let n = parseInt(inputCant.value, 10);
+    if (isNaN(n) || n < 0) n = 0;
+    if (n > 50) n = 50;
+
+    // Guardar valores ya escritos
+    const oldVals = [];
+    cont.querySelectorAll('input[name="participantes_nombres[]"]').forEach(function(inp){
+      oldVals.push(inp.value);
+    });
+
+    cont.innerHTML = '';
+
+    for (let i = 0; i < n; i++) {
+      const col = document.createElement('div');
+      col.className = 'col-sm-6 col-md-4';
+      col.innerHTML = `
+        <label class="form-label text-muted" style="font-size:.75rem;">Participante ${i+1}</label>
+        <input type="text"
+               name="participantes_nombres[]"
+               class="form-control form-control-sm"
+               placeholder="Buscar personal por apellido / nombre"
+               list="responsablesList"
+               autocomplete="off">
+      `;
+      cont.appendChild(col);
+    }
+
+    // Restaurar lo que ya había escrito el usuario
+    const newInputs = cont.querySelectorAll('input[name="participantes_nombres[]"]');
+    newInputs.forEach(function(inp, idx){
+      if (idx < oldVals.length) {
+        inp.value = oldVals[idx];
+      }
+    });
+  }
+
+  inputCant.addEventListener('input', renderCampos);
+})();
 </script>
 </body>
 </html>

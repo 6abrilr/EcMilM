@@ -390,7 +390,7 @@ $porcGlobal  = $totalActiv   > 0 ? round($hechasActiv   * 100 / $totalActiv,   1
                   <div class="accordion-body">
                     Actividades de instrucción para el personal de tropa, por objetivos y períodos.
                     <div class="mt-2">
-                      <a href="s3_educacion_tropa.php" class="gest-btn">Entrar</a>
+                      <a href="s3_educacion_tropa.php?from=s3" class="btn btn-ghost">Educación operacional de la tropa</a>
                     </div>
                   </div>
                 </div>

@@ -10,6 +10,28 @@ require_once __DIR__ . '/../config/db.php';
 
 function e($v){ return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'); }
 
+/* ===== Volver dinámico (S1 / S3) ===== */
+$from = strtolower(trim((string)($_GET['from'] ?? '')));
+
+if (!in_array($from, ['s1','s3'], true)) {
+  $from = '';
+}
+
+// fallback por referer si no vino el parámetro
+if ($from === '' && !empty($_SERVER['HTTP_REFERER'])) {
+  $refPath = parse_url((string)$_SERVER['HTTP_REFERER'], PHP_URL_PATH) ?: '';
+  $refBase = basename($refPath);
+
+  if ($refBase === 'areas_s1.php') $from = 's1';
+  if ($refBase === 'areas_s3.php') $from = 's3';
+}
+
+if ($from === '') $from = 's3'; // default
+
+$backHref  = ($from === 's1') ? 'areas_s1.php' : 'areas_s3.php';
+$backLabel = ($from === 's1') ? '⬅ Volver a S-1' : '⬅ Volver a S-3';
+$kickerTxt = ($from === 's1') ? 'S-1 · PERSONAL' : 'S-3 · OPERACIONES';
+
 /* ===== Assets ===== */
 $PUBLIC_URL = rtrim(str_replace('\\','/', dirname($_SERVER['SCRIPT_NAME'] ?? '')), '/');
 $APP_URL    = rtrim(dirname($PUBLIC_URL), '/');

@@ -381,6 +381,30 @@ $porcGlobal   = $totalPersonal > 0 ? round($personalActivo * 100 / $totalPersona
               </div>
 
               <div class="accordion-item">
+  <h2 class="accordion-header" id="s1-h-edutropa">
+    <button class="accordion-button collapsed" type="button"
+            data-bs-toggle="collapse"
+            data-bs-target="#s1-edutropa"
+            aria-expanded="false"
+            aria-controls="s1-edutropa">
+      Educación operacional de la tropa
+    </button>
+  </h2>
+
+  <div id="s1-edutropa" class="accordion-collapse collapse"
+       aria-labelledby="s1-h-edutropa"
+       data-bs-parent="#accordionS1">
+    <div class="accordion-body">
+      Gestión y consulta de documentación / registros de educación operacional de la tropa.
+      <div class="mt-2">
+        <a href="s3_educacion_tropa.php?from=s1" class="gest-btn">Entrar</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+              <div class="accordion-item">
                 <h2 class="accordion-header" id="s1-h-doc">
                 </h2>
                 <div id="s1-doc" class="accordion-collapse collapse" aria-labelledby="s1-h-doc" data-bs-parent="#accordionS1">

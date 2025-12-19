@@ -14,14 +14,14 @@ function norm($s){ return preg_replace('/\s+/u','',mb_strtoupper(trim((string)$s
 $PUBLIC_URL = rtrim(str_replace('\\','/', dirname($_SERVER['SCRIPT_NAME'] ?? $_SERVER['PHP_SELF'])), '/');
 $APP_URL    = rtrim(str_replace('\\','/', dirname($PUBLIC_URL)), '/');
 $ASSETS_URL = ($APP_URL === '' ? '' : $APP_URL) . '/assets';
-$IMG_BG     = $ASSETS_URL . '../assets/img/fondo.png'; // ya no se usa en el body, pero lo dejamos por compatibilidad
+$IMG_BG     = $ASSETS_URL . '../assets/img/fondo.png'; // compat
 
 /* ===== Parámetros ===== */
 $rel = $_GET['p'] ?? '';
 $sheetIdx = isset($_GET['s']) ? max(0,(int)$_GET['s']) : 0;
 $debugShowColor = isset($_GET['showcolor']);
-$areaParam = $_GET['area'] ?? ''; // área / subcarpeta actual (para volver al listado)
-$savedFlag = ($_GET['saved'] ?? '') === '1'; // flag de guardado correcto
+$areaParam = $_GET['area'] ?? '';
+$savedFlag = ($_GET['saved'] ?? '') === '1';
 
 /* Paginación */
 $allowedPP = [10,20,30,50,100];
@@ -31,7 +31,7 @@ $page = max(1,(int)($_GET['page'] ?? 1));
 
 /* ===== Paths base ===== */
 $projectBase = realpath(__DIR__ . '/..');
-$abs         = realpath($projectBase . '/' . $rel);
+$abs         = $projectBase ? realpath($projectBase . '/' . $rel) : false;
 if(!$projectBase || !$abs || !is_file($abs)){
   http_response_code(400); echo "Ruta inválida"; exit;
 }
@@ -52,13 +52,9 @@ $scopeMeta = [
   'visitas_de_estado_mayor' => ['label' => 'Visitas de Estado Mayor', 'list_url' => 'visitas_de_estado_mayor.php', 'dash_scope' => 'visitas_de_estado_mayor'],
 ];
 $SCOPE = $scopeMeta[$inScope];
-$isVisitas = ($inScope === 'visitas_de_estado_mayor');
 
-/* Tooltip de Acción Correctiva en VISITAS, LISTAS y ÚLTIMA INSPECCIÓN */
+/* Tooltip de Acción Correctiva */
 $hasAccionTooltip = in_array($inScope, ['visitas_de_estado_mayor','listas_control','ultima_inspeccion'], true);
-
-/* Ya no usamos “Carácter” del Excel como columna fija */
-$showCaracter = false;
 
 /* ===== Preferencias por archivo (modo nro + formato de tabla) ===== */
 $pdo->exec("CREATE TABLE IF NOT EXISTS xlsx_prefs (
@@ -93,7 +89,8 @@ if(isset($_GET['setfmt'])){
 }
 
 $stM = $pdo->prepare("SELECT mode_num_is, table_fmt FROM xlsx_prefs WHERE file_rel=?");
-$stM->execute([$rel]); $pref = $stM->fetch(PDO::FETCH_ASSOC) ?: ['mode_num_is'=>'item','table_fmt'=>'classic'];
+$stM->execute([$rel]);
+$pref = $stM->fetch(PDO::FETCH_ASSOC) ?: ['mode_num_is'=>'item','table_fmt'=>'classic'];
 $mode = $pref['mode_num_is'] ?? 'item';
 $tableFmt = $pref['table_fmt'] ?? 'classic';
 
@@ -132,7 +129,9 @@ if(!isset($errFatal) && $ext==='xlsx'){
     $minR=$maxR; $minC=$maxC; $found=false;
     for($r=1;$r<=$maxR;$r++){
       for($c=1;$c<=$maxC;$c++){
-        if(trim(cell_text($sh->getCell(coord($c,$r))))!==''){ $found=true; if($r<$minR)$minR=$r; if($c<$minC)$minC=$c; }
+        if(trim(cell_text($sh->getCell(coord($c,$r))))!==''){
+          $found=true; if($r<$minR)$minR=$r; if($c<$minC)$minC=$c;
+        }
       }
     }
     if(!$found) return [1,1,0,0];
@@ -163,20 +162,25 @@ if(!isset($errFatal) && $ext==='xlsx'){
       $val=cell_text($sh->getCell($tl));
       for($r=$tlR;$r<=$brR;$r++){
         for($c=$tlC;$c<=$brC;$c++){
-          $ri=$r-$minR; $ci=$c-$minC; if(!isset($grid[$ri][$ci]) || $grid[$ri][$ci]==='') $grid[$ri][$ci]=$val;
+          $ri=$r-$minR; $ci=$c-$minC;
+          if(!isset($grid[$ri][$ci]) || $grid[$ri][$ci]==='') $grid[$ri][$ci]=$val;
         }
       }
     }
   }
   function read_xlsx_all($file,$sheetIdx=0,&$sheetNames=[],&$err=null){
     try{
-      $reader=new \PhpOffice\PhpSpreadsheet\Reader\Xlsx(); $reader->load($file);
+      $reader=new \PhpOffice\PhpSpreadsheet\Reader\Xlsx();
       $ss=$reader->load($file);
-      $sheetNames=[]; $count=$ss->getSheetCount(); for($i=0;$i<$count;$i++){ $sheetNames[]=$ss->getSheet($i)->getTitle(); }
+      $sheetNames=[];
+      $count=$ss->getSheetCount();
+      for($i=0;$i<$count;$i++){ $sheetNames[]=$ss->getSheet($i)->getTitle(); }
       if($sheetIdx>=$count) $sheetIdx=0;
       $sh=$ss->getSheet($sheetIdx);
+
       [$minR,$minC,$maxR,$maxC]=sheet_used_bounds($sh);
       if($maxR<$minR||$maxC<$minC) return [[],[],[], null];
+
       $rows=[]; $rowFill=[];
       for($r=$minR;$r<=$maxR;$r++){
         $line=[]; $hasFill=false;
@@ -188,7 +192,10 @@ if(!isset($errFatal) && $ext==='xlsx'){
       }
       expand_merged_values($sh,$rows,$minR,$minC);
       return [$rows,$rowFill,$sheetNames,null];
-    }catch(Throwable $e){ $err=$e->getMessage(); return [[],[],[], $e->getMessage()]; }
+    }catch(Throwable $e){
+      $err=$e->getMessage();
+      return [[],[],[], $e->getMessage()];
+    }
   }
 }
 
@@ -248,18 +255,19 @@ $pdo->exec("CREATE TABLE IF NOT EXISTS checklist (
   row_idx INT NOT NULL,
   nro VARCHAR(100) NULL,
   descripcion TEXT NULL,
-  caracter VARCHAR(100) NULL,           -- reutilizada para Criticidad
+  caracter VARCHAR(100) NULL,
   accion_correctiva TEXT NULL,
   estado ENUM('si','no') NULL,
   observacion TEXT NULL,
-  evidencia_path VARCHAR(512) NULL,
+  evidencia_path TEXT NULL,
   updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   updated_by VARCHAR(100) NULL,
   UNIQUE KEY uq_file_row (file_rel,row_idx)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 
-try { $pdo->exec("ALTER TABLE checklist ADD COLUMN caracter VARCHAR(100) NULL"); } catch (Throwable $e) { /* ignore */ }
-try { $pdo->exec("ALTER TABLE checklist ADD COLUMN updated_by VARCHAR(100) NULL"); } catch (Throwable $e) { /* ignore */ }
+try { $pdo->exec("ALTER TABLE checklist ADD COLUMN caracter VARCHAR(100) NULL"); } catch (Throwable $e) {}
+try { $pdo->exec("ALTER TABLE checklist ADD COLUMN updated_by VARCHAR(100) NULL"); } catch (Throwable $e) {}
+try { $pdo->exec("ALTER TABLE checklist MODIFY evidencia_path TEXT NULL"); } catch (Throwable $e) {}
 
 $pdo->exec("CREATE TABLE IF NOT EXISTS checklist_form (
   id INT AUTO_INCREMENT PRIMARY KEY,
@@ -313,11 +321,10 @@ foreach($rows as $i=>$r){
   }
   if($lastSection){ $visible[]=$lastSection; $lastSection=null; }
 
-  /* Tooltip de Acción Correctiva: 3ra col del Excel original */
   $accion = '';
   if ($hasAccionTooltip) {
     $raw = $rawRows[$i] ?? [];
-    $accion = trim((string)($raw[2] ?? '')); // columna C
+    $accion = trim((string)($raw[2] ?? ''));
   }
 
   $saved = $prefill[$rowIndex] ?? ['caracter'=>'','estado'=>'','observacion'=>'','evidencia_path'=>''];
@@ -335,7 +342,7 @@ foreach($rows as $i=>$r){
   $rowIndex++;
 }
 
-/* Estadísticas (solo datos) */
+/* Estadísticas */
 $cSi=$cNo=$cNull=0;
 foreach($visible as $v){
   if(!empty($v['section'])) continue;
@@ -367,16 +374,50 @@ for($i=0;$i<count($visible);$i++){
   $render[] = $v;
 }
 
-/* Helper QS base (arrastra formato + área) */
+/* Helper QS base */
 function base_qs($rel,$sheetIdx,$debugShowColor,$perPage,$fmt,$areaParam){
-  $qs = 'p='.rawurlencode($rel).'&s='.(int)$sheetIdx.($debugShowColor?'&showcolor=1':'').'&pp='.(int)$perPage.'&fmt='.rawurlencode($fmt);
-  if($areaParam !== '') $qs .= '&area='.rawurlencode($areaParam);
+  $qs = 'p='.rawurlencode($rel).'&s='.(int)$sheetIdx.($debugShowColor?'&showcolor=1':'').'&pp='.(int)$perPage.'&fmt='.rawurlencode((string)$fmt);
+  if($areaParam !== '') $qs .= '&area='.rawurlencode((string)$areaParam);
   return $qs;
 }
 $baseQS = base_qs($rel,$sheetIdx,$debugShowColor,$perPage,$tableFmt,$areaParam);
 
 /* Para botón Volver */
 $listBackUrl = $SCOPE['list_url'] . ($areaParam !== '' ? ('?area='.rawurlencode($areaParam)) : '');
+
+/* Helper: evidencia_path a array */
+function evidencia_to_array_local($ev): array {
+  $files = [];
+  if ($ev === null || $ev === '') return $files;
+
+  $decoded = json_decode((string)$ev, true);
+  if (is_array($decoded)) {
+    foreach ($decoded as $p) {
+      $p = trim((string)$p);
+      if ($p !== '') $files[] = $p;
+    }
+    return $files;
+  }
+
+  $ev = (string)$ev;
+  $sep = null;
+  if (strpos($ev,'|') !== false)      $sep = '|';
+  elseif (strpos($ev,';') !== false) $sep = ';';
+  elseif (strpos($ev,',') !== false) $sep = ',';
+
+  if ($sep !== null) {
+    foreach (explode($sep,$ev) as $p) {
+      $p = trim($p);
+      if ($p !== '') $files[] = $p;
+    }
+  } else {
+    $p = trim($ev);
+    if ($p !== '') $files[] = $p;
+  }
+
+  return $files;
+}
+
 ?>
 <!doctype html>
 <html lang="es">
@@ -473,10 +514,10 @@ tbody tr:hover{ background:rgba(255,255,255,.05) }
 }
 
 @media (min-width: 1100px){
-  thead th:nth-last-child(4), tbody td:nth-last-child(4){ width:140px }   /* Criticidad */
-  thead th:nth-last-child(3), tbody td:nth-last-child(3){ width:160px }   /* Estado */
-  thead th:nth-last-child(2), tbody td:nth-last-child(2){ width:360px }   /* Observación */
-  thead th:nth-last-child(1), tbody td:nth-last-child(1){ width:340px }   /* Evidencia */
+  thead th:nth-last-child(4), tbody td:nth-last-child(4){ width:140px }
+  thead th:nth-last-child(3), tbody td:nth-last-child(3){ width:160px }
+  thead th:nth-last-child(2), tbody td:nth-last-child(2){ width:360px }
+  thead th:nth-last-child(1), tbody td:nth-last-child(1){ width:340px }
 }
 
 select, input[type="text"]{
@@ -519,7 +560,6 @@ input[type="file"]{
 .brand-hero .brand-sub{ color:#b9c6d8 }
 
 /* Tooltip Acción Correctiva */
-.tip-wrap{ display:inline-flex; align-items:center; gap:.35rem }
 .tip-dot{
   display:inline-flex;
   width:18px; height:18px;
@@ -557,7 +597,7 @@ input[type="file"]{
 .tip{ position:relative; display:inline-flex; }
 .tip:hover .tip-box, .tip:focus-within .tip-box{ visibility:visible; opacity:1; }
 
-/* Criticidad (celda bien visible) */
+/* Criticidad */
 .td-criticidad{
   position: relative;
   transition: background-color .15s ease, border-color .15s ease, box-shadow .15s ease, color .15s ease;
@@ -570,11 +610,6 @@ input[type="file"]{
   border: 1px solid rgba(255,255,255,.28);
   border-radius: 8px;
   font-weight: 700;
-}
-.td-criticidad select option{
-  background: #0f1520;
-  color: #e5e7eb;
-  font-weight: 600;
 }
 .td-criticidad.crit-baja{
   background: linear-gradient(90deg, rgba(22,163,74,.92), rgba(22,163,74,.65));
@@ -630,7 +665,7 @@ input[type="file"]{
   color:#e5e7eb;
 }
 
-/* Footer tabla (paginador abajo) */
+/* Footer */
 .table-footer {
   margin-top: .75rem;
   display: flex;
@@ -645,9 +680,7 @@ input[type="file"]{
   box-shadow: 0 8px 24px rgba(0,0,0,.6);
   font-size: .8rem;
 }
-.table-footer .pagination {
-  margin-bottom: 0;
-}
+.table-footer .pagination { margin-bottom: 0; }
 .table-footer .page-link {
   background: #020617;
   border-color: rgba(148,163,184,.6);
@@ -661,9 +694,8 @@ input[type="file"]{
   border-color: #16a34a;
   color: #022c22;
 }
-.table-footer .page-item.disabled .page-link {
-  opacity: .35;
-}
+.table-footer .page-item.disabled .page-link { opacity: .35; }
+
 .form-compact{
   display:inline-flex;
   align-items:center;
@@ -683,7 +715,7 @@ input[type="file"]{
   font-size:.8rem;
 }
 
-/* === Botones Volver / Inicio arriba derecha === */
+/* Botones top */
 .top-right-actions{
   position:fixed;
   top:10px;
@@ -700,6 +732,24 @@ input[type="file"]{
     align-items:flex-end;
   }
 }
+
+/* Botón flotante Guardar */
+#floatingSave{
+  position:fixed;
+  right:16px;
+  bottom:16px;
+  z-index:1300;
+  box-shadow:0 10px 24px rgba(0,0,0,.55);
+}
+
+/* Estado por fila (autosave) */
+.row-status{
+  font-size:.78rem;
+  font-weight:800;
+  color:#a7f3d0;
+}
+.row-status.err{ color:#fecaca; }
+.row-status.muted{ color:#9fb3c8; }
 </style>
 </head>
 <body>
@@ -716,7 +766,6 @@ input[type="file"]{
   </div>
 </header>
 
-<!-- Botones fijos arriba a la derecha -->
 <div class="top-right-actions">
   <a
     class="btnx btnx--muted"
@@ -731,7 +780,6 @@ input[type="file"]{
   </a>
 </div>
 
-<!-- Toast de confirmación de guardado -->
 <div class="position-fixed top-0 start-50 translate-middle-x p-3" style="z-index: 11000;">
   <div id="saveToast" class="toast align-items-center text-bg-success border-0 shadow"
        role="alert" aria-live="assertive" aria-atomic="true"
@@ -748,17 +796,24 @@ input[type="file"]{
 
 <div class="page container-fluid">
 
-  <!-- Toolbar superior (sin Volver / Inicio, que están fijos arriba) -->
   <div class="d-flex align-items-center justify-content-between toolbar mb-3">
     <div class="left">
 
       <?php if ($lastUpd): ?>
-        <span class="badge-area">
+        <span class="badge-area" id="lastUpdBadge"
+              data-last-upd="<?= e((string)$lastUpd) ?>"
+              data-last-by="<?= e((string)$lastBy) ?>">
           Última actualización:
-          <b><?= e(date('d/m/Y H:i', strtotime($lastUpd))) ?></b>
+          <b id="lastUpdTime"><?= e(date('d/m/Y H:i', strtotime($lastUpd))) ?></b>
           <?php if ($lastBy): ?>
-            — por <b><?= e($lastBy) ?></b>
+            — por <b id="lastUpdBy"><?= e($lastBy) ?></b>
+          <?php else: ?>
+            — por <b id="lastUpdBy">—</b>
           <?php endif; ?>
+        </span>
+      <?php else: ?>
+        <span class="badge-area" id="lastUpdBadge" style="opacity:.75">
+          Última actualización: <b id="lastUpdTime">—</b> — por <b id="lastUpdBy">—</b>
         </span>
       <?php endif; ?>
 
@@ -793,7 +848,6 @@ input[type="file"]{
         </form>
       <?php endif; ?>
 
-      <!-- Ítems por página en la misma barra -->
       <form method="get" class="form-compact">
         <input type="hidden" name="p" value="<?= e($rel) ?>">
         <input type="hidden" name="s" value="<?= (int)$sheetIdx ?>">
@@ -829,7 +883,7 @@ input[type="file"]{
           <li><hr class="dropdown-divider"></li>
           <li class="dropdown-header">Formato</li>
           <li><a class="dropdown-item<?= $tableFmt==='classic'?' active':'' ?>" href="ver_tabla.php?<?= base_qs($rel,$sheetIdx,$debugShowColor,$perPage,'classic',$areaParam) ?>&setfmt=classic&page=<?= (int)$page ?>">Clásico</a></li>
-          <li><a class="dropdown-item<?= $tableFmt==='form'?' active':'' ?>" href="ver_tabla.php?<?= base_qs($rel,$sheetIdx,$debugShowColor,$perPage,'form',$areaParam) ?>&setfmt=form&page=<?= (int)$page ?>">Formulario (Predio/Dimensiones/...)</a></li>
+          <li><a class="dropdown-item<?= $tableFmt==='form'?' active':'' ?>" href="ver_tabla.php?<?= base_qs($rel,$sheetIdx,$debugShowColor,$perPage,'form',$areaParam) ?>&setfmt=form&page=<?= (int)$page ?>">Formulario</a></li>
         </ul>
       </div>
 
@@ -843,7 +897,6 @@ input[type="file"]{
     </div>
   </div>
 
-  <!-- Overlay -->
   <div id="overlay" aria-hidden="true"><div class="spinner" role="status" aria-label="Guardando..."></div></div>
 
   <form id="bulkForm" action="save_check_bulk.php" method="post" enctype="multipart/form-data" class="box">
@@ -869,7 +922,7 @@ input[type="file"]{
         <tbody>
         <?php
           if(empty($render)){
-            $extraCols = 4; // Criticidad, Estado, Observación, Evidencia
+            $extraCols = 4;
             echo '<tr><td colspan="'.(count($headers)+$extraCols).'" class="text-muted">No hay filas para esta página.</td></tr>';
           } else {
             foreach($render as $v){
@@ -882,20 +935,18 @@ input[type="file"]{
 
               $r = $v['cols'];
               $rowIdx=(int)$v['row_idx'];
-              $crit=$v['criticidad'];
-              $est=$v['estado'];
-              $obs=$v['observacion'];
-              $ev=$v['ev'];
-              $accion = $v['accion'] ?? '';
+              $crit=(string)($v['criticidad'] ?? '');
+              $est=(string)($v['estado'] ?? '');
+              $obs=(string)($v['observacion'] ?? '');
+              $ev =(string)($v['ev'] ?? '');
+              $accion = (string)($v['accion'] ?? '');
 
               $critClass = ($crit==='baja' ? 'crit-baja' : ($crit==='media' ? 'crit-media' : ($crit==='alta' ? 'crit-alta' : '')));
 
-              echo '<tr>';
+              echo '<tr data-row="'.$rowIdx.'">';
 
-              // Columna 1 (Nro)
               echo '<td>'.e($r[0] ?? '').'</td>';
 
-              // Columna 2 (Observaciones) + Tooltip
               echo '<td>';
               echo e($r[1] ?? '');
               if($hasAccionTooltip && $accion !== ''){
@@ -906,7 +957,6 @@ input[type="file"]{
               }
               echo '</td>';
 
-              // Criticidad
               echo '<td class="td-criticidad '.e($critClass).'">';
               echo '<select name="criticidad['.$rowIdx.']" class="form-select form-select-sm criticidad-select" data-row="'.$rowIdx.'">';
               $opts = [''=>'—','baja'=>'Baja','media'=>'Media','alta'=>'Alta'];
@@ -917,21 +967,17 @@ input[type="file"]{
               echo '</select>';
               echo '</td>';
 
-              // Estado
-              echo '<td><select name="estado['.$rowIdx.']" class="form-select form-select-sm">';
+              echo '<td><select name="estado['.$rowIdx.']" class="form-select form-select-sm" data-row="'.$rowIdx.'">';
               echo '<option value="" '.($est===''?'selected':'').'>—</option>';
               echo '<option value="si" '.($est==='si'?'selected':'').'>Sí</option>';
               echo '<option value="no" '.($est==='no'?'selected':'').'>No</option>';
               echo '</select></td>';
 
-              // Observación editable
-              echo '<td><input class="form-control form-control-sm" type="text" name="observacion['.$rowIdx.']" value="'.e($obs).'" placeholder="Escribir..."></td>';
+              echo '<td><input class="form-control form-control-sm" type="text" name="observacion['.$rowIdx.']" data-row="'.$rowIdx.'" value="'.e($obs).'" placeholder="Escribir..."></td>';
 
-              // ==== Evidencia (múltiples archivos + listado) ====
               echo '<td>';
               echo '<div class="d-flex flex-column gap-2 ev-cell" data-row="'.$rowIdx.'">';
 
-              // Input file múltiple
               echo '<div>';
               echo '<input '
                   .'class="form-control form-control-sm ev-input" '
@@ -942,34 +988,8 @@ input[type="file"]{
                   .'accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.ppt,.pptx,.rar,.zip,.7z,.jpg,.jpeg,.png,.webp">';
               echo '</div>';
 
-              // Normalizar evidencia_path a array de rutas
-              $files = [];
-              if ($ev) {
-                $decoded = json_decode((string)$ev, true);
-                if (is_array($decoded)) {
-                  foreach ($decoded as $p) {
-                    $p = trim((string)$p);
-                    if ($p !== '') { $files[] = $p; }
-                  }
-                } else {
-                  $sep = null;
-                  if (strpos((string)$ev, '|') !== false)      $sep = '|';
-                  elseif (strpos((string)$ev, ';') !== false) $sep = ';';
-                  elseif (strpos((string)$ev, ',') !== false) $sep = ',';
+              $files = evidencia_to_array_local($ev);
 
-                  if ($sep !== null) {
-                    foreach (explode($sep, (string)$ev) as $p) {
-                      $p = trim($p);
-                      if ($p !== '') { $files[] = $p; }
-                    }
-                  } else {
-                    $p = trim((string)$ev);
-                    if ($p !== '') { $files[] = $p; }
-                  }
-                }
-              }
-
-              // Archivos ya cargados
               echo '<div class="ev-current small" id="ev-current-'.$rowIdx.'">';
               if ($files) {
                 $qsBack = $baseQS.'&page='.(int)$page;
@@ -977,23 +997,31 @@ input[type="file"]{
                 foreach ($files as $idx => $path) {
                   $label = basename($path);
                   $href  = '../'.ltrim($path, '/');
-                  echo '<div class="btn-group btn-group-sm mb-1" role="group">';
+
+                  // ⬇️ IMPORTANTE: incluye row, file + (p,s,pp,page,fmt,area,...)
+                  $delUrl = 'delete_evidencia.php?row='.$rowIdx.'&file='.$idx.'&'.$qsBack;
+
+                  echo '<div class="btn-group btn-group-sm mb-1" role="group" data-ev-item="1" data-ev-row="'.$rowIdx.'" data-ev-idx="'.$idx.'">';
                   echo '  <a class="btn btn-outline-info" href="'.e($href).'" target="_blank">'.e($label).'</a>';
-                  echo '  <a class="btn btn-outline-danger" '
-                       .'href="delete_evidencia.php?row='.$rowIdx.'&file='.$idx.'&'.$qsBack.'" '
-                       .'onclick="return confirm(\'¿Eliminar este archivo de evidencia?\')">&times;</a>';
+
+                  // ✅ SIN onclick: fallback real si no hay JS
+                  echo '  <a class="btn btn-outline-danger ev-del" href="'.e($delUrl).'" '
+                       .'data-del-url="'.e($delUrl).'" '
+                       .'data-row="'.$rowIdx.'" data-idx="'.$idx.'" '
+                       .'title="Eliminar">&times;</a>';
+
                   echo '</div>';
                 }
                 echo '</div>';
               } else {
                 echo '<span class="text-muted">Sin archivos cargados…</span>';
               }
-              echo '</div>'; // ev-current
+              echo '</div>';
 
-              // Archivos recién seleccionados (sin guardar aún)
               echo '<div class="ev-selected small text-info" id="ev-selected-'.$rowIdx.'"></div>';
+              echo '<div class="row-status muted" id="row-status-'.$rowIdx.'"></div>';
 
-              echo '</div>'; // ev-cell
+              echo '</div>';
               echo '</td>';
 
               echo '</tr>';
@@ -1005,7 +1033,6 @@ input[type="file"]{
     </div>
   </form>
 
-  <!-- Footer con resumen + paginador abajo -->
   <?php if ($totalItems > 0 || $totalPages > 1): ?>
     <div class="table-footer mt-2">
       <div>
@@ -1030,7 +1057,7 @@ input[type="file"]{
                 if($from>2) echo '<li class="page-item disabled"><span class="page-link">…</span></li>';
               }
               for($p=$from;$p<=$to;$p++){
-                $act = $p===$page?' active':''; 
+                $act = $p===$page?' active':'';
                 echo '<li class="page-item'.$act.'"><a class="page-link" href="ver_tabla.php?'.$baseQS.'&page='.$p.'">'.$p.'</a></li>';
               }
               if($to<$totalPages){
@@ -1049,7 +1076,10 @@ input[type="file"]{
 
 </div>
 
-<!-- Bootstrap JS -->
+<button id="floatingSave" type="button" class="btnx btnx--accent" title="Guardar cambios">
+  💾 Guardar
+</button>
+
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
 <script>
@@ -1070,8 +1100,72 @@ input[type="file"]{
     document.body.removeAttribute('aria-busy');
   }
 
+  function qsVal(name){
+    const el = form ? form.querySelector('input[name="'+name+'"]') : null;
+    return el ? el.value : '';
+  }
+
+  function setRowStatus(rowIdx, msg, kind){
+    const el = document.getElementById('row-status-'+rowIdx);
+    if(!el) return;
+    el.classList.remove('err','muted');
+    if(kind === 'err') el.classList.add('err');
+    else if(kind === 'muted') el.classList.add('muted');
+    el.textContent = msg || '';
+  }
+
+  function markRowSaving(rowIdx, saving){
+    const tr = document.querySelector('tr[data-row="'+rowIdx+'"]');
+    if(!tr) return;
+    tr.style.opacity = saving ? '0.75' : '1';
+  }
+
+  function escapeHtml(str){
+    return String(str).replace(/[&<>"']/g, function(m){
+      return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[m] || m;
+    });
+  }
+
+  function nowFmt(){
+    try{
+      const d = new Date();
+      return d.toLocaleString('es-AR', {
+        year:'numeric', month:'2-digit', day:'2-digit',
+        hour:'2-digit', minute:'2-digit'
+      }).replace(',', '');
+    }catch(e){
+      return '';
+    }
+  }
+
+  function updateLastUpdBadge(updatedBy){
+    const t = document.getElementById('lastUpdTime');
+    const b = document.getElementById('lastUpdBy');
+    const badge = document.getElementById('lastUpdBadge');
+    if(t) t.textContent = nowFmt() || '—';
+    if(b) b.textContent = updatedBy ? String(updatedBy) : '—';
+    if(badge) badge.style.opacity = '1';
+  }
+
+  async function readJsonOrText(res){
+    const ct = (res.headers.get('content-type') || '').toLowerCase();
+    if(ct.includes('application/json')){
+      const j = await res.json().catch(()=>null);
+      return { json: j, text: null };
+    }
+    const text = await res.text().catch(()=> '');
+    return { json: null, text };
+  }
+
+  // Botón flotante
+  const floatingSave = document.getElementById('floatingSave');
+  if (floatingSave && form) {
+    floatingSave.addEventListener('click', function(){
+      form.requestSubmit();
+    });
+  }
+
   if(form){
-    // Guardado manual (botón 💾)
     form.addEventListener('submit', function(){
       showOverlay();
       const toDisable = document.querySelectorAll('button, a.btnx');
@@ -1091,20 +1185,24 @@ input[type="file"]{
         fetch('save_check_bulk.php', {
           method: 'POST',
           body: fd,
-          credentials: 'same-origin'
-        }).then(function(){
-          window.location.href = href;
-        }).catch(function(){
-          hideOverlay();
-          if(confirm('Ocurrió un error al guardar automáticamente. ¿Deseás cambiar de página igualmente?')){
-            window.location.href = href;
+          credentials: 'same-origin',
+          headers: { 'X-Requested-With': 'XMLHttpRequest' }
+        }).then(async function(res){
+          if(!res.ok){
+            const r = await readJsonOrText(res);
+            const msg = (r.json && r.json.msg) ? r.json.msg : (r.text || ('HTTP '+res.status));
+            throw new Error(msg);
           }
+          window.location.href = href;
+        }).catch(function(err){
+          hideOverlay();
+          alert('Error al guardar automáticamente:\n' + err.message);
         });
       });
     });
   }
 
-  // Aplicar clase de color a la celda de Criticidad
+  // Criticidad color
   function applyCritClass(sel){
     const td = sel.closest('td');
     if(!td) return;
@@ -1114,61 +1212,234 @@ input[type="file"]{
     else if(sel.value === 'alta') td.classList.add('crit-alta');
   }
   document.querySelectorAll('.criticidad-select').forEach(function(sel){
-    applyCritClass(sel);   // estado inicial
+    applyCritClass(sel);
     sel.addEventListener('change', function(){ applyCritClass(sel); });
   });
 
-  // Popup de confirmación de guardado (toast Bootstrap)
+  // Toast guardado manual (?saved=1)
   const wasSaved = <?= $savedFlag ? 'true' : 'false' ?>;
   if (wasSaved && window.bootstrap) {
     const toastEl = document.getElementById('saveToast');
     if (toastEl) {
       const toast = new bootstrap.Toast(toastEl);
       toast.show();
-
-      // Limpiar el parámetro ?saved=1 de la URL
       try {
         const url = new URL(window.location.href);
         url.searchParams.delete('saved');
         window.history.replaceState({}, '', url);
-      } catch (e) {
-        // ignore
-      }
+      } catch (e) {}
     }
   }
 
-  // === Mostrar nombres de archivos seleccionados (sin guardar aún) ===
-  function escapeHtml(str){
-    return String(str).replace(/[&<>"']/g, function(m){
-      return ({
-        '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
-      })[m] || m;
-    });
-  }
-
+  // Mostrar nombres seleccionados
   document.querySelectorAll('.ev-input').forEach(function(input){
     input.addEventListener('change', function(){
-      var row = this.getAttribute('data-row') || (this.name.match(/\[(\d+)\]/) || [null, null])[1];
-      if (!row) return;
+      const row = this.getAttribute('data-row');
+      if(!row) return;
+      const rowIdx = parseInt(row,10);
 
-      var box = document.getElementById('ev-selected-'+row);
-      if (!box) return;
+      const box = document.getElementById('ev-selected-'+rowIdx);
+      if(!box) return;
 
-      var files = Array.from(this.files || []);
-      if (!files.length) {
+      const files = Array.from(this.files || []);
+      if(!files.length){
         box.innerHTML = '';
         return;
       }
 
-      var html = '<div class="text-info">Archivos seleccionados (pendiente de guardar):</div>';
+      let html = '<div class="text-info">Archivos seleccionados (se subirán automáticamente):</div>';
       html += '<ul class="mb-0 ps-3">';
-      files.forEach(function(f){
-        html += '<li>'+escapeHtml(f.name)+'</li>';
-      });
-      html += '</ul>';
-      html += '<div class="text-muted mt-1">Recordá presionar "Guardar" para subirlos.</div>';
-
+      files.forEach(f => { html += '<li>'+escapeHtml(f.name)+'</li>'; });
+      html += '</ul><div class="text-muted mt-1">Subiendo…</div>';
       box.innerHTML = html;
+
+      setRowStatus(rowIdx, 'Subiendo evidencia…', 'muted');
+    });
+  });
+
+  // ===== Autosave por fila =====
+  const rowTimers = new Map();
+
+  async function saveRow(rowIdx, includeFiles){
+    if(!form) return;
+
+    const fd = new FormData();
+    fd.append('mode', 'row');
+    fd.append('row_idx', String(rowIdx));
+
+    fd.append('file_rel', qsVal('file_rel'));
+    fd.append('sheet', qsVal('sheet'));
+    fd.append('showcolor', qsVal('showcolor'));
+    fd.append('pp', qsVal('pp'));
+    fd.append('page', qsVal('page'));
+    fd.append('fmt', qsVal('fmt'));
+    fd.append('area', qsVal('area'));
+
+    const crit = document.querySelector('select[name="criticidad['+rowIdx+']"]');
+    const est  = document.querySelector('select[name="estado['+rowIdx+']"]');
+    const obs  = document.querySelector('input[name="observacion['+rowIdx+']"]');
+
+    if(crit) fd.append('criticidad['+rowIdx+']', crit.value);
+    if(est)  fd.append('estado['+rowIdx+']', est.value);
+    if(obs)  fd.append('observacion['+rowIdx+']', obs.value);
+
+    if(includeFiles){
+      const input = document.querySelector('input.ev-input[data-row="'+rowIdx+'"]');
+      if(input && input.files && input.files.length){
+        Array.from(input.files).forEach(f => fd.append('evidencia['+rowIdx+'][]', f, f.name));
+      }
+    }
+
+    markRowSaving(rowIdx, true);
+    setRowStatus(rowIdx, includeFiles ? 'Guardando evidencia…' : 'Guardando…', 'muted');
+
+    const res = await fetch('save_check_bulk.php', {
+      method: 'POST',
+      body: fd,
+      credentials: 'same-origin',
+      headers: { 'X-Requested-With': 'XMLHttpRequest' }
+    });
+
+    markRowSaving(rowIdx, false);
+
+    if(!res.ok){
+      const r = await readJsonOrText(res);
+      const msg = (r.json && r.json.msg) ? r.json.msg : (r.text || ('HTTP '+res.status));
+      throw new Error(msg);
+    }
+
+    const j = await res.json().catch(()=>null);
+    if(!j || !j.ok) throw new Error((j && j.msg) ? j.msg : 'Error al guardar fila');
+
+    // Actualizar "Última actualización" en vivo
+    updateLastUpdBadge(j.updated_by || '');
+
+    // refrescar lista evidencia si aplica
+    if(includeFiles && j.files && Array.isArray(j.files)){
+      const boxSel = document.getElementById('ev-selected-'+rowIdx);
+      if(boxSel) boxSel.innerHTML = '<div class="text-success">✅ Evidencia guardada.</div>';
+
+      const evCurrent = document.getElementById('ev-current-'+rowIdx);
+      if(evCurrent){
+        if(!j.files.length){
+          evCurrent.innerHTML = '<span class="text-muted">Sin archivos cargados…</span>';
+        } else {
+          let html = '<div class="d-flex flex-wrap gap-1">';
+          j.files.forEach((path, idx) => {
+            const label = (path || '').split('/').pop();
+            const href = '../' + String(path || '').replace(/^\/+/, '');
+            const delUrl = 'delete_evidencia.php?row='+rowIdx+'&file='+idx+'&' + (j.qs_back || '');
+            html += '<div class="btn-group btn-group-sm mb-1" role="group" data-ev-item="1" data-ev-row="'+rowIdx+'" data-ev-idx="'+idx+'">';
+            html += '  <a class="btn btn-outline-info" href="'+escapeHtml(href)+'" target="_blank">'+escapeHtml(label)+'</a>';
+            html += '  <a class="btn btn-outline-danger ev-del" href="'+escapeHtml(delUrl)+'" data-del-url="'+escapeHtml(delUrl)+'" data-row="'+rowIdx+'" data-idx="'+idx+'" title="Eliminar">&times;</a>';
+            html += '</div>';
+          });
+          html += '</div>';
+          evCurrent.innerHTML = html;
+        }
+      }
+
+      const input = document.querySelector('input.ev-input[data-row="'+rowIdx+'"]');
+      if(input) input.value = '';
+    }
+
+    setRowStatus(rowIdx, '✅ Guardado', '');
+    setTimeout(() => setRowStatus(rowIdx, '', 'muted'), 1200);
+  }
+
+  // Selects: guarda inmediato
+  document.querySelectorAll('select[name^="criticidad["], select[name^="estado["]').forEach(function(el){
+    el.addEventListener('change', function(){
+      const m = this.name.match(/\[(\d+)\]/);
+      if(!m) return;
+      const rowIdx = parseInt(m[1],10);
+      saveRow(rowIdx, false).catch(err => setRowStatus(rowIdx, '❌ '+err.message, 'err'));
+    });
+  });
+
+  // Observación: debounce
+  document.querySelectorAll('input[name^="observacion["]').forEach(function(el){
+    el.addEventListener('input', function(){
+      const m = this.name.match(/\[(\d+)\]/);
+      if(!m) return;
+      const rowIdx = parseInt(m[1],10);
+
+      if(rowTimers.has(rowIdx)) clearTimeout(rowTimers.get(rowIdx));
+      rowTimers.set(rowIdx, setTimeout(() => {
+        saveRow(rowIdx, false).catch(err => setRowStatus(rowIdx, '❌ '+err.message, 'err'));
+      }, 800));
+    });
+  });
+
+  // Evidencia: autosube al seleccionar
+  document.querySelectorAll('.ev-input').forEach(function(input){
+    input.addEventListener('change', function(){
+      const row = this.getAttribute('data-row');
+      if(!row) return;
+      const rowIdx = parseInt(row,10);
+      saveRow(rowIdx, true).catch(err => setRowStatus(rowIdx, '❌ '+err.message, 'err'));
+    });
+  });
+
+  // ===== Borrar evidencia sin recargar (AJAX) =====
+  document.addEventListener('click', function(ev){
+    const a = ev.target && ev.target.closest ? ev.target.closest('a.ev-del') : null;
+    if(!a) return;
+
+    // si no hay JS, el link funciona normal. Con JS: interceptamos.
+    ev.preventDefault();
+
+    const rowIdx = parseInt(a.getAttribute('data-row') || '0', 10);
+    const url = a.getAttribute('data-del-url') || a.getAttribute('href');
+    if(!rowIdx || !url) return;
+
+    if(!confirm('¿Eliminar este archivo de evidencia?')) return;
+
+    setRowStatus(rowIdx, 'Eliminando evidencia…', 'muted');
+
+    fetch(url, {
+      method: 'GET',
+      credentials: 'same-origin',
+      headers: { 'X-Requested-With': 'XMLHttpRequest' }
+    }).then(async (res) => {
+      if(!res.ok){
+        const r = await readJsonOrText(res);
+        const msg = (r.json && (r.json.msg || r.json.error)) ? (r.json.msg || r.json.error) : (r.text || ('HTTP '+res.status));
+        throw new Error(msg);
+      }
+      const j = await res.json().catch(()=>null);
+      if(!j || !j.ok) throw new Error((j && (j.msg||j.error)) ? (j.msg||j.error) : 'Error al eliminar');
+
+      // Actualizar "Última actualización"
+      updateLastUpdBadge(j.updated_by || '');
+
+      const evCurrent = document.getElementById('ev-current-'+rowIdx);
+      if(evCurrent && j.files && Array.isArray(j.files)){
+        if(!j.files.length){
+          evCurrent.innerHTML = '<span class="text-muted">Sin archivos cargados…</span>';
+        } else {
+          let html = '<div class="d-flex flex-wrap gap-1">';
+          j.files.forEach((path, idx) => {
+            const label = (path || '').split('/').pop();
+            const href = '../' + String(path || '').replace(/^\/+/, '');
+            const delUrl = 'delete_evidencia.php?row='+rowIdx+'&file='+idx+'&' + (j.qs_back || '');
+            html += '<div class="btn-group btn-group-sm mb-1" role="group" data-ev-item="1" data-ev-row="'+rowIdx+'" data-ev-idx="'+idx+'">';
+            html += '  <a class="btn btn-outline-info" href="'+escapeHtml(href)+'" target="_blank">'+escapeHtml(label)+'</a>';
+            html += '  <a class="btn btn-outline-danger ev-del" href="'+escapeHtml(delUrl)+'" data-del-url="'+escapeHtml(delUrl)+'" data-row="'+rowIdx+'" data-idx="'+idx+'" title="Eliminar">&times;</a>';
+            html += '</div>';
+          });
+          html += '</div>';
+          evCurrent.innerHTML = html;
+        }
+      }
+
+      setRowStatus(rowIdx, '✅ Evidencia eliminada', '');
+      setTimeout(() => setRowStatus(rowIdx, '', 'muted'), 1200);
+
+    }).catch(err => {
+      setRowStatus(rowIdx, '❌ '+err.message, 'err');
+      // fallback duro si querés:
+      // window.location.href = url;
     });
   });
 

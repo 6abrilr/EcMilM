@@ -15,10 +15,10 @@ const IDLE_TIMEOUT = 900; // 15 minutos
 
 /*
  * URL del login.
- * Si tu sistema está en http://IP/inspeccion/ y el login en /inspeccion/login.php,
+ * Si tu sistema está en http://IP/ea y el login en /ea/login.php,
  * esta ruta es correcta. Si lo tenés en otro lado, AJUSTAR.
  */
-const LOGIN_URL = '/inspeccion/login.php';
+const LOGIN_URL = '/ea/login.php';
 
 /* ================= CSRF ================= */
 
@@ -122,3 +122,4 @@ function require_login(): void {
 function is_logged_in(): bool {
     return !empty($_SESSION['user']) && is_array($_SESSION['user']);
 }
+

@@ -1,5 +1,5 @@
 <?php
-// public/rol_combate.php — Rol de Combate B Com 602 (tabla única con filtros)
+// public/rol_combate.php — Rol de Combate (tabla única con filtros) — Compatible con DB "unidad" actual
 declare(strict_types=1);
 
 require_once __DIR__ . '/../auth/bootstrap.php';
@@ -7,11 +7,16 @@ require_login();
 require_once __DIR__ . '/../config/db.php';
 
 function e($v){ return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'); }
+function norm_dni(string $dni): string { return preg_replace('/\D+/', '', $dni) ?? ''; }
 
 /* ===== Usuario / permisos ===== */
 $user = function_exists('current_user') ? current_user() : ($_SESSION['user'] ?? []);
 
-// ADAPTAR ESTAS CLAVES A TU CPS SI FUERA NECESARIO (para el botón "Volver a áreas")
+// Unidad activa (según tu bootstrap / sesión). Fallback a 1.
+$unidadActiva = (int)($_SESSION['unidad_id_activa'] ?? ($_SESSION['unidad_id'] ?? 1));
+if ($unidadActiva <= 0) $unidadActiva = 1;
+
+// ADAPTAR ESTAS CLAVES A TU CPS SI FUERA NECESARIO (para el botón "Volver")
 $areaSesion = strtoupper(trim((string)($user['area'] ?? '')));   // ej: 'S1' o 'S3'
 $esS1       = ($areaSesion === 'S1');
 $esS3       = ($areaSesion === 'S3');
@@ -21,22 +26,26 @@ $rolApp         = 'usuario';
 $areasAccesoArr = [];
 
 try {
-    // Usamos el DNI del usuario logueado (como en areas.php)
-    $dniUser = trim((string)($user['dni'] ?? ''));
-
+    $dniUser = norm_dni((string)($user['dni'] ?? $user['username'] ?? ''));
     if ($dniUser !== '' && isset($pdo)) {
-        $sqlRoles = "SELECT rol_app, areas_acceso
-                     FROM roles_locales
-                     WHERE dni = :dni
-                     LIMIT 1";
+        // Preferimos el registro de la unidad; si no existe, tomamos el de unidad_id NULL
+        $sqlRoles = "
+          SELECT rol_app, areas_acceso
+          FROM roles_locales
+          WHERE dni = :dni
+            AND (unidad_id = :uid OR unidad_id IS NULL)
+          ORDER BY CASE WHEN unidad_id = :uid THEN 1 ELSE 2 END
+          LIMIT 1
+        ";
         $stmtRoles = $pdo->prepare($sqlRoles);
-        $stmtRoles->execute([':dni' => $dniUser]);
+        $stmtRoles->execute([':dni' => $dniUser, ':uid'=>$unidadActiva]);
+
         if ($rowRol = $stmtRoles->fetch(PDO::FETCH_ASSOC)) {
             $rolApp = strtolower(trim((string)($rowRol['rol_app'] ?? 'usuario')));
 
             // areas_acceso viene como JSON: ["S1","S3",...]
             $rawAreas = $rowRol['areas_acceso'] ?? '[]';
-            $tmp = json_decode($rawAreas, true);
+            $tmp = json_decode((string)$rawAreas, true);
             if (is_array($tmp)) {
                 $areasAccesoArr = array_map(
                     static fn($x) => strtoupper(trim((string)$x)),
@@ -46,7 +55,6 @@ try {
         }
     }
 } catch (Throwable $e) {
-    // fail-safe: sin permisos
     $rolApp         = 'usuario';
     $areasAccesoArr = [];
 }
@@ -62,7 +70,7 @@ if ($esS1) {
 } elseif ($esS3) {
     $areasUrl = 'areas_s3.php';
 } else {
-    $areasUrl = 'elegir_inicio.php';
+    $areasUrl = 'inicio.php';
 }
 
 /* ===== Rutas / assets ===== */
@@ -84,8 +92,247 @@ $RC_ELEMENTOS = [
     8 => 'Personal en Comisión',
 ];
 
+/* ==========================================================
+   Helpers: Nota JSON (guardamos campos extra dentro de rca.nota)
+   ========================================================== */
+function nota_to_array(?string $nota): array {
+    if (!$nota) return [];
+    $nota = trim($nota);
+    if ($nota === '') return [];
+    $j = json_decode($nota, true);
+    return is_array($j) ? $j : [];
+}
+function array_to_nota(array $a): string {
+    // guardamos un JSON compacto
+    $j = json_encode($a, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    return is_string($j) ? $j : '{}';
+}
+
+/* ==========================================================
+   Asegurar que existan los 8 "elementos" en rol_combate (sin cambiar esquema)
+   - Usamos rol_combate.orden = 1..8 como "sección"
+   - rol_combate.rol = nombre del elemento (solo para catálogo)
+   ========================================================== */
+try {
+    $pdo->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
+
+    $st = $pdo->prepare("SELECT id, orden FROM rol_combate WHERE unidad_id=:uid");
+    $st->execute([':uid'=>$unidadActiva]);
+    $exist = $st->fetchAll() ?: [];
+    $mapOrdenToId = [];
+    foreach ($exist as $r) {
+        $ord = (int)($r['orden'] ?? 0);
+        $id  = (int)($r['id'] ?? 0);
+        if ($ord >= 1 && $ord <= 8 && $id > 0) $mapOrdenToId[$ord] = $id;
+    }
+
+    // Insertar faltantes (no rompe si ya están)
+    foreach ($RC_ELEMENTOS as $ord => $label) {
+        if (!isset($mapOrdenToId[$ord])) {
+            $ins = $pdo->prepare("
+              INSERT INTO rol_combate (unidad_id, categoria, rol, orden)
+              VALUES (:uid, :cat, :rol, :ord)
+            ");
+            $ins->execute([
+                ':uid'=>$unidadActiva,
+                ':cat'=>'elemento',
+                ':rol'=>$label,
+                ':ord'=>$ord
+            ]);
+        }
+    }
+} catch (Throwable $e) {
+    // si falla, seguimos igual (solo catálogo)
+}
+
+/* ==========================================================
+   AJAX: Guardar cambios (sin rol_combate_ajax.php)
+   - Guarda los campos extra dentro de rca.nota (JSON)
+   - Cambiar "Elemento" actualiza rca.rol_id apuntando al rol_combate con ese orden
+   ========================================================== */
+$isAjax = ($_SERVER['REQUEST_METHOD'] === 'POST')
+    && (($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '') === 'XMLHttpRequest');
+
+if ($isAjax) {
+    if (function_exists('csrf_verify')) csrf_verify();
+
+    header('Content-Type: application/json; charset=utf-8');
+
+    try {
+        if (!$puedeEditar) {
+            throw new RuntimeException('Sin permisos para editar (requiere acceso S3).');
+        }
+
+        $personalId   = (int)($_POST['personal_id'] ?? 0);
+        $asignacionId = (int)($_POST['asignacion_id'] ?? 0);
+        $rolId        = (int)($_POST['rol_id'] ?? 0);
+        $seccion      = (int)($_POST['seccion'] ?? 0);
+        $campo        = trim((string)($_POST['campo'] ?? ''));
+        $valor        = trim((string)($_POST['valor'] ?? ''));
+
+        if ($personalId <= 0) throw new RuntimeException('personal_id inválido.');
+        if ($campo === '') throw new RuntimeException('campo inválido.');
+
+        // Validar que el personal pertenezca a la unidad activa
+        $stP = $pdo->prepare("SELECT id FROM personal_unidad WHERE id=:pid AND unidad_id=:uid LIMIT 1");
+        $stP->execute([':pid'=>$personalId, ':uid'=>$unidadActiva]);
+        if (!$stP->fetchColumn()) throw new RuntimeException('Personal no pertenece a la unidad activa.');
+
+        // Resolver rol_combate (elemento) por seccion (orden)
+        $resolverRolPorSeccion = function(int $sec) use ($pdo, $unidadActiva): int {
+            if ($sec < 1 || $sec > 8) return 0;
+            $st = $pdo->prepare("SELECT id FROM rol_combate WHERE unidad_id=:uid AND orden=:o LIMIT 1");
+            $st->execute([':uid'=>$unidadActiva, ':o'=>$sec]);
+            return (int)($st->fetchColumn() ?: 0);
+        };
+
+        // Buscar asignación activa si no viene asignacion_id
+        if ($asignacionId <= 0) {
+            $stA = $pdo->prepare("
+              SELECT id, rol_id, nota
+              FROM rol_combate_asignaciones
+              WHERE unidad_id=:uid AND personal_id=:pid
+                AND (hasta IS NULL OR hasta > CURDATE())
+              ORDER BY id DESC
+              LIMIT 1
+            ");
+            $stA->execute([':uid'=>$unidadActiva, ':pid'=>$personalId]);
+            if ($rowA = $stA->fetch(PDO::FETCH_ASSOC)) {
+                $asignacionId = (int)$rowA['id'];
+                $rolId = (int)($rowA['rol_id'] ?? 0);
+            }
+        }
+
+        // 1) Cambiar elemento (seccion) => cambia rca.rol_id
+        if ($campo === 'seccion') {
+            if ($seccion < 1 || $seccion > 8) {
+                throw new RuntimeException('Sección inválida (1..8).');
+            }
+
+            $rolElementoId = $resolverRolPorSeccion($seccion);
+            if ($rolElementoId <= 0) throw new RuntimeException('No se pudo resolver rol_combate para esa sección.');
+
+            if ($asignacionId > 0) {
+                $up = $pdo->prepare("
+                  UPDATE rol_combate_asignaciones
+                  SET rol_id=:rid
+                  WHERE id=:id AND unidad_id=:uid AND personal_id=:pid
+                  LIMIT 1
+                ");
+                $up->execute([':rid'=>$rolElementoId, ':id'=>$asignacionId, ':uid'=>$unidadActiva, ':pid'=>$personalId]);
+            } else {
+                $ins = $pdo->prepare("
+                  INSERT INTO rol_combate_asignaciones
+                    (unidad_id, rol_id, personal_id, desde, hasta, nota, created_at, created_by_id)
+                  VALUES
+                    (:uid, :rid, :pid, CURDATE(), NULL, NULL, NOW(), :cb)
+                ");
+                $ins->execute([
+                    ':uid'=>$unidadActiva,
+                    ':rid'=>$rolElementoId,
+                    ':pid'=>$personalId,
+                    ':cb'=> (int)($_SESSION['user_personal_id'] ?? 0) ?: null
+                ]);
+                $asignacionId = (int)$pdo->lastInsertId();
+            }
+
+            echo json_encode([
+                'ok'=>true,
+                'asignacion_id'=>$asignacionId,
+                'rol_id'=>$rolElementoId,
+                'seccion'=>$seccion,
+            ], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+
+        // Para cualquier otro campo: necesitamos seccion válida
+        if ($seccion < 1 || $seccion > 8) {
+            // si no vino, intentamos deducirla por rolId actual
+            if ($rolId > 0) {
+                $st = $pdo->prepare("SELECT orden FROM rol_combate WHERE id=:id AND unidad_id=:uid LIMIT 1");
+                $st->execute([':id'=>$rolId, ':uid'=>$unidadActiva]);
+                $seccion = (int)($st->fetchColumn() ?: 0);
+            }
+        }
+        if ($seccion < 1 || $seccion > 8) {
+            throw new RuntimeException('Primero seleccione un Elemento (1..8).');
+        }
+
+        // Si no hay asignación, la creamos con rol_id según sección
+        if ($asignacionId <= 0) {
+            $rolElementoId = $resolverRolPorSeccion($seccion);
+            if ($rolElementoId <= 0) throw new RuntimeException('No se pudo resolver rol_combate para la sección.');
+            $ins = $pdo->prepare("
+              INSERT INTO rol_combate_asignaciones
+                (unidad_id, rol_id, personal_id, desde, hasta, nota, created_at, created_by_id)
+              VALUES
+                (:uid, :rid, :pid, CURDATE(), NULL, NULL, NOW(), :cb)
+            ");
+            $ins->execute([
+                ':uid'=>$unidadActiva,
+                ':rid'=>$rolElementoId,
+                ':pid'=>$personalId,
+                ':cb'=> (int)($_SESSION['user_personal_id'] ?? 0) ?: null
+            ]);
+            $asignacionId = (int)$pdo->lastInsertId();
+            $rolId = $rolElementoId;
+        }
+
+        // Leer nota actual
+        $stN = $pdo->prepare("SELECT nota FROM rol_combate_asignaciones WHERE id=:id AND unidad_id=:uid AND personal_id=:pid LIMIT 1");
+        $stN->execute([':id'=>$asignacionId, ':uid'=>$unidadActiva, ':pid'=>$personalId]);
+        $notaRaw = (string)($stN->fetchColumn() ?? '');
+
+        $notaArr = nota_to_array($notaRaw);
+
+        // Campos soportados (guardados en JSON dentro de nota)
+        $allowed = [
+            'rol_combate',
+            'armamento_principal',
+            'ni_armamento_principal',
+            'armamento_secundario',
+            'ni_armamento_secundario',
+            'rol_administrativo',
+            'vehiculo',
+        ];
+        if (!in_array($campo, $allowed, true)) {
+            throw new RuntimeException('Campo no permitido.');
+        }
+
+        // Set / unset
+        if ($valor === '') {
+            unset($notaArr[$campo]);
+        } else {
+            $notaArr[$campo] = $valor;
+        }
+
+        $notaJson = array_to_nota($notaArr);
+
+        $up = $pdo->prepare("
+          UPDATE rol_combate_asignaciones
+          SET nota=:nota
+          WHERE id=:id AND unidad_id=:uid AND personal_id=:pid
+          LIMIT 1
+        ");
+        $up->execute([':nota'=>$notaJson, ':id'=>$asignacionId, ':uid'=>$unidadActiva, ':pid'=>$personalId]);
+
+        echo json_encode([
+            'ok'=>true,
+            'asignacion_id'=>$asignacionId,
+            'rol_id'=>$rolId,
+            'seccion'=>$seccion,
+        ], JSON_UNESCAPED_UNICODE);
+        exit;
+
+    } catch (Throwable $ex) {
+        http_response_code(400);
+        echo json_encode(['ok'=>false, 'error'=>$ex->getMessage()], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+}
+
 /* ===== Parámetros de filtros ===== */
-$personaId      = isset($_GET['id']) ? (int)$_GET['id'] : 0; // por si venís de otro lado
+$personaId      = isset($_GET['id']) ? (int)$_GET['id'] : 0;
 $from           = $_GET['from'] ?? 's1';
 if ($from !== 's1' && $from !== 's3') $from = 's1';
 
@@ -102,68 +349,78 @@ try {
 
     $sql = "
         SELECT
-            p.id                  AS personal_id,
+            p.id              AS personal_id,
             p.dni,
             p.grado,
-            p.arma_espec          AS arma,
-            p.apellido_nombre     AS nombre_apellido,
+            p.arma            AS arma,
+            p.apellido_nombre AS nombre_apellido,
 
-            rc.id                 AS rol_id,
-            rc.seccion,
-            rc.puesto             AS rol_combate,
+            rc.id             AS rol_id,
+            rc.orden          AS seccion,
+            rc.rol            AS elemento_label,
 
-            rca.id                AS asignacion_id,
-            rca.armamento_principal,
-            rca.ni_armamento_principal,
-            rca.armamento_secundario,
-            rca.ni_armamento_secundario,
-            rca.rol_administrativo,
-            rca.vehiculo
+            rca.id            AS asignacion_id,
+            rca.nota          AS nota_json
         FROM personal_unidad p
         LEFT JOIN rol_combate_asignaciones rca
                ON p.id = rca.personal_id
+              AND rca.unidad_id = p.unidad_id
               AND (rca.hasta IS NULL OR rca.hasta > CURDATE())
         LEFT JOIN rol_combate rc
-               ON rc.id = rca.rol_combate_id
-        WHERE (p.grado IS NULL OR p.grado <> 'A/C')
+               ON rc.id = rca.rol_id
+              AND rc.unidad_id = p.unidad_id
+        WHERE p.unidad_id = :uid
+          AND (p.grado IS NULL OR p.grado <> 'A/C')
     ";
 
-    $conds  = [];
-    $params = [];
+    $params = [':uid'=>$unidadActiva];
 
     if ($filtroDni !== '') {
-        $conds[] = "p.dni LIKE :dni";
+        $sql .= " AND p.dni LIKE :dni";
         $params[':dni'] = '%' . $filtroDni . '%';
     }
 
     if ($filtroNombre !== '') {
-        // en la tabla es apellido_nombre
-        $conds[] = "p.apellido_nombre LIKE :nom";
+        $sql .= " AND p.apellido_nombre LIKE :nom";
         $params[':nom'] = '%' . $filtroNombre . '%';
     }
 
     if ($filtroSeccion !== '' && ctype_digit($filtroSeccion)) {
         $secNum = (int)$filtroSeccion;
         if ($secNum >= 1 && $secNum <= 8) {
-            $conds[] = "rc.seccion = :sec";
+            $sql .= " AND rc.orden = :sec";
             $params[':sec'] = $secNum;
         }
-    }
-
-    if ($conds) {
-        $sql .= " AND " . implode(" AND ", $conds);
     }
 
     $sql .= " ORDER BY p.id ASC";
 
     $stmt = $pdo->prepare($sql);
     $stmt->execute($params);
-    $filasRol = $stmt->fetchAll() ?: [];
+    $raw = $stmt->fetchAll() ?: [];
+
+    // Expandir nota_json a columnas esperadas por la UI (sin tocar esquema)
+    foreach ($raw as $r) {
+        $notaArr = nota_to_array($r['nota_json'] ?? null);
+
+        $r['rol_combate'] = (string)($notaArr['rol_combate'] ?? '');
+        $r['armamento_principal'] = (string)($notaArr['armamento_principal'] ?? '');
+        $r['ni_armamento_principal'] = (string)($notaArr['ni_armamento_principal'] ?? '');
+        $r['armamento_secundario'] = (string)($notaArr['armamento_secundario'] ?? '');
+        $r['ni_armamento_secundario'] = (string)($notaArr['ni_armamento_secundario'] ?? '');
+        $r['rol_administrativo'] = (string)($notaArr['rol_administrativo'] ?? '');
+        $r['vehiculo'] = (string)($notaArr['vehiculo'] ?? '');
+
+        $filasRol[] = $r;
+    }
 
 } catch (Throwable $ex) {
     $listadoError = $ex->getMessage();
     $filasRol = [];
 }
+
+// CSRF token (si existe) para AJAX
+$csrfToken = function_exists('csrf_token') ? (string)csrf_token() : '';
 ?>
 <!doctype html>
 <html lang="es">
@@ -258,6 +515,8 @@ try {
     padding: .30rem .35rem;
   }
 
+  .table-dark-custom thead th{ color:#fff !important; }
+
   .table-rol-combate col.col-nro      { width: 4%;  }
   .table-rol-combate col.col-dni      { width: 8%;  }
   .table-rol-combate col.col-grado    { width: 6%;  }
@@ -316,14 +575,14 @@ try {
                 class="btn btn-success btn-sm"
                 style="font-weight:700; padding:.35rem .9rem;"
                 onclick="window.location.href='<?= e($areasUrl) ?>'">
-          Volver a áreas
+          Volver al inicio
         </button>
       <?php endif; ?>
 
       <button type="button"
               class="btn btn-success btn-sm"
               style="font-weight:700; padding:.35rem .9rem;"
-              onclick="if (window.history.length > 1) { window.history.back(); } else { window.location.href='elegir_inicio.php'; }">
+              onclick="if (window.history.length > 1) { window.history.back(); } else { window.location.href='personal.php'; }">
         Volver
       </button>
     </div>
@@ -390,10 +649,10 @@ try {
         <div>
           <div class="panel-title">Rol de Combate · B Com 602</div>
           <div class="panel-sub mb-0">
-            Tabla única. Cada fila vincula personal de la unidad con su función y medios asignados.
+            Tabla única (compat DB actual). Datos “extra” se guardan en <code>rol_combate_asignaciones.nota</code> como JSON.
           </div>
           <div class="small text-muted mt-1">
-            Registros mostrados: <?= e((string)count($filasRol)) ?>
+            Unidad ID: <?= e((string)$unidadActiva) ?> · Registros mostrados: <?= e((string)count($filasRol)) ?>
             <?php if ($filtroSeccion !== '' && ctype_digit($filtroSeccion)): ?>
               · Elemento seleccionado: <?= e($RC_ELEMENTOS[(int)$filtroSeccion] ?? ('Sección ' . $filtroSeccion)) ?>
             <?php endif; ?>
@@ -401,11 +660,6 @@ try {
         </div>
 
         <div class="d-flex flex-column flex-sm-row gap-2">
-          <a href="s1_personal.php"
-             class="btn btn-sm btn-outline-success"
-             style="font-weight:600; padding:.35rem .9rem;">
-            Agregar persona (S-1)
-          </a>
           <button id="btnExportPdf"
                   type="button"
                   class="btn btn-sm btn-outline-light"
@@ -483,9 +737,7 @@ try {
               $nroReal = 0;
               foreach ($filasRol as $row):
                 $personalIdRow = (int)($row['personal_id'] ?? 0);
-                if ($personalIdRow === 0) {
-                  continue;
-                }
+                if ($personalIdRow === 0) continue;
                 $nroReal++;
 
                 $esPersonaMarcada = ($personaId > 0 && $personalIdRow === $personaId);
@@ -502,7 +754,7 @@ try {
                 data-personal-id="<?= e((string)$personalIdRow) ?>"
                 data-rol-id="<?= e((string)($row['rol_id'] ?? '')) ?>"
                 data-asignacion-id="<?= e((string)($row['asignacion_id'] ?? '')) ?>"
-                data-seccion="<?= $secRow >= 1 && $secRow <= 8 ? e((string)$secRow) : '' ?>"
+                data-seccion="<?= ($secRow>=1 && $secRow<=8) ? e((string)$secRow) : '' ?>"
               >
                 <td><?= e($nroReal) ?></td>
                 <td><?= e($row['dni'] ?? '') ?></td>
@@ -619,20 +871,15 @@ try {
 <script>
 const PUEDE_EDITAR = <?= $puedeEditar ? 'true' : 'false' ?>;
 const LOGO_URL     = '<?= e($ESCUDO) ?>';
+const CSRF_TOKEN   = '<?= e($csrfToken) ?>';
 
 // ===== Exportar tabla a PDF (impresión) =====
 function exportTablaPDF() {
   const tabla = document.querySelector('.table-rol-combate');
-  if (!tabla) {
-    alert('No se encontró la tabla para exportar.');
-    return;
-  }
+  if (!tabla) { alert('No se encontró la tabla para exportar.'); return; }
 
   const win = window.open('', '_blank');
-  if (!win) {
-    alert('El navegador bloqueó la ventana emergente.');
-    return;
-  }
+  if (!win) { alert('El navegador bloqueó la ventana emergente.'); return; }
 
   const titulo = 'Rol de Combate · B Com 602';
 
@@ -643,41 +890,14 @@ function exportTablaPDF() {
 <meta charset="utf-8">
 <title>${titulo}</title>
 <style>
-  @page {
-    size: A4 landscape;
-    margin: 15mm 15mm 15mm 20mm;
-  }
-  body{
-    font-family:"Times New Roman", serif;
-    font-size:10px;
-    margin:0;
-    color:#111;
-  }
-  h1{
-    font-size:14pt;
-    text-align:center;
-    margin:6px 0 2px;
-  }
-  .sub{
-    font-size:11pt;
-    text-align:center;
-    margin-bottom:8px;
-  }
-  table{
-    width:100%;
-    border-collapse:collapse;
-  }
-  th,td{
-    border:1px solid #000;
-    padding:2px 3px;
-  }
-  th{
-    background:#e5e7eb;
-  }
-  .enc-cab td{
-    border:none !important;
-    padding:0;
-  }
+  @page { size: A4 landscape; margin: 15mm 15mm 15mm 20mm; }
+  body{ font-family:"Times New Roman", serif; font-size:10px; margin:0; color:#111; }
+  h1{ font-size:14pt; text-align:center; margin:6px 0 2px; }
+  .sub{ font-size:11pt; text-align:center; margin-bottom:8px; }
+  table{ width:100%; border-collapse:collapse; }
+  th,td{ border:1px solid #000; padding:2px 3px; }
+  th{ background:#e5e7eb; }
+  .enc-cab td{ border:none !important; padding:0; }
 </style>
 </head>
 <body>
@@ -686,12 +906,8 @@ function exportTablaPDF() {
   <table width="100%" style="border:none; border-collapse:collapse; border-spacing:0;">
     <tr class="enc-cab">
       <td style="text-align:left;">
-        <p style="font-family:'Times New Roman',serif; font-size:16pt; margin:0 0 0 40px;">
-          Ejército Argentino
-        </p>
-        <p style="font-family:'Times New Roman',serif; font-size:14pt; margin:0;">
-          Batallón de Comunicaciones 602
-        </p>
+        <p style="font-family:'Times New Roman',serif; font-size:16pt; margin:0 0 0 40px;">Ejército Argentino</p>
+        <p style="font-family:'Times New Roman',serif; font-size:14pt; margin:0;">Batallón de Comunicaciones 602</p>
       </td>
       <td style="text-align:right; vertical-align:middle;">
         <img src="${LOGO_URL}" style="height:70px;">
@@ -720,13 +936,9 @@ function exportTablaPDF() {
 
 document.addEventListener('DOMContentLoaded', () => {
   const btnPdf = document.getElementById('btnExportPdf');
-  if (btnPdf) {
-    btnPdf.addEventListener('click', exportTablaPDF);
-  }
+  if (btnPdf) btnPdf.addEventListener('click', exportTablaPDF);
 
-  if (!PUEDE_EDITAR) {
-    return;
-  }
+  if (!PUEDE_EDITAR) return;
 
   async function saveCampo(row, ctrl, desdeBoton = false) {
     const campo = ctrl.dataset.field;
@@ -753,7 +965,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     const valor = ctrl.value;
+
     const fd = new FormData();
+    if (CSRF_TOKEN) fd.append('_csrf', CSRF_TOKEN);
+
     fd.append('personal_id', personalId);
     fd.append('rol_id', rolId);
     fd.append('asignacion_id', asignacionId);
@@ -762,7 +977,7 @@ document.addEventListener('DOMContentLoaded', () => {
     fd.append('valor', valor);
 
     try {
-      const resp = await fetch('rol_combate_ajax.php', {
+      const resp = await fetch('rol_combate.php', {
         method: 'POST',
         body: fd,
         headers: { 'X-Requested-With': 'XMLHttpRequest' }
@@ -770,9 +985,10 @@ document.addEventListener('DOMContentLoaded', () => {
       const data = await resp.json();
 
       if (data && data.ok) {
-        if (data.rol_id)        row.dataset.rolId        = data.rol_id;
-        if (data.asignacion_id) row.dataset.asignacionId = data.asignacion_id;
-        if (data.seccion)       row.dataset.seccion      = data.seccion;
+        if (data.rol_id !== undefined)        row.dataset.rolId        = String(data.rol_id);
+        if (data.asignacion_id !== undefined) row.dataset.asignacionId = String(data.asignacion_id);
+        if (data.seccion !== undefined)       row.dataset.seccion      = String(data.seccion);
+
         if (!desdeBoton) showToast('Cambios guardados correctamente.', 'success');
       } else {
         const msg = (data && data.error) ? data.error : 'Error desconocido';
@@ -791,9 +1007,7 @@ document.addEventListener('DOMContentLoaded', () => {
     row.querySelectorAll('.rc-input').forEach(ctrl => {
       const handler = () => saveCampo(row, ctrl, false);
       ctrl.addEventListener('change', handler);
-      if (ctrl.tagName === 'INPUT') {
-        ctrl.addEventListener('blur', handler);
-      }
+      if (ctrl.tagName === 'INPUT') ctrl.addEventListener('blur', handler);
     });
   });
 
@@ -831,10 +1045,7 @@ document.addEventListener('DOMContentLoaded', () => {
   let toastInst = toastEl ? new bootstrap.Toast(toastEl) : null;
 
   function showToast(message, tipo = 'success') {
-    if (!toastEl || !toastInst) {
-      alert(message);
-      return;
-    }
+    if (!toastEl || !toastInst) { alert(message); return; }
     toastMsg.textContent = message;
     toastEl.classList.remove('text-bg-success', 'text-bg-danger');
     toastEl.classList.add(tipo === 'error' ? 'text-bg-danger' : 'text-bg-success');

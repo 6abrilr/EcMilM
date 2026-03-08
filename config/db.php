@@ -2,7 +2,7 @@
 $cfg = [
   'host' => '127.0.0.1',
   'port' => 3306,
-  'db'   => 'inspecciones',
+  'db'   => 'unidad',
   'user' => 'root',
   'pass' => 'ContraseñaSegura123',
 ];
@@ -12,4 +12,5 @@ $pdo = new PDO($dsn, $cfg['user'], $cfg['pass'], [
   PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
   PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
 ]);
+
 

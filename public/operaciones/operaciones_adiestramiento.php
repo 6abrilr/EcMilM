@@ -5,11 +5,11 @@
  *
  * ✅ REGLA ABSOLUTA (FS):
  *   TODO lo referido a PAFB se guarda en:
- *   /var/www/html/ea/storage/unidades/ecmilm/operaciones/pafb/
+ *   <ROOT>/storage/unidades/ecmilm/OPERACIONES/PAFB/
  *
  * ✅ Estructura:
- *   - Docs fijos:  /pafb/_docs/<docKey>/ + _meta.json
- *   - PAFB por año: /pafb/<YEAR>/<cardId>/ + /pafb/<YEAR>/_meta.json
+ *   - Documentacion fija: /PAFB/DOCUMENTACION/<docKey>/ + _meta.json
+ *   - PAFB por año: /PAFB/<YEAR>/<cardId>/ + /PAFB/<YEAR>/_meta.json
  *
  * ✅ Descarga/abrir archivos:
  *   - Se hace por este mismo PHP (download endpoint) para NO depender de exponer /storage por URL.
@@ -34,6 +34,72 @@ if (session_status() !== PHP_SESSION_ACTIVE) { @session_start(); }
 
 function e($v): string { return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'); }
 function starts_with(string $h, string $n): bool { return substr($h, 0, strlen($n)) === $n; }
+function normalize_rel_path(string $path): ?string {
+  $path = trim(str_replace('\\', '/', $path));
+  if ($path === '' || $path === '/') return '';
+  $parts = array_values(array_filter(explode('/', $path), static fn($p) => $p !== '' && $p !== '.'));
+  $safe = [];
+  foreach ($parts as $part) {
+    if ($part === '..') return null;
+    $safe[] = $part;
+  }
+  return implode('/', $safe);
+}
+function format_dt_local(?int $ts): string {
+  if (!$ts || $ts <= 0) return '—';
+  return date('d/m/Y H:i', $ts);
+}
+function human_size(int $bytes): string {
+  if ($bytes < 1024) return $bytes . ' B';
+  if ($bytes < 1024 * 1024) return number_format($bytes / 1024, 1) . ' KB';
+  if ($bytes < 1024 * 1024 * 1024) return number_format($bytes / 1024 / 1024, 2) . ' MB';
+  return number_format($bytes / 1024 / 1024 / 1024, 2) . ' GB';
+}
+function scan_shared_dir(string $baseAbs, string $relative): array {
+  $baseReal = realpath($baseAbs);
+  if ($baseReal === false) {
+    return ['ok' => false, 'error' => 'No existe la carpeta compartida.', 'current' => '', 'entries' => []];
+  }
+
+  $relative = normalize_rel_path($relative);
+  if ($relative === null) {
+    return ['ok' => false, 'error' => 'Ruta inválida.', 'current' => '', 'entries' => []];
+  }
+
+  $targetAbs = $relative === '' ? $baseReal : ($baseReal . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $relative));
+  $targetReal = realpath($targetAbs);
+  if ($targetReal === false || !is_dir($targetReal) || !starts_with($targetReal, $baseReal)) {
+    return ['ok' => false, 'error' => 'La carpeta solicitada no existe.', 'current' => $relative, 'entries' => []];
+  }
+
+  $items = @scandir($targetReal);
+  if (!is_array($items)) {
+    return ['ok' => false, 'error' => 'No se pudo leer la carpeta compartida.', 'current' => $relative, 'entries' => []];
+  }
+
+  $entries = [];
+  foreach ($items as $item) {
+    if ($item === '.' || $item === '..') continue;
+    $abs = $targetReal . DIRECTORY_SEPARATOR . $item;
+    $isDir = is_dir($abs);
+    $childRel = $relative === '' ? $item : ($relative . '/' . $item);
+    $entries[] = [
+      'name' => $item,
+      'rel' => $childRel,
+      'is_dir' => $isDir,
+      'size' => $isDir ? null : (int)@filesize($abs),
+      'mtime' => (int)@filemtime($abs),
+      'ext' => $isDir ? '' : strtolower((string)pathinfo($item, PATHINFO_EXTENSION)),
+    ];
+  }
+
+  usort($entries, static function (array $a, array $b): int {
+    if ($a['is_dir'] !== $b['is_dir']) return $a['is_dir'] ? -1 : 1;
+    return strcasecmp((string)$a['name'], (string)$b['name']);
+  });
+
+  return ['ok' => true, 'error' => '', 'current' => $relative, 'entries' => $entries];
+}
 
 /* ==========================================================
    ✅ BASE WEB robusta (/ea)
@@ -52,11 +118,17 @@ $ESCUDO     = $ASSETS_URL . '/img/ecmilm.png';
 /* ==========================================================
    ✅ STORAGE CANÓNICO ABSOLUTO (FS)
    TODO PAFB va acá:
-   /var/www/html/ea/storage/unidades/ecmilm/operaciones/pafb/
+   <ROOT>/storage/unidades/ecmilm/OPERACIONES/PAFB/
    ========================================================== */
-$PAFB_ROOT_ABS = '/var/www/html/ea/storage/unidades/ecmilm/operaciones/pafb';
+$ROOT_FS = realpath(__DIR__ . '/../../');
+if ($ROOT_FS === false) {
+  http_response_code(500);
+  exit('No se pudo resolver la raiz del proyecto.');
+}
 
-$DOCS_ABS_DIR  = $PAFB_ROOT_ABS . '/_docs'; // /_docs/<docKey>/
+$PAFB_ROOT_ABS = $ROOT_FS . '/storage/unidades/ecmilm/OPERACIONES/PAFB';
+
+$DOCS_ABS_DIR  = $PAFB_ROOT_ABS . '/DOCUMENTACION'; // /DOCUMENTACION/<docKey>/
 $PAFB_BASE_ABS = $PAFB_ROOT_ABS;            // /<YEAR>/<cardId>/
 
 /* ==========================
@@ -139,15 +211,42 @@ function parse_ini_size_to_bytes(string $v): int {
 function human_mb(int $bytes): string {
   return number_format($bytes / 1024 / 1024, 2) . ' MB';
 }
+function ascii_slug(string $txt): string {
+  $txt = trim($txt);
+  if ($txt === '') return 'archivo';
+  $map = [
+    'Á'=>'A','À'=>'A','Ä'=>'A','Â'=>'A','á'=>'a','à'=>'a','ä'=>'a','â'=>'a',
+    'É'=>'E','È'=>'E','Ë'=>'E','Ê'=>'E','é'=>'e','è'=>'e','ë'=>'e','ê'=>'e',
+    'Í'=>'I','Ì'=>'I','Ï'=>'I','Î'=>'I','í'=>'i','ì'=>'i','ï'=>'i','î'=>'i',
+    'Ó'=>'O','Ò'=>'O','Ö'=>'O','Ô'=>'O','ó'=>'o','ò'=>'o','ö'=>'o','ô'=>'o',
+    'Ú'=>'U','Ù'=>'U','Ü'=>'U','Û'=>'U','ú'=>'u','ù'=>'u','ü'=>'u','û'=>'u',
+    'Ñ'=>'N','ñ'=>'n'
+  ];
+  $txt = strtr($txt, $map);
+  $txt = preg_replace('/[^A-Za-z0-9._ -]+/', '', $txt) ?? $txt;
+  $txt = preg_replace('/\s+/', ' ', $txt) ?? $txt;
+  $txt = trim($txt, " .-_");
+  $txt = str_replace(' ', '_', $txt);
+  return $txt !== '' ? $txt : 'archivo';
+}
+function unique_filename_in_dir(string $dirAbs, string $baseName, string $ext): string {
+  $baseName = ascii_slug($baseName);
+  $ext = strtolower(ltrim($ext, '.'));
+  $candidate = $baseName . ($ext !== '' ? '.' . $ext : '');
+  $n = 2;
+  while (is_file($dirAbs . '/' . $candidate)) {
+    $candidate = $baseName . '_' . $n . ($ext !== '' ? '.' . $ext : '');
+    $n++;
+  }
+  return $candidate;
+}
 
 /* ===== Validaciones DOCS ===== */
 function is_pdf_name(string $name): bool {
   return strtolower(pathinfo($name, PATHINFO_EXTENSION)) === 'pdf';
 }
-function safe_pdf_filename(string $original): string {
-  $rnd = bin2hex(random_bytes(4));
-  $ts  = date('Ymd_His');
-  return $ts . '_' . $rnd . '.pdf';
+function safe_pdf_filename(string $dirAbs, string $label): string {
+  return unique_filename_in_dir($dirAbs, $label, 'pdf');
 }
 function is_valid_doc_key(string $k, array $DOCS): bool {
   return isset($DOCS[$k]);
@@ -163,11 +262,8 @@ function is_allowed_ext(string $name): bool {
 function ext_of(string $name): string {
   return strtolower(pathinfo($name, PATHINFO_EXTENSION));
 }
-function safe_filename(string $original): string {
-  $ext = ext_of($original);
-  $rnd = bin2hex(random_bytes(4));
-  $ts  = date('Ymd_His');
-  return $ts . '_' . $rnd . '.' . $ext;
+function safe_filename(string $dirAbs, string $label, string $original): string {
+  return unique_filename_in_dir($dirAbs, $label, ext_of($original));
 }
 function is_valid_card_id(string $id): bool {
   if (in_array($id, ['diag1','c1','diag2','c2'], true)) return true;
@@ -228,6 +324,14 @@ function mime_for_ext(string $ext): string {
   if ($ext === 'pdf')  return 'application/pdf';
   if ($ext === 'xlsx') return 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
   if ($ext === 'xls')  return 'application/vnd.ms-excel';
+  if ($ext === 'doc')  return 'application/msword';
+  if ($ext === 'docx') return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+  if ($ext === 'jpg' || $ext === 'jpeg') return 'image/jpeg';
+  if ($ext === 'png') return 'image/png';
+  if ($ext === 'webp') return 'image/webp';
+  if ($ext === 'txt' || $ext === 'log') return 'text/plain; charset=UTF-8';
+  if ($ext === 'csv') return 'text/csv; charset=UTF-8';
+  if ($ext === 'zip') return 'application/zip';
   return 'application/octet-stream';
 }
 
@@ -270,6 +374,26 @@ if (isset($_GET['download'])) {
 
     $ext = strtolower(pathinfo($realAbs, PATHINFO_EXTENSION));
     send_file_download($realAbs, $file, mime_for_ext($ext));
+  }
+
+  if ($type === 'shared') {
+    $path = (string)($_GET['path'] ?? '');
+    $rel = normalize_rel_path($path);
+    if ($rel === null || $rel === '') { http_response_code(400); echo "Ruta inválida."; exit; }
+
+    $base = realpath($GLOBALS['PAFB_ROOT_ABS']);
+    if (!$base) { http_response_code(404); echo "Base no disponible."; exit; }
+
+    $abs = $base . '/' . str_replace('\\', '/', $rel);
+    $realAbs = realpath($abs);
+    if (!$realAbs || !is_file($realAbs) || !starts_with($realAbs, $base)) {
+      http_response_code(404);
+      echo "Archivo no encontrado.";
+      exit;
+    }
+
+    $ext = strtolower(pathinfo($realAbs, PATHINFO_EXTENSION));
+    send_file_download($realAbs, basename($realAbs), mime_for_ext($ext));
   }
 
   http_response_code(400);
@@ -391,6 +515,18 @@ foreach ($DOCS as $k => $d) {
   ];
 }
 
+$sharedBrowseRel = normalize_rel_path((string)($_GET['shared'] ?? ''));
+if ($sharedBrowseRel === null) $sharedBrowseRel = '';
+$sharedState = scan_shared_dir($PAFB_ROOT_ABS, $sharedBrowseRel);
+$sharedSegments = [];
+if ($sharedState['ok'] && $sharedState['current'] !== '') {
+  $acc = [];
+  foreach (explode('/', (string)$sharedState['current']) as $seg) {
+    $acc[] = $seg;
+    $sharedSegments[] = ['name' => $seg, 'rel' => implode('/', $acc)];
+  }
+}
+
 /* ==========================================================
    Helpers Year-meta init
    ========================================================== */
@@ -460,7 +596,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
               if (!is_pdf_name($name)) { $flashErr = "Solo PDF permitido: {$name}."; break; }
               if ($size > $MAX_DOC_BYTES) { $flashErr = "Archivo demasiado grande: {$name} (" . human_mb($size) . "). Máximo: {$MAX_DOC_MB}MB."; break; }
 
-              $final = safe_pdf_filename($name);
+              $final = safe_pdf_filename($docDirAbs, $ref);
               $destAbs = $docDirAbs . '/' . $final;
 
               if (!@move_uploaded_file($tmp, $destAbs)) {
@@ -715,7 +851,8 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
                       if ($size > 25 * 1024 * 1024) { $flashErr = "Archivo demasiado grande (máx 25MB): $name"; break; }
                       if (!is_allowed_ext($name)) { $flashErr = "Extensión no permitida: $name (solo .xlsx/.xls/.pdf)."; break; }
 
-                      $finalName = safe_filename($name);
+                      $labelBase = $ref !== '' ? $ref : pathinfo($name, PATHINFO_FILENAME);
+                      $finalName = safe_filename($destDirAbs, $labelBase, $name);
                       $destAbs   = $destDirAbs . '/' . $finalName;
 
                       if (!@move_uploaded_file($tmp, $destAbs)) {
@@ -1134,6 +1271,55 @@ if ($view === 'new') {
   .year-input-group .form-control, .year-input-group .btn{ height:44px; }
   .year-input-group .form-control{ max-width:180px; }
   .year-input-group .btn{ display:flex; align-items:center; gap:.45rem; white-space:nowrap; }
+  .shared-panel{
+    margin-top:24px;
+    background:rgba(15,23,42,.82);
+    border:1px solid rgba(148,163,184,.28);
+    border-radius:18px;
+    padding:18px;
+  }
+  .shared-toolbar{
+    display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;
+    margin-bottom:12px;
+  }
+  .shared-path{
+    display:flex; flex-wrap:wrap; gap:6px; align-items:center; font-size:.86rem; color:#cbd5e1;
+  }
+  .shared-path a{ color:#7dd3fc; text-decoration:none; }
+  .shared-table{
+    width:100%;
+    border-collapse:collapse;
+    overflow:hidden;
+    border-radius:12px;
+  }
+  .shared-table th, .shared-table td{
+    padding:10px 12px;
+    border-bottom:1px solid rgba(148,163,184,.16);
+    text-align:left;
+    font-size:.84rem;
+  }
+  .shared-table th{
+    color:#93c5fd;
+    background:rgba(30,41,59,.92);
+    font-weight:800;
+  }
+  .shared-table td{ color:#e5e7eb; }
+  .shared-table tr:hover td{ background:rgba(59,130,246,.08); }
+  .shared-name{
+    display:flex; align-items:center; gap:10px; min-width:0;
+  }
+  .shared-icon{
+    width:28px; text-align:center; font-size:1rem;
+  }
+  .shared-link{
+    color:#e5e7eb; text-decoration:none; font-weight:700;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  }
+  .shared-link:hover{ color:#7dd3fc; }
+  .shared-meta{ color:#94a3b8; font-size:.75rem; }
+  .shared-empty{
+    padding:18px; border:1px dashed rgba(148,163,184,.24); border-radius:12px; color:#94a3b8;
+  }
 </style>
 </head>
 
@@ -1360,6 +1546,94 @@ if ($view === 'new') {
         </div>
       <?php endif; ?>
 
+      <div class="shared-panel" id="shared-browser">
+        <div class="section-header" style="margin-bottom:10px;">
+          <div class="section-title" style="font-size:1.25rem;">Carpeta compartida PAFB</div>
+          <div class="section-sub">
+            Acá se ve todo lo que exista físicamente dentro de <code><?= e(str_replace('\\', '/', $PAFB_ROOT_ABS)) ?></code>,
+            incluso si lo cargaron desde Windows Explorer y no desde la página.
+          </div>
+        </div>
+
+        <?php if (!$sharedState['ok']): ?>
+          <div class="alert alert-warning mb-0"><?= e((string)$sharedState['error']) ?></div>
+        <?php else: ?>
+          <div class="shared-toolbar">
+            <div class="shared-path">
+              <span><b>Ruta:</b></span>
+                <a class="js-shared-nav" href="<?= e($SCRIPT_NAME) ?>#shared-browser">PAFB</a>
+              <?php foreach ($sharedSegments as $seg): ?>
+                <span>/</span>
+                <a class="js-shared-nav" href="<?= e($SCRIPT_NAME) ?>?shared=<?= e(rawurlencode((string)$seg['rel'])) ?>#shared-browser"><?= e((string)$seg['name']) ?></a>
+              <?php endforeach; ?>
+            </div>
+
+            <div class="d-flex gap-2 flex-wrap">
+              <?php if ($sharedState['current'] !== ''): ?>
+                <?php
+                  $parentRel = '';
+                  $partsParent = explode('/', (string)$sharedState['current']);
+                  array_pop($partsParent);
+                  $parentRel = implode('/', $partsParent);
+                ?>
+                <a class="btn-ghost js-shared-nav" href="<?= e($SCRIPT_NAME) ?><?= $parentRel !== '' ? ('?shared=' . e(rawurlencode($parentRel))) : '' ?>#shared-browser">⬅ Volver</a>
+              <?php endif; ?>
+              <a class="btn-ghost js-shared-nav" href="<?= e($SCRIPT_NAME) ?>#shared-browser">Ir a raíz PAFB</a>
+            </div>
+          </div>
+
+          <?php if (empty($sharedState['entries'])): ?>
+            <div class="shared-empty">Esta carpeta está vacía.</div>
+          <?php else: ?>
+            <div style="overflow:auto;">
+              <table class="shared-table">
+                <thead>
+                  <tr>
+                    <th>Nombre</th>
+                    <th style="width:140px;">Tipo</th>
+                    <th style="width:160px;">Modificado</th>
+                    <th style="width:120px;">Tamaño</th>
+                    <th style="width:120px;">Acción</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <?php foreach ($sharedState['entries'] as $entry): ?>
+                    <?php
+                      $isDir = (bool)$entry['is_dir'];
+                      $rel = (string)$entry['rel'];
+                      $openHref = $isDir
+                        ? ($SCRIPT_NAME . '?shared=' . rawurlencode($rel))
+                        : ($SCRIPT_NAME . '?download=1&type=shared&path=' . rawurlencode($rel));
+                    ?>
+                    <tr>
+                      <td>
+                        <div class="shared-name">
+                          <div class="shared-icon"><?= $isDir ? '📁' : '📄' ?></div>
+                          <div style="min-width:0;">
+                            <a class="shared-link <?= $isDir ? 'js-shared-nav' : '' ?>" <?= $isDir ? '' : 'target="_blank" rel="noopener"' ?> href="<?= e($isDir ? ($openHref . '#shared-browser') : $openHref) ?>">
+                              <?= e((string)$entry['name']) ?>
+                            </a>
+                            <div class="shared-meta"><?= e($rel) ?></div>
+                          </div>
+                        </div>
+                      </td>
+                      <td><?= $isDir ? 'Carpeta' : e(strtoupper((string)($entry['ext'] !== '' ? $entry['ext'] : 'archivo'))) ?></td>
+                      <td><?= e(format_dt_local((int)$entry['mtime'])) ?></td>
+                      <td><?= $isDir ? '—' : e(human_size((int)($entry['size'] ?? 0))) ?></td>
+                      <td>
+                        <a class="btn-mini <?= $isDir ? 'js-shared-nav' : '' ?>" <?= $isDir ? '' : 'target="_blank" rel="noopener"' ?> href="<?= e($isDir ? ($openHref . '#shared-browser') : $openHref) ?>">
+                          <?= $isDir ? 'Abrir' : 'Ver' ?>
+                        </a>
+                      </td>
+                    </tr>
+                  <?php endforeach; ?>
+                </tbody>
+              </table>
+            </div>
+          <?php endif; ?>
+        <?php endif; ?>
+      </div>
+
     <?php elseif ($view === 'new'): ?>
       <?php
         $anioActual = (int)date('Y');
@@ -1528,10 +1802,13 @@ if ($view === 'new') {
           <input type="hidden" name="doc_key" id="uploadDocKey" value="">
 
           <div class="mb-2">
-            <label class="form-label fw-bold mb-1">Referencia (obligatoria)</label>
+            <label class="form-label fw-bold mb-1">Nombre / referencia (obligatorio)</label>
             <input type="text" name="doc_ref" class="form-control" maxlength="180"
                    placeholder="Ej: Directiva 828/20 - Actualización 2025 / Fuente: ... / Observación ..."
                    required>
+            <div class="form-text text-light" style="opacity:.75">
+              Ese texto se usa como nombre del archivo guardado dentro de <code>DOCUMENTACION</code>.
+            </div>
           </div>
 
           <div class="mb-2">
@@ -1569,8 +1846,11 @@ if ($view === 'new') {
           <input type="hidden" name="key" id="uploadKey" value="">
 
           <div class="mb-3">
-            <label class="form-label fw-bold">Referencia (opcional)</label>
+            <label class="form-label fw-bold">Nombre / referencia</label>
             <input type="text" name="ref" class="form-control" placeholder="Ej: AFI <?= e((string)$YEAR) ?> / Acta / Orden / Observación">
+            <div class="form-text text-light" style="opacity:.75">
+              Si lo completás, el archivo se guarda con ese nombre. Si lo dejás vacío, se usa el nombre original.
+            </div>
           </div>
 
           <div class="mb-2">
@@ -1639,6 +1919,30 @@ if ($view === 'new') {
 
 <script>
 document.addEventListener('DOMContentLoaded', () => {
+  const sharedScrollKey = 'pafb_shared_scroll';
+  const sharedNavLinks = document.querySelectorAll('.js-shared-nav');
+  const sharedBrowser = document.getElementById('shared-browser');
+
+  if (sharedBrowser && window.location.hash === '#shared-browser') {
+    const rawSavedScroll = sessionStorage.getItem(sharedScrollKey);
+    if (rawSavedScroll) {
+      const savedScroll = parseInt(rawSavedScroll, 10);
+      if (!Number.isNaN(savedScroll)) {
+        window.requestAnimationFrame(() => window.scrollTo({ top: savedScroll, behavior: 'auto' }));
+      }
+    } else {
+      window.requestAnimationFrame(() => {
+        sharedBrowser.scrollIntoView({ block: 'start', behavior: 'auto' });
+      });
+    }
+  }
+
+  sharedNavLinks.forEach(link => {
+    link.addEventListener('click', () => {
+      sessionStorage.setItem(sharedScrollKey, String(window.scrollY));
+    });
+  });
+
   // Confirm delete year (storage)
   document.querySelectorAll('form.js-delete-year').forEach(form => {
     form.addEventListener('submit', (ev) => {
@@ -1650,7 +1954,7 @@ document.addEventListener('DOMContentLoaded', () => {
           <div style="text-align:left">
             <div>¿Querés eliminar el año <b>${year}</b>?</div>
             <div class="mt-2">Se borrará la carpeta en storage:</div>
-            <div><code>/var/www/html/ea/storage/unidades/ecmilm/operaciones/pafb/${year}/</code></div>
+            <div><code><?= e(str_replace('\\', '/', $PAFB_ROOT_ABS)) ?>/${year}/</code></div>
             <div class="mt-2" style="opacity:.9">Esta acción no se puede deshacer.</div>
           </div>
         `,

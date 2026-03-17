@@ -8,17 +8,6 @@ if (!function_exists('h')) {
   function h(string $s): string { return htmlspecialchars($s, ENT_QUOTES, 'UTF-8'); }
 }
 
-/* ============================
-   ✅ SUPERADMIN HARD OVERRIDE
-   ============================ */
-const EA_SUPERADMIN_DNI  = '41742406';
-const EA_SUPERADMIN_USER = 'nesrojas';
-
-function is_superadmin_login(string $username): bool {
-  $u = strtolower(trim($username));
-  return ($u === strtolower(EA_SUPERADMIN_USER) || $u === EA_SUPERADMIN_DNI);
-}
-
 /*
  * Base de la app y home post-login.
  * Ej: /ea/login.php => APP_BASE=/ea
@@ -42,27 +31,10 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
   $pass     = (string)($_POST['password'] ?? '');
 
   try {
-    // 1) Login normal (tu lógica actual)
     $ok = auth_login_cps($username, $pass);
 
-    // 2) ✅ Si falla, pero es superadmin, intentar "forzar" (igual valida CPS)
-    if (!$ok && is_superadmin_login($username)) {
-      if (function_exists('auth_login_cps_force_superadmin')) {
-        $ok = auth_login_cps_force_superadmin($username, $pass, [
-          'dni'      => EA_SUPERADMIN_DNI,
-          'username' => EA_SUPERADMIN_USER,
-        ]);
-      } else {
-        // Si no existe la función en login_cps.php, no podemos forzar sin romper seguridad.
-        // Mantenemos el rechazo para no abrir backdoor.
-        $ok = false;
-      }
-    }
-
     if ($ok) {
-      // Si querés respetar next:
-      // header('Location: ' . $next);
-      // pero vos venías usando HOME fijo:
+      auth_touch_activity();
       header('Location: ' . $HOME_AFTER_LOGIN);
       exit;
     }

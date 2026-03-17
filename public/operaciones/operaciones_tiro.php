@@ -5,20 +5,25 @@ declare(strict_types=1);
 $OFFLINE_MODE = false;
 
 require_once __DIR__ . '/../../auth/bootstrap.php';
-if (!$OFFLINE_MODE) require_login();
 require_once __DIR__ . '/../../config/db.php';
+require_once __DIR__ . '/../../includes/operaciones_helper.php';
 require_once __DIR__ . '/operaciones_tiro_tables_helper.php';
+
+if (!$OFFLINE_MODE) {
+    operaciones_require_login();
+}
 
 s3_tiro_ensure_tables($pdo);
 
-function e($v){ return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'); }
+$esAdmin = operaciones_es_admin($pdo);
+$modoResumido = !$esAdmin;
 
-/* Assets */
-$PUBLIC_URL = rtrim(str_replace("\\","/", dirname($_SERVER["SCRIPT_NAME"] ?? "")), "/");
-$APP_URL    = rtrim(dirname($PUBLIC_URL), "/");
-$ASSETS     = ($APP_URL==="" ? "" : $APP_URL)."/assets";
-$IMG_BG     = $ASSETS."/img/fondo.png";
-$ESCUDO     = $ASSETS."/img/escudo_bcom602.png";
+$ASSET_WEB = operaciones_assets_url();
+$IMG_BG    = operaciones_assets_url('img/fondo.png');
+$ESCUDO    = operaciones_assets_url('img/escudo_bcom602.png');
+
+// Compatibility helper used in templates
+function e($v){ return operaciones_e($v); }
 
 /* ========== KPIs ========= */
 function kpi_resultado(PDO $pdo, string $table): float {
@@ -43,7 +48,7 @@ $pctB9  = kpi_resultado($pdo, 's3_tiro_b9');
 <meta charset="utf-8">
 <title>S-3 · Tiro · Batallón de Comunicaciones 602</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<link rel="stylesheet" href="../assets/css/theme-602.css">
+<link rel="stylesheet" href="<?= e($ASSET_WEB) ?>/css/theme-602.css">
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 
 <style>
@@ -102,7 +107,7 @@ body{
         <div class="brand-sub text-muted">“Hogar de las Comunicaciones Fijas del Ejército”</div>
       </div>
     </div>
-    <a href="areas_s3.php" class="btn btn-secondary btn-sm fw-bold">Volver a S-3</a>
+    <a href="operaciones.php" class="btn btn-secondary btn-sm fw-bold">Volver a S-3</a>
   </div>
 </header>
 
@@ -114,6 +119,12 @@ body{
   </div>
   <h3 class="fw-bold mb-3">Tiro</h3>
   <p class="text-muted">Seleccione un módulo para cargar o consultar información.</p>
+
+  <?php if ($modoResumido): ?>
+    <div class="alert alert-warning" role="alert">
+      <strong>Vista resumida:</strong> la información se muestra de forma limitada para usuarios no administradores.
+    </div>
+  <?php endif; ?>
 
   <div class="row g-4">
 
@@ -135,6 +146,17 @@ body{
           <h6 class="card-title">Condición B9</h6>
           <p class="small text-muted mb-2">Apto para Servicios de Vigilancia</p>
           <div class="kpi-num"><?= e($pctB9) ?>%</div>
+        </div>
+      </a>
+    </div>
+
+    <!-- Condiciones -->
+    <div class="col-md-6 col-lg-3">
+      <a href="operaciones_tiro_condiciones.php" class="text-decoration-none text-light">
+        <div class="card-s3 h-100">
+          <h6 class="card-title">Resumen condiciones</h6>
+          <p class="small text-muted mb-2">Todas las condiciones de tiro y quién las rindió</p>
+          <div class="kpi-num">📋</div>
         </div>
       </a>
     </div>
@@ -166,5 +188,6 @@ body{
 </div>
 </div>
 
+<?php operaciones_render_chat_widget($pdo); ?>
 </body>
 </html>

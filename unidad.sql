@@ -1,2208 +1,1441 @@
--- phpMyAdmin SQL Dump
--- version 5.2.1deb3
--- https://www.phpmyadmin.net/
---
--- Servidor: localhost:3306
--- Tiempo de generación: 08-03-2026 a las 22:04:16
--- Versión del servidor: 10.11.14-MariaDB-0ubuntu0.24.04.1
--- Versión de PHP: 8.3.6
-
-SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
-START TRANSACTION;
-SET time_zone = "+00:00";
-
-
-/*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
-/*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
-/*!40101 SET @OLD_COLLATION_CONNECTION=@@COLLATION_CONNECTION */;
-/*!40101 SET NAMES utf8mb4 */;
-
---
--- Base de datos: `unidad`
---
-
--- --------------------------------------------------------
-
---
--- Estructura de tabla para la tabla `calendario_diario`
---
-
-CREATE TABLE `calendario_diario` (
-  `id` int(11) NOT NULL,
-  `unidad_id` int(11) NOT NULL,
-  `area_code` varchar(20) NOT NULL,
-  `fecha` date NOT NULL,
-  `detalle` text NOT NULL,
-  `creado_por` varchar(80) DEFAULT NULL,
-  `creado_por_id` int(11) DEFAULT NULL,
-  `updated_at` timestamp NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
-  `created_at` timestamp NULL DEFAULT current_timestamp()
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
---
--- Volcado de datos para la tabla `calendario_diario`
---
-
-INSERT INTO `calendario_diario` (`id`, `unidad_id`, `area_code`, `fecha`, `detalle`, `creado_por`, `creado_por_id`, `updated_at`, `created_at`) VALUES
-(1, 1, 'INFORMATICA', '2026-02-19', 'Formateo PC Operaciones\nDesarrollo página Ec Mil M\nVideoconferencia Deop', 'Rojas Gabriel', 1, '2026-02-19 22:54:48', '2026-02-19 22:54:48'),
-(2, 1, 'INFORMATICA', '2026-02-18', 'Cableado SAF\nEmpece a formatear PC - Operaciones', 'Rojas Gabriel', 1, '2026-02-19 22:56:57', '2026-02-19 22:56:57');
-
--- --------------------------------------------------------
-
---
--- Estructura de tabla para la tabla `calendario_tareas`
---
-
-CREATE TABLE `calendario_tareas` (
-  `id` int(11) NOT NULL,
-  `unidad_id` int(11) NOT NULL,
-  `area_code` varchar(20) NOT NULL,
-  `titulo` varchar(120) NOT NULL,
-  `descripcion` text DEFAULT NULL,
-  `estado` enum('POR_HACER','EN_PROCESO','REALIZADA') NOT NULL DEFAULT 'POR_HACER',
-  `prioridad` enum('BAJA','MEDIA','ALTA') NOT NULL DEFAULT 'MEDIA',
-  `inicio` datetime DEFAULT NULL,
-  `fin` datetime DEFAULT NULL,
-  `fecha_vencimiento` date DEFAULT NULL,
-  `asignado_a` varchar(80) DEFAULT NULL,
-  `creado_por` varchar(80) DEFAULT NULL,
-  `creado_por_id` int(11) DEFAULT NULL,
-  `updated_at` timestamp NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
-  `created_at` timestamp NULL DEFAULT current_timestamp()
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
---
--- Volcado de datos para la tabla `calendario_tareas`
---
-
-INSERT INTO `calendario_tareas` (`id`, `unidad_id`, `area_code`, `titulo`, `descripcion`, `estado`, `prioridad`, `inicio`, `fin`, `fecha_vencimiento`, `asignado_a`, `creado_por`, `creado_por_id`, `updated_at`, `created_at`) VALUES
-(1, 1, 'INFORMATICA', 'Cableado oficina subdirector', 'Se realizo el cableado en la oficina del subdirector, agregando una roseta', 'REALIZADA', 'ALTA', '2026-02-06 09:00:00', '2026-02-06 11:30:00', NULL, 'ST SCD ROJAS', '41742406', NULL, '2026-02-07 19:17:11', '2026-02-07 19:17:11'),
-(2, 1, 'INFORMATICA', 'Cableado SAF', 'Se realizo cableado nuevo en la oficina\nSe agregaron pacheras\nSe identificaron cables utp\nSe movio de lugar la impresora\nSe coloco un switch\nSe acomodo cableado y fichas\nTerminado el 13FEB26', 'REALIZADA', 'MEDIA', '2026-02-04 08:00:00', '2026-02-13 13:00:00', '2026-02-10', 'ST SCD ROJAS', '41742406', NULL, '2026-02-19 22:24:18', '2026-02-07 19:20:28');
-
--- --------------------------------------------------------
-
---
--- Estructura de tabla para la tabla `checklist`
---
-
-CREATE TABLE `checklist` (
-  `id` int(11) NOT NULL,
-  `unidad_id` int(11) NOT NULL,
-  `file_rel` varchar(512) NOT NULL,
-  `row_idx` int(11) NOT NULL,
-  `estado` enum('si','no') DEFAULT NULL,
-  `observacion` text DEFAULT NULL,
-  `evidencia_path` text DEFAULT NULL,
-  `updated_at` timestamp NULL DEFAULT NULL,
-  `caracter` varchar(100) DEFAULT NULL,
-  `updated_by_id` int(11) DEFAULT NULL,
-  `updated_by` varchar(100) DEFAULT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
--- --------------------------------------------------------
-
---
--- Estructura de tabla para la tabla `checklist_form`
---
-
-CREATE TABLE `checklist_form` (
-  `id` int(11) NOT NULL,
-  `unidad_id` int(11) NOT NULL,
-  `file_rel` varchar(512) NOT NULL,
-  `titulo` varchar(255) DEFAULT NULL,
-  `nota` text DEFAULT NULL,
-  `updated_at` timestamp NULL DEFAULT NULL,
-  `updated_by_id` int(11) DEFAULT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
--- --------------------------------------------------------
-
---
--- Estructura de tabla para la tabla `destino`
---
-
-CREATE TABLE `destino` (
-  `id` int(11) NOT NULL,
-  `unidad_id` int(11) NOT NULL,
-  `codigo` varchar(30) DEFAULT NULL,
-  `nombre` varchar(255) NOT NULL,
-  `ruta` varchar(255) DEFAULT NULL,
-  `activo` tinyint(1) NOT NULL DEFAULT 1
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
---
--- Volcado de datos para la tabla `destino`
---
-
-INSERT INTO `destino` (`id`, `unidad_id`, `codigo`, `nombre`, `ruta`, `activo`) VALUES
-(1, 1, 'S1', 'Personal', 'personal/personal.php', 1),
-(2, 1, 'S2', 'Inteligencia', 'inteligencia/inteligencia.php', 1),
-(3, 1, 'S3', 'Operaciones', 'operaciones/operaciones.php', 1),
-(4, 1, 'S4', 'Materiales', 'materiales/materiales.php', 1),
-(5, 1, 'S5', 'Presupuesto', 'presupuesto/presupuesto.php', 1),
-(6, 1, 'SAF', 'SAF', 'SAF/SAF.php', 1),
-(7, 1, 'INF', 'Informática', 'informatica/informatica.php', 1),
-(8, 1, 'DIR', 'Dirección', 'direccion/direccion.php', 1),
-(9, 1, 'SAN', 'Sanidad', 'sanidad/anidad.php', 1),
-(23, 1, 'IGE', 'Inspeccion General Ejercito', 'ige/ige.php', 1);
-
--- --------------------------------------------------------
-
---
--- Estructura de tabla para la tabla `documentos`
---
-
-CREATE TABLE `documentos` (
-  `id` int(11) NOT NULL,
-  `unidad_id` int(11) NOT NULL,
-  `destino_id` int(11) DEFAULT NULL,
-  `categoria` varchar(255) DEFAULT NULL,
-  `titulo` varchar(255) DEFAULT NULL,
-  `original_name` varchar(255) DEFAULT NULL,
-  `descripcion` text DEFAULT NULL,
-  `path` varchar(512) DEFAULT NULL,
-  `mime` varchar(120) DEFAULT NULL,
-  `bytes` bigint(20) DEFAULT NULL,
-  `sha256` char(64) DEFAULT NULL,
-  `created_at` timestamp NULL DEFAULT current_timestamp(),
-  `deleted_at` timestamp NULL DEFAULT NULL,
-  `updated_at` timestamp NULL DEFAULT NULL,
-  `updated_by_id` int(11) DEFAULT NULL,
-  `created_by_id` int(11) DEFAULT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
--- --------------------------------------------------------
-
---
--- Estructura de tabla para la tabla `educacion_tropa_actividades`
---
-
-CREATE TABLE `educacion_tropa_actividades` (
-  `id` bigint(20) UNSIGNED NOT NULL,
-  `unidad_id` int(11) NOT NULL DEFAULT 0,
-  `ciclo` varchar(10) NOT NULL,
-  `sem` varchar(20) NOT NULL DEFAULT '',
-  `fecha` date DEFAULT NULL,
-  `tema` varchar(200) NOT NULL,
-  `responsable` varchar(200) NOT NULL DEFAULT '',
-  `participantes` varchar(200) NOT NULL DEFAULT '',
-  `lugar` varchar(200) NOT NULL DEFAULT '',
-  `cumplio` tinyint(1) NOT NULL DEFAULT 0,
-  `doc` varchar(255) NOT NULL DEFAULT '',
-  `created_at` datetime NOT NULL DEFAULT current_timestamp(),
-  `updated_at` datetime DEFAULT NULL,
-  `created_by` bigint(20) DEFAULT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
--- --------------------------------------------------------
-
---
--- Estructura de tabla para la tabla `educacion_tropa_personal_ciclos`
---
-
-CREATE TABLE `educacion_tropa_personal_ciclos` (
-  `id` bigint(20) UNSIGNED NOT NULL,
-  `unidad_id` int(11) NOT NULL DEFAULT 0,
-  `personal_unidad_id` bigint(20) NOT NULL,
-  `ciclo` varchar(10) NOT NULL,
-  `cumplido` tinyint(1) NOT NULL DEFAULT 0,
-  `updated_at` datetime NOT NULL DEFAULT current_timestamp(),
-  `updated_by` bigint(20) DEFAULT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
---
--- Volcado de datos para la tabla `educacion_tropa_personal_ciclos`
---
-
-INSERT INTO `educacion_tropa_personal_ciclos` (`id`, `unidad_id`, `personal_unidad_id`, `ciclo`, `cumplido`, `updated_at`, `updated_by`) VALUES
-(1, 0, 1, '1', 0, '2026-02-01 22:44:40', NULL),
-(3, 0, 1, '2', 0, '2026-02-01 22:44:40', NULL),
-(4, 0, 1, '3', 0, '2026-02-01 22:44:40', NULL),
-(5, 0, 1, 'nia', 0, '2026-02-01 22:44:40', NULL);
-
--- --------------------------------------------------------
-
---
--- Estructura de tabla para la tabla `inf_cat_estado_dispositivo`
---
-
-CREATE TABLE `inf_cat_estado_dispositivo` (
-  `id` int(11) NOT NULL,
-  `codigo` varchar(40) NOT NULL,
-  `nombre` varchar(120) NOT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
---
--- Volcado de datos para la tabla `inf_cat_estado_dispositivo`
---
-
-INSERT INTO `inf_cat_estado_dispositivo` (`id`, `codigo`, `nombre`) VALUES
-(1, 'activo', 'Activo'),
-(2, 'deposito', 'Depósito'),
-(3, 'reparacion', 'En reparación'),
-(4, 'baja', 'Baja');
-
--- --------------------------------------------------------
-
---
--- Estructura de tabla para la tabla `inf_dispositivo_detalle`
---
-
-CREATE TABLE `inf_dispositivo_detalle` (
-  `id` int(11) NOT NULL,
-  `red_dispositivo_id` int(11) NOT NULL,
-  `unidad_id` int(11) NOT NULL,
-  `estado_id` int(11) DEFAULT NULL,
-  `etiqueta` varchar(120) DEFAULT NULL,
-  `hostname` varchar(120) DEFAULT NULL,
-  `fabricante` varchar(120) DEFAULT NULL,
-  `modelo` varchar(120) DEFAULT NULL,
-  `serial` varchar(120) DEFAULT NULL,
-  `inventario` varchar(120) DEFAULT NULL,
-  `so` varchar(120) DEFAULT NULL,
-  `firmware` varchar(120) DEFAULT NULL,
-  `edificio_id` int(11) DEFAULT NULL,
-  `piso_id` int(11) DEFAULT NULL,
-  `oficina_id` int(11) DEFAULT NULL,
-  `asignado_personal_id` int(11) DEFAULT NULL,
-  `nota` text DEFAULT NULL,
-  `created_at` timestamp NULL DEFAULT current_timestamp(),
-  `updated_at` timestamp NULL DEFAULT NULL ON UPDATE current_timestamp()
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
--- --------------------------------------------------------
-
---
--- Estructura de tabla para la tabla `inf_redes`
---
-
-CREATE TABLE `inf_redes` (
-  `id` int(11) NOT NULL,
-  `unidad_id` int(11) NOT NULL,
-  `nombre` varchar(120) NOT NULL,
-  `vlan` varchar(60) DEFAULT NULL,
-  `cidr` varchar(60) DEFAULT NULL,
-  `gateway` varchar(45) DEFAULT NULL,
-  `dns` varchar(180) DEFAULT NULL,
-  `nota` varchar(255) DEFAULT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
--- --------------------------------------------------------
-
---
--- Estructura de tabla para la tabla `items`
---
-
-CREATE TABLE `items` (
-  `id` int(11) NOT NULL,
-  `unidad_id` int(11) NOT NULL,
-  `file_rel` varchar(512) NOT NULL,
-  `row_idx` int(11) NOT NULL,
-  `texto` text DEFAULT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
--- --------------------------------------------------------
-
---
--- Estructura de tabla para la tabla `it_activos`
---
-
-CREATE TABLE `it_activos` (
-  `id` int(11) NOT NULL,
-  `unidad_id` int(11) NOT NULL,
-  `tipo` enum('pc','camara','herramienta','mueble','insumo','otro') NOT NULL DEFAULT 'otro',
-  `etiqueta` varchar(120) DEFAULT NULL,
-  `descripcion` varchar(255) NOT NULL,
-  `marca` varchar(190) DEFAULT NULL,
-  `modelo` varchar(190) DEFAULT NULL,
-  `nro_serie` varchar(190) DEFAULT NULL,
-  `estado` enum('operativo','mantenimiento','baja','roto','prestamo') NOT NULL DEFAULT 'operativo',
-  `condicion` enum('activo','deposito') NOT NULL DEFAULT 'activo',
-  `edificio_id` int(11) DEFAULT NULL,
-  `area_id` int(11) DEFAULT NULL,
-  `ubicacion_detalle` varchar(190) DEFAULT NULL,
-  `asignado_personal_id` int(11) DEFAULT NULL,
-  `fuente_fondos_id` int(11) DEFAULT NULL,
-  `fecha_alta` date DEFAULT NULL,
-  `observaciones` text DEFAULT NULL,
-  `creado_en` datetime NOT NULL DEFAULT current_timestamp(),
-  `actualizado_en` datetime DEFAULT NULL ON UPDATE current_timestamp(),
-  `dispositivo_tipo` enum('PC','NOTEBOOK','SERVIDOR','IMPRESORA','MODEM','ROUTER','SWITCH','AP','OTRO') DEFAULT NULL,
-  `equipo_nombre` varchar(120) DEFAULT NULL,
-  `usuario_asignado` varchar(160) DEFAULT NULL,
-  `sistema_operativo` varchar(120) DEFAULT NULL,
-  `antivirus` varchar(120) DEFAULT NULL,
-  `office_version` varchar(120) DEFAULT NULL,
-  `serial_windows` varchar(120) DEFAULT NULL,
-  `cpu` varchar(120) DEFAULT NULL,
-  `ram_gb` decimal(6,2) DEFAULT NULL,
-  `disco_tipo` enum('HDD','SSD','NVME','EMMC','OTRO') DEFAULT NULL,
-  `disco_gb` int(11) DEFAULT NULL,
-  `monitor` varchar(120) DEFAULT NULL,
-  `perifericos` text DEFAULT NULL,
-  `mac` varchar(32) DEFAULT NULL,
-  `ip` varchar(45) DEFAULT NULL,
-  `ip_gateway` varchar(45) DEFAULT NULL,
-  `dns1` varchar(45) DEFAULT NULL,
-  `dns2` varchar(45) DEFAULT NULL,
-  `switch_puerto` varchar(60) DEFAULT NULL,
-  `patchera_puerto` varchar(60) DEFAULT NULL,
-  `sector_red` varchar(120) DEFAULT NULL,
-  `vlan` varchar(40) DEFAULT NULL,
-  `ip_fija` tinyint(1) NOT NULL DEFAULT 0,
-  `categoria` varchar(30) NOT NULL DEFAULT 'informatica'
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
--- --------------------------------------------------------
-
---
--- Estructura de tabla para la tabla `it_edificios`
---
-
-CREATE TABLE `it_edificios` (
-  `id` int(11) NOT NULL,
-  `unidad_id` int(11) NOT NULL,
-  `numero` int(11) DEFAULT NULL,
-  `nombre` varchar(190) NOT NULL,
-  `descripcion` text DEFAULT NULL,
-  `ip_rango_desde` varchar(45) DEFAULT NULL,
-  `ip_rango_hasta` varchar(45) DEFAULT NULL,
-  `creado_en` datetime NOT NULL DEFAULT current_timestamp()
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
---
--- Volcado de datos para la tabla `it_edificios`
---
-
-INSERT INTO `it_edificios` (`id`, `unidad_id`, `numero`, `nombre`, `descripcion`, `ip_rango_desde`, `ip_rango_hasta`, `creado_en`) VALUES
-(1, 1, 20, 'Plana Prueba', 'Edificio N°18', '192.168.18.1', '192.168.18.254', '2026-02-08 16:50:08');
-
--- --------------------------------------------------------
-
---
--- Estructura de tabla para la tabla `it_fuentes_fondos`
---
-
-CREATE TABLE `it_fuentes_fondos` (
-  `id` int(11) NOT NULL,
-  `unidad_id` int(11) NOT NULL,
-  `nombre` varchar(190) NOT NULL,
-  `descripcion` text DEFAULT NULL,
-  `creado_en` datetime NOT NULL DEFAULT current_timestamp()
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
--- --------------------------------------------------------
-
---
--- Estructura de tabla para la tabla `it_internet`
---
-
-CREATE TABLE `it_internet` (
-  `id` int(11) NOT NULL,
-  `unidad_id` int(11) NOT NULL,
-  `edificio_id` int(11) NOT NULL,
-  `proveedor` varchar(120) NOT NULL,
-  `servicio` varchar(120) DEFAULT NULL,
-  `plan` varchar(120) DEFAULT NULL,
-  `velocidad` varchar(80) DEFAULT NULL,
-  `costo` decimal(12,2) DEFAULT NULL,
-  `ip_publica` varchar(60) DEFAULT NULL,
-  `nota` varchar(255) DEFAULT NULL,
-  `updated_at` timestamp NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
--- --------------------------------------------------------
-
---
--- Estructura de tabla para la tabla `it_mantenimientos`
---
-
-CREATE TABLE `it_mantenimientos` (
-  `id` int(11) NOT NULL,
-  `unidad_id` int(11) NOT NULL,
-  `edificio_id` int(11) NOT NULL,
-  `activo_id` int(11) DEFAULT NULL,
-  `fecha` date NOT NULL,
-  `tipo` varchar(80) NOT NULL DEFAULT 'preventivo',
-  `detalle` text NOT NULL,
-  `realizado_por` varchar(120) DEFAULT NULL,
-  `costo` decimal(12,2) DEFAULT NULL,
-  `created_at` timestamp NULL DEFAULT current_timestamp()
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
--- --------------------------------------------------------
-
---
--- Estructura de tabla para la tabla `personal_documentos`
---
-
-CREATE TABLE `personal_documentos` (
-  `id` int(11) NOT NULL,
-  `unidad_id` int(11) NOT NULL,
-  `personal_id` int(11) NOT NULL,
-  `sanidad_id` int(11) DEFAULT NULL,
-  `evento_id` int(11) DEFAULT NULL,
-  `tipo` varchar(120) DEFAULT NULL,
-  `titulo` varchar(255) DEFAULT NULL,
-  `original_name` varchar(255) DEFAULT NULL,
-  `mime` varchar(120) DEFAULT NULL,
-  `bytes` bigint(20) DEFAULT NULL,
-  `sha256` char(64) DEFAULT NULL,
-  `path` varchar(512) DEFAULT NULL,
-  `nota` text DEFAULT NULL,
-  `fecha` date DEFAULT NULL,
-  `created_at` timestamp NULL DEFAULT current_timestamp(),
-  `deleted_at` timestamp NULL DEFAULT NULL,
-  `created_by_id` int(11) DEFAULT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
--- --------------------------------------------------------
-
---
--- Estructura de tabla para la tabla `personal_eventos`
---
-
-CREATE TABLE `personal_eventos` (
-  `id` int(11) NOT NULL,
-  `unidad_id` int(11) NOT NULL,
-  `personal_id` int(11) NOT NULL,
-  `tipo` varchar(60) NOT NULL,
-  `desde` date DEFAULT NULL,
-  `hasta` date DEFAULT NULL,
-  `estado` varchar(30) DEFAULT NULL,
-  `titulo` varchar(255) DEFAULT NULL,
-  `descripcion` text DEFAULT NULL,
-  `data_json` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL CHECK (json_valid(`data_json`)),
-  `created_at` timestamp NULL DEFAULT current_timestamp(),
-  `created_by_id` int(11) DEFAULT NULL,
-  `updated_at` timestamp NULL DEFAULT NULL,
-  `updated_by_id` int(11) DEFAULT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
--- --------------------------------------------------------
-
---
--- Estructura de tabla para la tabla `personal_unidad`
---
-
-CREATE TABLE `personal_unidad` (
-  `id` int(11) NOT NULL,
-  `unidad_id` int(11) NOT NULL,
-  `dni` varchar(20) NOT NULL,
-  `cuil` varchar(20) DEFAULT NULL,
-  `fecha_nac` date DEFAULT NULL,
-  `peso` decimal(6,2) DEFAULT NULL,
-  `altura` decimal(5,2) DEFAULT NULL,
-  `sexo` varchar(10) DEFAULT NULL,
-  `domicilio` varchar(255) DEFAULT NULL,
-  `estado_civil` varchar(60) DEFAULT NULL,
-  `hijos` int(11) DEFAULT NULL,
-  `nou` varchar(60) DEFAULT NULL,
-  `nro_cta` varchar(60) DEFAULT NULL,
-  `cbu` varchar(60) DEFAULT NULL,
-  `alias_banco` varchar(100) DEFAULT NULL,
-  `fecha_ultimo_anexo27` date DEFAULT NULL,
-  `tiene_parte_enfermo` tinyint(1) NOT NULL DEFAULT 0,
-  `parte_enfermo_desde` date DEFAULT NULL,
-  `parte_enfermo_hasta` date DEFAULT NULL,
-  `cantidad_parte_enfermo` int(11) DEFAULT NULL,
-  `destino_interno` varchar(255) DEFAULT NULL,
-  `rol` varchar(255) DEFAULT NULL,
-  `anios_en_destino` decimal(5,2) DEFAULT NULL,
-  `fracc` varchar(60) DEFAULT NULL,
-  `jerarquia` enum('OFICIAL','SUBOFICIAL','SOLDADO','AGENTE_CIVIL') DEFAULT NULL,
-  `grado` varchar(60) DEFAULT NULL,
-  `arma` varchar(60) DEFAULT NULL,
-  `apellido_nombre` varchar(255) DEFAULT NULL,
-  `apellido` varchar(120) DEFAULT NULL,
-  `nombre` varchar(120) DEFAULT NULL,
-  `destino_id` int(11) DEFAULT NULL,
-  `funcion` varchar(255) DEFAULT NULL,
-  `telefono` varchar(60) DEFAULT NULL,
-  `correo` varchar(120) DEFAULT NULL,
-  `fecha_alta` date DEFAULT NULL,
-  `observaciones` text DEFAULT NULL,
-  `role_id` int(11) NOT NULL DEFAULT 3,
-  `created_at` timestamp NULL DEFAULT current_timestamp(),
-  `updated_at` timestamp NULL DEFAULT NULL,
-  `updated_by_id` int(11) DEFAULT NULL,
-  `extra_json` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL CHECK (json_valid(`extra_json`))
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
---
--- Volcado de datos para la tabla `personal_unidad`
---
-
-INSERT INTO `personal_unidad` (`id`, `unidad_id`, `dni`, `cuil`, `fecha_nac`, `peso`, `altura`, `sexo`, `domicilio`, `estado_civil`, `hijos`, `nou`, `nro_cta`, `cbu`, `alias_banco`, `fecha_ultimo_anexo27`, `tiene_parte_enfermo`, `parte_enfermo_desde`, `parte_enfermo_hasta`, `cantidad_parte_enfermo`, `destino_interno`, `rol`, `anios_en_destino`, `fracc`, `jerarquia`, `grado`, `arma`, `apellido_nombre`, `apellido`, `nombre`, `destino_id`, `funcion`, `telefono`, `correo`, `fecha_alta`, `observaciones`, `role_id`, `created_at`, `updated_at`, `updated_by_id`, `extra_json`) VALUES
-(156, 1, '41742406', NULL, NULL, NULL, NULL, 'M', 'Vice Almirante John Oconnor 1068, Bariloche, Argentina', 'Soltero', 0, NULL, NULL, NULL, NULL, NULL, 0, '2026-12-31', '2027-01-01', 0, 'Informatica', NULL, 1.00, '2', 'OFICIAL', 'ST', 'SCD', 'Rojas Gabriel', NULL, NULL, 7, NULL, NULL, NULL, NULL, NULL, 1, '2026-02-26 01:25:45', '2026-02-26 01:26:11', 156, '{\"jerarquia\": \"OFICIAL\", \"jerarquia_label\": \"OFICIALES\"}'),
-(158, 1, '43618351', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, '1', 'SUBOFICIAL', 'CB', 'Mus', 'ALVES LENCINA Josué', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 3, '2026-02-26 01:26:03', '2026-02-26 01:26:11', 156, '{\"jerarquia\": \"SUBOFICIAL\", \"jerarquia_label\": \"SUBOFICIALES\"}'),
-(159, 1, '37695054', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, 'D', 'SUBOFICIAL', 'CB', 'I', 'ARGEL Néstor Paul', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 3, '2026-02-26 01:26:03', '2026-02-26 01:26:11', 156, '{\"jerarquia\": \"SUBOFICIAL\", \"jerarquia_label\": \"SUBOFICIALES\"}'),
-(160, 1, '41901928', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, '1', 'SUBOFICIAL', 'CB', 'Conduc Mot', 'ESPINOSA Juan Sebastian Alejandro', NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'RETIRO:', 3, '2026-02-26 01:26:03', '2026-02-26 01:26:11', 156, '{\"jerarquia\": \"SUBOFICIAL\", \"jerarquia_label\": \"SUBOFICIALES\"}'),
-(161, 1, '42736155', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, '3', 'SUBOFICIAL', 'CB EC', 'Mec Info', 'FERNANDEZ Brian Ignacio', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 3, '2026-02-26 01:26:03', '2026-02-26 01:26:11', 156, '{\"jerarquia\": \"SUBOFICIAL\", \"jerarquia_label\": \"SUBOFICIALES\"}'),
-(162, 1, '41755576', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, '3', 'SUBOFICIAL', 'CB EC', 'Mec Inst', 'PEREZ Sergio Daniel', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 3, '2026-02-26 01:26:03', '2026-02-26 01:26:11', 156, '{\"jerarquia\": \"SUBOFICIAL\", \"jerarquia_label\": \"SUBOFICIALES\"}'),
-(163, 1, '43804935', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, '5', 'SUBOFICIAL', 'CB EC', 'Mus', 'VIEIRA DE LIMA Gustavo Rafael', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 3, '2026-02-26 01:26:03', '2026-02-26 01:26:11', 156, '{\"jerarquia\": \"SUBOFICIAL\", \"jerarquia_label\": \"SUBOFICIALES\"}'),
-(164, 1, '39229210', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, '3', 'SUBOFICIAL', 'CI', 'Mec Eq Fij', 'BAEZ FARIÑA Gabriel Moises', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 3, '2026-02-26 01:26:03', '2026-02-26 01:26:11', 156, '{\"jerarquia\": \"SUBOFICIAL\", \"jerarquia_label\": \"SUBOFICIALES\"}'),
-(165, 1, '38585795', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, '4', 'SUBOFICIAL', 'CI', 'Ofic', 'CABALLERO LUNA Carolina Mariel', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 3, '2026-02-26 01:26:03', '2026-02-26 01:26:11', 156, '{\"jerarquia\": \"SUBOFICIAL\", \"jerarquia_label\": \"SUBOFICIALES\"}'),
-(166, 1, '40628111', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, '4', 'SUBOFICIAL', 'CI', 'Mus', 'FLORES Cintia Abigail', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 3, '2026-02-26 01:26:03', '2026-02-26 01:26:11', 156, '{\"jerarquia\": \"SUBOFICIAL\", \"jerarquia_label\": \"SUBOFICIALES\"}'),
-(167, 1, '35709978', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, '1', 'SUBOFICIAL', 'CI', 'Tal', 'FRANCO Blas Ariel Alejandro', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 3, '2026-02-26 01:26:03', '2026-02-26 01:26:11', 156, '{\"jerarquia\": \"SUBOFICIAL\", \"jerarquia_label\": \"SUBOFICIALES\"}'),
-(168, 1, '40488065', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, '5', 'SUBOFICIAL', 'CI', 'I', 'FRANCO Ezequiel Julian', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 3, '2026-02-26 01:26:03', '2026-02-26 01:26:11', 156, '{\"jerarquia\": \"SUBOFICIAL\", \"jerarquia_label\": \"SUBOFICIALES\"}'),
-(169, 1, '42069719', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, '5', 'SUBOFICIAL', 'CI', 'I', 'GAITAN Elio Jesus', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 3, '2026-02-26 01:26:03', '2026-02-26 01:26:11', 156, '{\"jerarquia\": \"SUBOFICIAL\", \"jerarquia_label\": \"SUBOFICIALES\"}'),
-(170, 1, '36837146', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, '4', 'SUBOFICIAL', 'CI', 'Mus', 'GUTIERREZ Pedro Hernan', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 3, '2026-02-26 01:26:03', '2026-02-26 01:26:11', 156, '{\"jerarquia\": \"SUBOFICIAL\", \"jerarquia_label\": \"SUBOFICIALES\"}'),
-(171, 1, '35818697', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, '2', 'SUBOFICIAL', 'CI', 'Herr', 'MALDONADO GUERRERO Mauricio Esteban', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 3, '2026-02-26 01:26:03', '2026-02-26 01:26:11', 156, '{\"jerarquia\": \"SUBOFICIAL\", \"jerarquia_label\": \"SUBOFICIALES\"}'),
-(172, 1, '39675068', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, '2', 'SUBOFICIAL', 'CI', 'Mus', 'MARTINEZ Yanina Adriana', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 3, '2026-02-26 01:26:03', '2026-02-26 01:26:11', 156, '{\"jerarquia\": \"SUBOFICIAL\", \"jerarquia_label\": \"SUBOFICIALES\"}'),
-(173, 1, '36614359', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, '2', 'SUBOFICIAL', 'CI', 'Mec Eq Camp', 'MELENDEZ Alejandro Damian', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 3, '2026-02-26 01:26:03', '2026-02-26 01:26:11', 156, '{\"jerarquia\": \"SUBOFICIAL\", \"jerarquia_label\": \"SUBOFICIALES\"}'),
-(174, 1, '19040619', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, '3', 'SUBOFICIAL', 'CI', 'I', 'MONDO Agustin Vicente', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 3, '2026-02-26 01:26:03', '2026-02-26 01:26:11', 156, '{\"jerarquia\": \"SUBOFICIAL\", \"jerarquia_label\": \"SUBOFICIALES\"}'),
-(175, 1, '41054639', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, '1', 'SUBOFICIAL', 'CI', 'Int', 'ORTEGA SALAZAR Sebastian Nicolas', NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'LICENCIA: No tiene fecha presentación (SAF)', 3, '2026-02-26 01:26:03', '2026-02-26 01:26:11', 156, '{\"jerarquia\": \"SUBOFICIAL\", \"jerarquia_label\": \"SUBOFICIALES\"}'),
-(176, 1, '33918403', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, '1', 'SUBOFICIAL', 'CI', 'Mus', 'PAINEFIL Cristian David', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 3, '2026-02-26 01:26:03', '2026-02-26 01:26:11', 156, '{\"jerarquia\": \"SUBOFICIAL\", \"jerarquia_label\": \"SUBOFICIALES\"}'),
-(177, 1, '35954614', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, '1', 'SUBOFICIAL', 'CI', 'Mus', 'QUISPE Lucas Jesús', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 3, '2026-02-26 01:26:03', '2026-02-26 01:26:11', 156, '{\"jerarquia\": \"SUBOFICIAL\", \"jerarquia_label\": \"SUBOFICIALES\"}'),
-(178, 1, '40329557', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, '4', 'SUBOFICIAL', 'CI', 'Mus', 'ROBLES Martin Miguel', NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'RETIRO:', 3, '2026-02-26 01:26:03', '2026-02-26 01:26:11', 156, '{\"jerarquia\": \"SUBOFICIAL\", \"jerarquia_label\": \"SUBOFICIALES\"}'),
-(179, 1, '38789882', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, '3', 'SUBOFICIAL', 'CI', 'Mus', 'RUEDA Sebastian Jose', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 3, '2026-02-26 01:26:03', '2026-02-26 01:26:11', 156, '{\"jerarquia\": \"SUBOFICIAL\", \"jerarquia_label\": \"SUBOFICIALES\"}'),
-(180, 1, '35077099', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, '1', 'SUBOFICIAL', 'CI Art 11', 'Sas', 'CIRULLI Mauricio Daniel', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 3, '2026-02-26 01:26:03', '2026-02-26 01:26:11', 156, '{\"jerarquia\": \"SUBOFICIAL\", \"jerarquia_label\": \"SUBOFICIALES\"}'),
-(181, 1, '36233006', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, '5', 'SUBOFICIAL', 'CI Art 11', 'Enf Grl', 'CUELLO Emanuel Sergio', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 3, '2026-02-26 01:26:03', '2026-02-26 01:26:11', 156, '{\"jerarquia\": \"SUBOFICIAL\", \"jerarquia_label\": \"SUBOFICIALES\"}'),
-(182, 1, '34714645', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, 'F', 'SUBOFICIAL', 'CI Art 11', 'I', 'MOLINAS Santiago Andrés', NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'RETIRO:', 3, '2026-02-26 01:26:03', '2026-02-26 01:26:11', 156, '{\"jerarquia\": \"SUBOFICIAL\", \"jerarquia_label\": \"SUBOFICIALES\"}'),
-(183, 1, '38925650', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, '4', 'SUBOFICIAL', 'CI EC', 'Cama', 'TOLOSA Braian Emanuel', NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'RETIRO:', 3, '2026-02-26 01:26:03', '2026-02-26 01:26:11', 156, '{\"jerarquia\": \"SUBOFICIAL\", \"jerarquia_label\": \"SUBOFICIALES\"}'),
-(184, 1, '40516245', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, '3', 'SUBOFICIAL', 'CI EC', 'Coc', 'VEGA Anibal Leonel', NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'RETIRO:', 3, '2026-02-26 01:26:03', '2026-02-26 01:26:11', 156, '{\"jerarquia\": \"SUBOFICIAL\", \"jerarquia_label\": \"SUBOFICIALES\"}'),
-(185, 1, '38335684', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, '4', 'SUBOFICIAL', 'CI EC', 'Coc', 'VEGA Mauricio Nicolás', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 3, '2026-02-26 01:26:03', '2026-02-26 01:26:11', 156, '{\"jerarquia\": \"SUBOFICIAL\", \"jerarquia_label\": \"SUBOFICIALES\"}'),
-(186, 1, '25402368', NULL, '1976-10-28', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, '3', 'SUBOFICIAL', 'SA', 'I', 'BARRIA VARGAS Enrique Antonio', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 3, '2026-02-26 01:26:03', '2026-02-26 01:26:11', 156, '{\"jerarquia\": \"SUBOFICIAL\", \"jerarquia_label\": \"SUBOFICIALES\"}'),
-(187, 1, '31485399', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, '5', 'SUBOFICIAL', 'SA', 'I', 'BRITEZ Leonardo Ariel', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 3, '2026-02-26 01:26:03', '2026-02-26 01:26:11', 156, '{\"jerarquia\": \"SUBOFICIAL\", \"jerarquia_label\": \"SUBOFICIALES\"}'),
-(188, 1, '27632543', NULL, '1980-01-13', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, '3', 'SUBOFICIAL', 'SA', 'Int', 'DEL CID Manuel Antonio', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 3, '2026-02-26 01:26:03', '2026-02-26 01:26:11', 156, '{\"jerarquia\": \"SUBOFICIAL\", \"jerarquia_label\": \"SUBOFICIALES\"}'),
-(189, 1, '30669051', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, '5', 'SUBOFICIAL', 'SA', 'Mus', 'FERNANDEZ MACIAS Rodrigo Héctor', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 3, '2026-02-26 01:26:03', '2026-02-26 01:26:11', 156, '{\"jerarquia\": \"SUBOFICIAL\", \"jerarquia_label\": \"SUBOFICIALES\"}'),
-(190, 1, '22366012', NULL, '1971-07-30', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, 'D', 'SUBOFICIAL', 'SA', 'Mec Inst', 'FLORES Luis Antonio', NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'LICENCIA: 01/03/2026 · RETIRO: 31/08/2026', 3, '2026-02-26 01:26:03', '2026-02-26 01:26:11', 156, '{\"jerarquia\": \"SUBOFICIAL\", \"jerarquia_label\": \"SUBOFICIALES\"}'),
-(191, 1, '27747507', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, '5', 'SUBOFICIAL', 'SA', 'Conduc Mot', 'GOÑI VILLALBA Nahuel Nelson', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 3, '2026-02-26 01:26:03', '2026-02-26 01:26:11', 156, '{\"jerarquia\": \"SUBOFICIAL\", \"jerarquia_label\": \"SUBOFICIALES\"}'),
-(192, 1, '28577701', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, '5', 'SUBOFICIAL', 'SA', 'I', 'HIGUERAS VILLAGRA Héctor Hugo', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 3, '2026-02-26 01:26:03', '2026-02-26 01:26:11', 156, '{\"jerarquia\": \"SUBOFICIAL\", \"jerarquia_label\": \"SUBOFICIALES\"}'),
-(193, 1, '26249322', NULL, '1978-02-10', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, '2', 'SUBOFICIAL', 'SA', 'I', 'JURADO Carlos Héctor', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 3, '2026-02-26 01:26:03', '2026-02-26 01:26:11', 156, '{\"jerarquia\": \"SUBOFICIAL\", \"jerarquia_label\": \"SUBOFICIALES\"}'),
-(194, 1, '28190245', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, '1', 'SUBOFICIAL', 'SA', 'Mus', 'LOPEZ Fernando Raul', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 3, '2026-02-26 01:26:03', '2026-02-26 01:26:11', 156, '{\"jerarquia\": \"SUBOFICIAL\", \"jerarquia_label\": \"SUBOFICIALES\"}'),
-(195, 1, '23745244', NULL, '1974-11-10', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, '2', 'SUBOFICIAL', 'SA', 'Carp', 'MARTIN Sergio Bernardo', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 3, '2026-02-26 01:26:03', '2026-02-26 01:26:11', 156, '{\"jerarquia\": \"SUBOFICIAL\", \"jerarquia_label\": \"SUBOFICIALES\"}'),
-(196, 1, '30268302', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, '3', 'SUBOFICIAL', 'SA', 'Enf Grl', 'MOYANO David Marcelo', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 3, '2026-02-26 01:26:03', '2026-02-26 01:26:11', 156, '{\"jerarquia\": \"SUBOFICIAL\", \"jerarquia_label\": \"SUBOFICIALES\"}'),
-(197, 1, '26951915', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, '5', 'SUBOFICIAL', 'SA', 'Baq', 'NAVARRO Daniel Alejandro', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 3, '2026-02-26 01:26:03', '2026-02-26 01:26:11', 156, '{\"jerarquia\": \"SUBOFICIAL\", \"jerarquia_label\": \"SUBOFICIALES\"}'),
-(198, 1, '31153974', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, '2', 'SUBOFICIAL', 'SA', 'Mec', 'NOGALES Daniel Alejandro', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 3, '2026-02-26 01:26:03', '2026-02-26 01:26:11', 156, '{\"jerarquia\": \"SUBOFICIAL\", \"jerarquia_label\": \"SUBOFICIALES\"}'),
-(199, 1, '28490734', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, '5', 'SUBOFICIAL', 'SA', 'I', 'ORTIZ Diego Fabián', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 3, '2026-02-26 01:26:03', '2026-02-26 01:26:11', 156, '{\"jerarquia\": \"SUBOFICIAL\", \"jerarquia_label\": \"SUBOFICIALES\"}'),
-(200, 1, '27008470', NULL, '1978-12-01', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, 'D', 'SUBOFICIAL', 'SA', 'I(c)', 'PICONE Juan Manuel', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 3, '2026-02-26 01:26:03', '2026-02-26 01:26:11', 156, '{\"jerarquia\": \"SUBOFICIAL\", \"jerarquia_label\": \"SUBOFICIALES\"}'),
-(201, 1, '27943349', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, '5', 'SUBOFICIAL', 'SA', 'Mus', 'RATTO Martin Miguel', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 3, '2026-02-26 01:26:03', '2026-02-26 01:26:11', 156, '{\"jerarquia\": \"SUBOFICIAL\", \"jerarquia_label\": \"SUBOFICIALES\"}'),
-(202, 1, '30602133', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, '5', 'SUBOFICIAL', 'SA', 'Ing', 'RONDAN Matías Daniel Armando', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 3, '2026-02-26 01:26:03', '2026-02-26 01:26:11', 156, '{\"jerarquia\": \"SUBOFICIAL\", \"jerarquia_label\": \"SUBOFICIALES\"}'),
-(203, 1, '28646442', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, '5', 'SUBOFICIAL', 'SA', 'I', 'TAPIA Fernando Adrián', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 3, '2026-02-26 01:26:03', '2026-02-26 01:26:11', 156, '{\"jerarquia\": \"SUBOFICIAL\", \"jerarquia_label\": \"SUBOFICIALES\"}'),
-(204, 1, '29716411', NULL, '1983-01-21', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, '2', 'SUBOFICIAL', 'SA', 'Com', 'TORRES GONZALEZ Andrés Nicolás', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 3, '2026-02-26 01:26:03', '2026-02-26 01:26:11', 156, '{\"jerarquia\": \"SUBOFICIAL\", \"jerarquia_label\": \"SUBOFICIALES\"}'),
-(205, 1, '21323602', NULL, '1970-11-14', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, '3', 'SUBOFICIAL', 'SA', 'I', 'VALLEJOS Roberto Carlos', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 3, '2026-02-26 01:26:03', '2026-02-26 01:26:11', 156, '{\"jerarquia\": \"SUBOFICIAL\", \"jerarquia_label\": \"SUBOFICIALES\"}'),
-(206, 1, '26727367', NULL, '1978-08-21', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, '2', 'SUBOFICIAL', 'SA', 'C', 'VILLAFAÑE Carlos Sandro', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 3, '2026-02-26 01:26:03', '2026-02-26 01:26:11', 156, '{\"jerarquia\": \"SUBOFICIAL\", \"jerarquia_label\": \"SUBOFICIALES\"}'),
-(207, 1, '24200730', NULL, '1974-10-26', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, '2', 'SUBOFICIAL', 'SA', 'Cama', 'VISUARA Pedro José', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 3, '2026-02-26 01:26:03', '2026-02-26 01:26:11', 156, '{\"jerarquia\": \"SUBOFICIAL\", \"jerarquia_label\": \"SUBOFICIALES\"}'),
-(208, 1, '28259195', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, '5', 'SUBOFICIAL', 'SA', 'Int', 'ZAMORA Ivana Gabriela', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 3, '2026-02-26 01:26:03', '2026-02-26 01:26:11', 156, '{\"jerarquia\": \"SUBOFICIAL\", \"jerarquia_label\": \"SUBOFICIALES\"}'),
-(209, 1, '26567574', NULL, '1978-05-11', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, '3', 'SUBOFICIAL', 'SA', 'Cama', 'ZONINO Leandro Walter', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 3, '2026-02-26 01:26:03', '2026-02-26 01:26:11', 156, '{\"jerarquia\": \"SUBOFICIAL\", \"jerarquia_label\": \"SUBOFICIALES\"}'),
-(210, 1, '36174185', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, '1', 'SUBOFICIAL', 'SG', 'Mec Mot Rueda', 'ACEVEDO Eduardo Horacio', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 3, '2026-02-26 01:26:03', '2026-02-26 01:26:11', 156, '{\"jerarquia\": \"SUBOFICIAL\", \"jerarquia_label\": \"SUBOFICIALES\"}'),
-(211, 1, '34714452', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, '4', 'SUBOFICIAL', 'SG', 'I', 'ALCARAZ Juan Alejandro', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 3, '2026-02-26 01:26:03', '2026-02-26 01:26:11', 156, '{\"jerarquia\": \"SUBOFICIAL\", \"jerarquia_label\": \"SUBOFICIALES\"}'),
-(212, 1, '31007476', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, '1', 'SUBOFICIAL', 'SG', 'C', 'ARRIAGADA Pablo Jose', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 3, '2026-02-26 01:26:03', '2026-02-26 01:26:11', 156, '{\"jerarquia\": \"SUBOFICIAL\", \"jerarquia_label\": \"SUBOFICIALES\"}'),
-(213, 1, '34340814', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, '3', 'SUBOFICIAL', 'SG', 'I', 'AYALA Ignacio Evaristo', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 3, '2026-02-26 01:26:03', '2026-02-26 01:26:11', 156, '{\"jerarquia\": \"SUBOFICIAL\", \"jerarquia_label\": \"SUBOFICIALES\"}'),
-(214, 1, '36809263', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, '3', 'SUBOFICIAL', 'SG', 'Baq', 'AZOCAR Diego Nicolás', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 3, '2026-02-26 01:26:03', '2026-02-26 01:26:11', 156, '{\"jerarquia\": \"SUBOFICIAL\", \"jerarquia_label\": \"SUBOFICIALES\"}'),
-(215, 1, '33954988', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, '4', 'SUBOFICIAL', 'SG', 'Carp', 'BENITEZ Guillermo Sebastian', NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'RETIRO:', 3, '2026-02-26 01:26:03', '2026-02-26 01:26:11', 156, '{\"jerarquia\": \"SUBOFICIAL\", \"jerarquia_label\": \"SUBOFICIALES\"}'),
-(216, 1, '34521400', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, '3', 'SUBOFICIAL', 'SG', 'Mus', 'BIDART Claudio Alejandro', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 3, '2026-02-26 01:26:03', '2026-02-26 01:26:11', 156, '{\"jerarquia\": \"SUBOFICIAL\", \"jerarquia_label\": \"SUBOFICIALES\"}'),
-(217, 1, '30784152', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, '1', 'SUBOFICIAL', 'SG', 'Conduc Mot', 'BUSTOS Matías Gonzalo', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 3, '2026-02-26 01:26:03', '2026-02-26 01:26:11', 156, '{\"jerarquia\": \"SUBOFICIAL\", \"jerarquia_label\": \"SUBOFICIALES\"}'),
-(218, 1, '33426767', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, '3', 'SUBOFICIAL', 'SG', 'I', 'CABEZAS Adrian', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 3, '2026-02-26 01:26:03', '2026-02-26 01:26:11', 156, '{\"jerarquia\": \"SUBOFICIAL\", \"jerarquia_label\": \"SUBOFICIALES\"}'),
-(219, 1, '33042967', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, '4', 'SUBOFICIAL', 'SG', 'I', 'CARRASCO Juan', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 3, '2026-02-26 01:26:03', '2026-02-26 01:26:11', 156, '{\"jerarquia\": \"SUBOFICIAL\", \"jerarquia_label\": \"SUBOFICIALES\"}'),
-(220, 1, '32263444', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, '1', 'SUBOFICIAL', 'SG', 'Enf Grl', 'CORONEL Victor Ezequiel', NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'RETIRO:', 3, '2026-02-26 01:26:03', '2026-02-26 01:26:11', 156, '{\"jerarquia\": \"SUBOFICIAL\", \"jerarquia_label\": \"SUBOFICIALES\"}'),
-(221, 1, '25354264', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, 'D', 'SUBOFICIAL', 'SG', 'Baq', 'GARCIA David Nelson', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 3, '2026-02-26 01:26:03', '2026-02-26 01:26:11', 156, '{\"jerarquia\": \"SUBOFICIAL\", \"jerarquia_label\": \"SUBOFICIALES\"}'),
-(222, 1, '36320839', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, '3', 'SUBOFICIAL', 'SG', 'Int', 'GONZALEZ Florencia Cristina', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 3, '2026-02-26 01:26:03', '2026-02-26 01:26:11', 156, '{\"jerarquia\": \"SUBOFICIAL\", \"jerarquia_label\": \"SUBOFICIALES\"}'),
-(223, 1, '31083567', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, '1', 'SUBOFICIAL', 'SG', 'Baq', 'GONZALEZ Sergio Damián', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 3, '2026-02-26 01:26:03', '2026-02-26 01:26:11', 156, '{\"jerarquia\": \"SUBOFICIAL\", \"jerarquia_label\": \"SUBOFICIALES\"}'),
-(224, 1, '35036679', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, '3', 'SUBOFICIAL', 'SG', 'I', 'GRAGEDA David Jonathan', NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'RETIRO:', 3, '2026-02-26 01:26:03', '2026-02-26 01:26:11', 156, '{\"jerarquia\": \"SUBOFICIAL\", \"jerarquia_label\": \"SUBOFICIALES\"}'),
-(225, 1, '38173615', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, '5', 'SUBOFICIAL', 'SG', 'Condcuc Mot', 'HOLMAN Alan Franco', NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'LICENCIA: No tiene fecha presentación (SAF)', 3, '2026-02-26 01:26:03', '2026-02-26 01:26:11', 156, '{\"jerarquia\": \"SUBOFICIAL\", \"jerarquia_label\": \"SUBOFICIALES\"}'),
-(226, 1, '32645836', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, '2', 'SUBOFICIAL', 'SG', 'I', 'HUAIQUILAF Miguel Angel', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 3, '2026-02-26 01:26:03', '2026-02-26 01:26:11', 156, '{\"jerarquia\": \"SUBOFICIAL\", \"jerarquia_label\": \"SUBOFICIALES\"}'),
-(227, 1, '34775404', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, '3', 'SUBOFICIAL', 'SG', 'Env Vet', 'LEIVA Eduardo Luis', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 3, '2026-02-26 01:26:03', '2026-02-26 01:26:11', 156, '{\"jerarquia\": \"SUBOFICIAL\", \"jerarquia_label\": \"SUBOFICIALES\"}'),
-(228, 1, '35595466', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, '3', 'SUBOFICIAL', 'SG', 'Conduc Mot', 'LEIVA Jonathan Segundo', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 3, '2026-02-26 01:26:03', '2026-02-26 01:26:11', 156, '{\"jerarquia\": \"SUBOFICIAL\", \"jerarquia_label\": \"SUBOFICIALES\"}'),
-(229, 1, '39917711', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, '5', 'SUBOFICIAL', 'SG', 'Enf Grl', 'MEDINA Natalia Soledad', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 3, '2026-02-26 01:26:03', '2026-02-26 01:26:11', 156, '{\"jerarquia\": \"SUBOFICIAL\", \"jerarquia_label\": \"SUBOFICIALES\"}'),
-(230, 1, '25487062', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, 'D', 'SUBOFICIAL', 'SG', 'Baq', 'ÑANCURPAY Gustavo Javier', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 3, '2026-02-26 01:26:03', '2026-02-26 01:26:11', 156, '{\"jerarquia\": \"SUBOFICIAL\", \"jerarquia_label\": \"SUBOFICIALES\"}'),
-(231, 1, '33659938', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, '5', 'SUBOFICIAL', 'SG', 'Mus', 'OYARZO Valeria de las Nieves', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 3, '2026-02-26 01:26:03', '2026-02-26 01:26:11', 156, '{\"jerarquia\": \"SUBOFICIAL\", \"jerarquia_label\": \"SUBOFICIALES\"}'),
-(232, 1, '35459870', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, '4', 'SUBOFICIAL', 'SG', 'Int', 'PEREZ Ariel Alejandro', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 3, '2026-02-26 01:26:03', '2026-02-26 01:26:11', 156, '{\"jerarquia\": \"SUBOFICIAL\", \"jerarquia_label\": \"SUBOFICIALES\"}'),
-(233, 1, '34666961', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, '5', 'SUBOFICIAL', 'SG', 'Mus', 'QUIJADA Veronica', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 3, '2026-02-26 01:26:03', '2026-02-26 01:26:11', 156, '{\"jerarquia\": \"SUBOFICIAL\", \"jerarquia_label\": \"SUBOFICIALES\"}'),
-(234, 1, '33327936', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, '4', 'SUBOFICIAL', 'SG', 'Herr', 'QUIÑENAO Valdemar Segundo', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 3, '2026-02-26 01:26:03', '2026-02-26 01:26:11', 156, '{\"jerarquia\": \"SUBOFICIAL\", \"jerarquia_label\": \"SUBOFICIALES\"}'),
-(235, 1, '37256482', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, '5', 'SUBOFICIAL', 'SG', 'Ofic', 'SANTILLAN Luis Ernesto', NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'RETIRO:', 3, '2026-02-26 01:26:03', '2026-02-26 01:26:11', 156, '{\"jerarquia\": \"SUBOFICIAL\", \"jerarquia_label\": \"SUBOFICIALES\"}'),
-(236, 1, '34945277', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, '5', 'SUBOFICIAL', 'SG', 'Cama', 'TORO TORCIBIA Jesús Elías', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 3, '2026-02-26 01:26:03', '2026-02-26 01:26:11', 156, '{\"jerarquia\": \"SUBOFICIAL\", \"jerarquia_label\": \"SUBOFICIALES\"}'),
-(237, 1, '35928720', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, '2', 'SUBOFICIAL', 'SG', 'Mec Info', 'VALDIVIEZO Cecilia Nadia Tamara', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 3, '2026-02-26 01:26:03', '2026-02-26 01:26:11', 156, '{\"jerarquia\": \"SUBOFICIAL\", \"jerarquia_label\": \"SUBOFICIALES\"}'),
-(238, 1, '35593401', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, '4', 'SUBOFICIAL', 'SG', 'Baq', 'VEGA Rubén', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 3, '2026-02-26 01:26:03', '2026-02-26 01:26:11', 156, '{\"jerarquia\": \"SUBOFICIAL\", \"jerarquia_label\": \"SUBOFICIALES\"}'),
-(239, 1, '35027266', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, '5', 'SUBOFICIAL', 'SG', 'Coc', 'VILLALBA Damian Esteban', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 3, '2026-02-26 01:26:03', '2026-02-26 01:26:11', 156, '{\"jerarquia\": \"SUBOFICIAL\", \"jerarquia_label\": \"SUBOFICIALES\"}'),
-(240, 1, '29736108', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, '4', 'SUBOFICIAL', 'SI', 'Conduc Mot', 'ALARCON Diego Armando', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 3, '2026-02-26 01:26:03', '2026-02-26 01:26:11', 156, '{\"jerarquia\": \"SUBOFICIAL\", \"jerarquia_label\": \"SUBOFICIALES\"}'),
-(241, 1, '25722823', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, '1', 'SUBOFICIAL', 'SI', 'Mus', 'ALBA Néstor Cristóbal', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 3, '2026-02-26 01:26:03', '2026-02-26 01:26:11', 156, '{\"jerarquia\": \"SUBOFICIAL\", \"jerarquia_label\": \"SUBOFICIALES\"}'),
-(242, 1, '25856603', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, '3', 'SUBOFICIAL', 'SI', 'Vet', 'BOMPADRE Eugenio Fernando', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 3, '2026-02-26 01:26:03', '2026-02-26 01:26:11', 156, '{\"jerarquia\": \"SUBOFICIAL\", \"jerarquia_label\": \"SUBOFICIALES\"}'),
-(243, 1, '30784104', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, '3', 'SUBOFICIAL', 'SI', 'I', 'CABEZA Ricardo Nicolás', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 3, '2026-02-26 01:26:03', '2026-02-26 01:26:11', 156, '{\"jerarquia\": \"SUBOFICIAL\", \"jerarquia_label\": \"SUBOFICIALES\"}'),
-(244, 1, '30857263', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, '5', 'SUBOFICIAL', 'SI', 'I', 'CALA Cesar Cristian', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 3, '2026-02-26 01:26:03', '2026-02-26 01:26:11', 156, '{\"jerarquia\": \"SUBOFICIAL\", \"jerarquia_label\": \"SUBOFICIALES\"}'),
-(245, 1, '31858665', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, '5', 'SUBOFICIAL', 'SI', 'Baq', 'CASTAÑEDA Julio', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 3, '2026-02-26 01:26:03', '2026-02-26 01:26:11', 156, '{\"jerarquia\": \"SUBOFICIAL\", \"jerarquia_label\": \"SUBOFICIALES\"}'),
-(246, 1, '28720666', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, '3', 'SUBOFICIAL', 'SI', 'I', 'CORSO Néstor Mauricio', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 3, '2026-02-26 01:26:03', '2026-02-26 01:26:11', 156, '{\"jerarquia\": \"SUBOFICIAL\", \"jerarquia_label\": \"SUBOFICIALES\"}'),
-(247, 1, '29659801', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, '2', 'SUBOFICIAL', 'SI', 'Coc', 'EDUARDS Gustavo Omar', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 3, '2026-02-26 01:26:03', '2026-02-26 01:26:11', 156, '{\"jerarquia\": \"SUBOFICIAL\", \"jerarquia_label\": \"SUBOFICIALES\"}'),
-(248, 1, '30482789', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, '2', 'SUBOFICIAL', 'SI', 'Mus', 'FERNANDEZ Claudio Matías', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 3, '2026-02-26 01:26:03', '2026-02-26 01:26:11', 156, '{\"jerarquia\": \"SUBOFICIAL\", \"jerarquia_label\": \"SUBOFICIALES\"}'),
-(249, 1, '29428568', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, '3', 'SUBOFICIAL', 'SI', 'Coc', 'FERNANDEZ Gustavo Javier', NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'RETIRO:', 3, '2026-02-26 01:26:03', '2026-02-26 01:26:11', 156, '{\"jerarquia\": \"SUBOFICIAL\", \"jerarquia_label\": \"SUBOFICIALES\"}'),
-(250, 1, '30889331', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, '2', 'SUBOFICIAL', 'SI', 'I', 'FLORES Ricardo Sebastian', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 3, '2026-02-26 01:26:03', '2026-02-26 01:26:11', 156, '{\"jerarquia\": \"SUBOFICIAL\", \"jerarquia_label\": \"SUBOFICIALES\"}'),
-(251, 1, '27435089', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, '1', 'SUBOFICIAL', 'SI', 'I', 'GALLARDO Gabriel Germán', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 3, '2026-02-26 01:26:03', '2026-02-26 01:26:11', 156, '{\"jerarquia\": \"SUBOFICIAL\", \"jerarquia_label\": \"SUBOFICIALES\"}'),
-(252, 1, '30344887', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, '5', 'SUBOFICIAL', 'SI', 'Conduc Mot', 'GIMENEZ Victor Jesús', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 3, '2026-02-26 01:26:03', '2026-02-26 01:26:11', 156, '{\"jerarquia\": \"SUBOFICIAL\", \"jerarquia_label\": \"SUBOFICIALES\"}'),
-(253, 1, '31706085', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, '4', 'SUBOFICIAL', 'SI', 'I', 'GONZALEZ Raúl Alberto', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 3, '2026-02-26 01:26:03', '2026-02-26 01:26:11', 156, '{\"jerarquia\": \"SUBOFICIAL\", \"jerarquia_label\": \"SUBOFICIALES\"}'),
-(254, 1, '32011637', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, '3', 'SUBOFICIAL', 'SI', 'Zap', 'HERRERA Matias Adrian', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 3, '2026-02-26 01:26:03', '2026-02-26 01:26:11', 156, '{\"jerarquia\": \"SUBOFICIAL\", \"jerarquia_label\": \"SUBOFICIALES\"}'),
-(255, 1, '31865182', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, '5', 'SUBOFICIAL', 'SI', 'I', 'MENDEZ Gonzalo Andrés', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 3, '2026-02-26 01:26:03', '2026-02-26 01:26:11', 156, '{\"jerarquia\": \"SUBOFICIAL\", \"jerarquia_label\": \"SUBOFICIALES\"}'),
-(256, 1, '32308597', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, '4', 'SUBOFICIAL', 'SI', 'Mus', 'MOGAYA Cristian Emmanuel', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 3, '2026-02-26 01:26:03', '2026-02-26 01:26:11', 156, '{\"jerarquia\": \"SUBOFICIAL\", \"jerarquia_label\": \"SUBOFICIALES\"}'),
-(257, 1, '30594078', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, '5', 'SUBOFICIAL', 'SI', 'Mus', 'MONTERO Edgar Alejandro', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 3, '2026-02-26 01:26:03', '2026-02-26 01:26:11', 156, '{\"jerarquia\": \"SUBOFICIAL\", \"jerarquia_label\": \"SUBOFICIALES\"}'),
-(258, 1, '31215603', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, '5', 'SUBOFICIAL', 'SI', 'Conduc Mot', 'MORINICO Natalia Cintia Soledad', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 3, '2026-02-26 01:26:03', '2026-02-26 01:26:11', 156, '{\"jerarquia\": \"SUBOFICIAL\", \"jerarquia_label\": \"SUBOFICIALES\"}'),
-(259, 1, '30391943', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, '4', 'SUBOFICIAL', 'SI', 'I', 'NAVARRO Gastón Damián', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 3, '2026-02-26 01:26:03', '2026-02-26 01:26:11', 156, '{\"jerarquia\": \"SUBOFICIAL\", \"jerarquia_label\": \"SUBOFICIALES\"}'),
-(260, 1, '26013530', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, '2', 'SUBOFICIAL', 'SI', 'Cama', 'PINTOS Juan José', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 3, '2026-02-26 01:26:03', '2026-02-26 01:26:11', 156, '{\"jerarquia\": \"SUBOFICIAL\", \"jerarquia_label\": \"SUBOFICIALES\"}'),
-(261, 1, '29280196', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, '3', 'SUBOFICIAL', 'SI', 'Conduc Mot', 'RIVAS Miguel Ángel', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 3, '2026-02-26 01:26:03', '2026-02-26 01:26:11', 156, '{\"jerarquia\": \"SUBOFICIAL\", \"jerarquia_label\": \"SUBOFICIALES\"}'),
-(262, 1, '28000250', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, '2', 'SUBOFICIAL', 'SI', 'I', 'SANTIBAÑEZ Félix Gabriel', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 3, '2026-02-26 01:26:03', '2026-02-26 01:26:11', 156, '{\"jerarquia\": \"SUBOFICIAL\", \"jerarquia_label\": \"SUBOFICIALES\"}'),
-(263, 1, '30231828', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, '2', 'SUBOFICIAL', 'SI', 'Ing', 'TOLEDO Carolina Marcela', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 3, '2026-02-26 01:26:03', '2026-02-26 01:26:11', 156, '{\"jerarquia\": \"SUBOFICIAL\", \"jerarquia_label\": \"SUBOFICIALES\"}'),
-(264, 1, '33494778', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, '3', 'SUBOFICIAL', 'SI', 'Mec Mot', 'TORO Sergio Daniel', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 3, '2026-02-26 01:26:03', '2026-02-26 01:26:11', 156, '{\"jerarquia\": \"SUBOFICIAL\", \"jerarquia_label\": \"SUBOFICIALES\"}'),
-(265, 1, '28667939', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, '2', 'SUBOFICIAL', 'SI', 'I', 'URIBE Cesar Horacio', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 3, '2026-02-26 01:26:03', '2026-02-26 01:26:11', 156, '{\"jerarquia\": \"SUBOFICIAL\", \"jerarquia_label\": \"SUBOFICIALES\"}'),
-(266, 1, '31118613', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, '3', 'SUBOFICIAL', 'SI', 'I', 'VERA Miguel Alberto', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 3, '2026-02-26 01:26:03', '2026-02-26 01:26:11', 156, '{\"jerarquia\": \"SUBOFICIAL\", \"jerarquia_label\": \"SUBOFICIALES\"}'),
-(267, 1, '25241958', NULL, '1976-06-04', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, 'D', 'SUBOFICIAL', 'SM', 'Ofic', 'BEARZZOTTI Diego Sebastián', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 3, '2026-02-26 01:26:03', '2026-02-26 01:26:11', 156, '{\"jerarquia\": \"SUBOFICIAL\", \"jerarquia_label\": \"SUBOFICIALES\"}'),
-(268, 1, '23402081', NULL, '1973-08-22', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, 'D', 'SUBOFICIAL', 'SM', 'Mec Eq Fij', 'CARDOZO Ariel Ramón Alejandro', NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'LICENCIA: 01/03/2026 · RETIRO: 30/08/2026', 3, '2026-02-26 01:26:03', '2026-02-26 01:26:11', 156, '{\"jerarquia\": \"SUBOFICIAL\", \"jerarquia_label\": \"SUBOFICIALES\"}'),
-(269, 1, '26844587', NULL, '1978-10-12', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, 'D', 'SUBOFICIAL', 'SM', 'Int', 'HENANDEZ Dardo Eliseo', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 3, '2026-02-26 01:26:03', '2026-02-26 01:26:11', 156, '{\"jerarquia\": \"SUBOFICIAL\", \"jerarquia_label\": \"SUBOFICIALES\"}'),
-(270, 1, '24038848', NULL, '1974-05-31', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, 'D', 'SUBOFICIAL', 'SM', 'Mus', 'LEAL CALQUIN Pablo Marcelo', NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'LICENCIA: 01/01/2027 · RETIRO: 30/06/2027', 3, '2026-02-26 01:26:03', '2026-02-26 01:26:11', 156, '{\"jerarquia\": \"SUBOFICIAL\", \"jerarquia_label\": \"SUBOFICIALES\"}'),
-(271, 1, '22643215', NULL, '1972-04-27', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, 'D', 'SUBOFICIAL', 'SM', 'Ing', 'MOREIRA Hugo Daniel', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 3, '2026-02-26 01:26:03', '2026-02-26 01:26:11', 156, '{\"jerarquia\": \"SUBOFICIAL\", \"jerarquia_label\": \"SUBOFICIALES\"}'),
-(272, 1, '22951566', NULL, '1972-12-02', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, 'D', 'SUBOFICIAL', 'SM', 'Mus', 'OBERTI David Alejandro', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 3, '2026-02-26 01:26:03', '2026-02-26 01:26:11', 156, '{\"jerarquia\": \"SUBOFICIAL\", \"jerarquia_label\": \"SUBOFICIALES\"}'),
-(273, 1, '22843745', NULL, '1972-12-05', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, 'D', 'SUBOFICIAL', 'SM', 'Conduc Mot', 'PEREYRA Gustavo Daniel', NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'LICENCIA: 01/03/2026 · RETIRO: 30/08/2026', 3, '2026-02-26 01:26:03', '2026-02-26 01:26:11', 156, '{\"jerarquia\": \"SUBOFICIAL\", \"jerarquia_label\": \"SUBOFICIALES\"}'),
-(274, 1, '26260962', NULL, '1978-04-15', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, 'D', 'SUBOFICIAL', 'SM', 'Cama', 'SEQUEIRA José Luis', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 3, '2026-02-26 01:26:03', '2026-02-26 01:26:11', 156, '{\"jerarquia\": \"SUBOFICIAL\", \"jerarquia_label\": \"SUBOFICIALES\"}'),
-(275, 1, '24346947', NULL, '1975-03-29', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, 'D', 'SUBOFICIAL', 'SM', '2do Mtro', 'SUAREZ Raúl Federico', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 3, '2026-02-26 01:26:03', '2026-02-26 01:26:11', 156, '{\"jerarquia\": \"SUBOFICIAL\", \"jerarquia_label\": \"SUBOFICIALES\"}'),
-(276, 1, '24095875', NULL, '1973-03-19', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, 'D', 'SUBOFICIAL', 'SM', 'Mus', 'VERA Edgardo José', NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'LICENCIA: 01/01/2027 · RETIRO: 30/06/2027', 3, '2026-02-26 01:26:03', '2026-02-26 01:26:11', 156, '{\"jerarquia\": \"SUBOFICIAL\", \"jerarquia_label\": \"SUBOFICIALES\"}'),
-(277, 1, '27988394', NULL, '1979-12-11', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, 'F', 'SUBOFICIAL', 'SP', 'I', 'BRIGNOLI David Maximiliano', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 3, '2026-02-26 01:26:03', '2026-02-26 01:26:11', 156, '{\"jerarquia\": \"SUBOFICIAL\", \"jerarquia_label\": \"SUBOFICIALES\"}'),
-(278, 1, '28523569', NULL, '1980-12-22', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, '4', 'SUBOFICIAL', 'SP', 'Ofic', 'CELAYES Soledad Elizabet', NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'RETIRO:', 3, '2026-02-26 01:26:03', '2026-02-26 01:26:11', 156, '{\"jerarquia\": \"SUBOFICIAL\", \"jerarquia_label\": \"SUBOFICIALES\"}'),
-(279, 1, '24799030', NULL, '1975-08-13', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, 'D', 'SUBOFICIAL', 'SP', 'Mec Mot Elec', 'CHOCOBAR Sergio Valentín', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 3, '2026-02-26 01:26:03', '2026-02-26 01:26:11', 156, '{\"jerarquia\": \"SUBOFICIAL\", \"jerarquia_label\": \"SUBOFICIALES\"}'),
-(280, 1, '27839269', NULL, '1980-07-22', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, '2', 'SUBOFICIAL', 'SP', 'Mus', 'CORREA Juan Carlos', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 3, '2026-02-26 01:26:03', '2026-02-26 01:26:11', 156, '{\"jerarquia\": \"SUBOFICIAL\", \"jerarquia_label\": \"SUBOFICIALES\"}'),
-(281, 1, '25599777', NULL, '1975-06-19', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, 'D', 'SUBOFICIAL', 'SP', 'Mus', 'GOMEZ Gustavo Alfredo', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 3, '2026-02-26 01:26:03', '2026-02-26 01:26:11', 156, '{\"jerarquia\": \"SUBOFICIAL\", \"jerarquia_label\": \"SUBOFICIALES\"}'),
-(282, 1, '24174548', NULL, '1974-11-12', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, '3', 'SUBOFICIAL', 'SP', 'I', 'GONZALEZ Sergio', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 3, '2026-02-26 01:26:03', '2026-02-26 01:26:11', 156, '{\"jerarquia\": \"SUBOFICIAL\", \"jerarquia_label\": \"SUBOFICIALES\"}'),
-(283, 1, '23997633', NULL, '1974-05-08', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, '3', 'SUBOFICIAL', 'SP', 'I', 'GUAIQUIL Luis Héctor', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 3, '2026-02-26 01:26:03', '2026-02-26 01:26:11', 156, '{\"jerarquia\": \"SUBOFICIAL\", \"jerarquia_label\": \"SUBOFICIALES\"}'),
-(284, 1, '26469299', NULL, '1978-04-08', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, '2', 'SUBOFICIAL', 'SP', 'Coc', 'MARIN Javier Alberto', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 3, '2026-02-26 01:26:03', '2026-02-26 01:26:11', 156, '{\"jerarquia\": \"SUBOFICIAL\", \"jerarquia_label\": \"SUBOFICIALES\"}'),
-(285, 1, '25102918', NULL, '1976-04-04', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, '1', 'SUBOFICIAL', 'SP', 'Cond Mot', 'MATUZ Hector Marcelino', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 3, '2026-02-26 01:26:03', '2026-02-26 01:26:11', 156, '{\"jerarquia\": \"SUBOFICIAL\", \"jerarquia_label\": \"SUBOFICIALES\"}'),
-(286, 1, '24574710', NULL, '1975-03-25', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, '2', 'SUBOFICIAL', 'SP', 'A', 'MERINO Ariel Ambrocio', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 3, '2026-02-26 01:26:03', '2026-02-26 01:26:11', 156, '{\"jerarquia\": \"SUBOFICIAL\", \"jerarquia_label\": \"SUBOFICIALES\"}'),
-(287, 1, '27489199', NULL, '1979-11-16', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, '1', 'SUBOFICIAL', 'SP', 'Conduc Mot', 'MONSALVE Javier Arturo', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 3, '2026-02-26 01:26:03', '2026-02-26 01:26:11', 156, '{\"jerarquia\": \"SUBOFICIAL\", \"jerarquia_label\": \"SUBOFICIALES\"}');
-INSERT INTO `personal_unidad` (`id`, `unidad_id`, `dni`, `cuil`, `fecha_nac`, `peso`, `altura`, `sexo`, `domicilio`, `estado_civil`, `hijos`, `nou`, `nro_cta`, `cbu`, `alias_banco`, `fecha_ultimo_anexo27`, `tiene_parte_enfermo`, `parte_enfermo_desde`, `parte_enfermo_hasta`, `cantidad_parte_enfermo`, `destino_interno`, `rol`, `anios_en_destino`, `fracc`, `jerarquia`, `grado`, `arma`, `apellido_nombre`, `apellido`, `nombre`, `destino_id`, `funcion`, `telefono`, `correo`, `fecha_alta`, `observaciones`, `role_id`, `created_at`, `updated_at`, `updated_by_id`, `extra_json`) VALUES
-(288, 1, '24469692', NULL, '1975-05-29', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, '4', 'SUBOFICIAL', 'SP', 'Baq', 'MUÑOZ Claudio Ernesto', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 3, '2026-02-26 01:26:03', '2026-02-26 01:26:11', 156, '{\"jerarquia\": \"SUBOFICIAL\", \"jerarquia_label\": \"SUBOFICIALES\"}'),
-(289, 1, '25424051', NULL, '1976-02-12', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, '3', 'SUBOFICIAL', 'SP', 'Coc', 'ÑANCUCHEO Antonio Nicolás', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 3, '2026-02-26 01:26:03', '2026-02-26 01:26:11', 156, '{\"jerarquia\": \"SUBOFICIAL\", \"jerarquia_label\": \"SUBOFICIALES\"}'),
-(290, 1, '31733898', NULL, '1979-11-10', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, '1', 'SUBOFICIAL', 'SP', 'Com', 'PORTAL Orlando Héctor', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 3, '2026-02-26 01:26:03', '2026-02-26 01:26:11', 156, '{\"jerarquia\": \"SUBOFICIAL\", \"jerarquia_label\": \"SUBOFICIALES\"}'),
-(291, 1, '25616225', NULL, '1977-01-16', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, '2', 'SUBOFICIAL', 'SP', 'Mec Inst', 'RIQUELME Claudio Marcelo', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 3, '2026-02-26 01:26:03', '2026-02-26 01:26:11', 156, '{\"jerarquia\": \"SUBOFICIAL\", \"jerarquia_label\": \"SUBOFICIALES\"}'),
-(292, 1, '25193625', NULL, '1976-04-10', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, 'F', 'SUBOFICIAL', 'SP', 'Mus', 'RUPPEL Nelson Daniel', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 3, '2026-02-26 01:26:03', '2026-02-26 01:26:11', 156, '{\"jerarquia\": \"SUBOFICIAL\", \"jerarquia_label\": \"SUBOFICIALES\"}'),
-(293, 1, '21780085', NULL, '1970-11-14', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, '1', 'SUBOFICIAL', 'SP', 'I', 'SEGUEL Néstor De La Cruz', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 3, '2026-02-26 01:26:03', '2026-02-26 01:26:11', 156, '{\"jerarquia\": \"SUBOFICIAL\", \"jerarquia_label\": \"SUBOFICIALES\"}'),
-(294, 1, '23721243', NULL, '1974-05-02', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, 'F', 'SUBOFICIAL', 'SP', 'Int', 'SOLA Ariel Gustavo', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 3, '2026-02-26 01:26:03', '2026-02-26 01:26:11', 156, '{\"jerarquia\": \"SUBOFICIAL\", \"jerarquia_label\": \"SUBOFICIALES\"}'),
-(295, 1, '23727771', NULL, '1976-03-18', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, '1', 'SUBOFICIAL', 'SP', 'I', 'URIBE Carlos Daniel', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 3, '2026-02-26 01:26:03', '2026-02-26 01:26:11', 156, '{\"jerarquia\": \"SUBOFICIAL\", \"jerarquia_label\": \"SUBOFICIALES\"}'),
-(296, 1, '26349261', NULL, '1978-01-24', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, 'D', 'SUBOFICIAL', 'SP', 'A', 'VELAZQUEZ Héctor Emiliano', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 3, '2026-02-26 01:26:03', '2026-02-26 01:26:11', 156, '{\"jerarquia\": \"SUBOFICIAL\", \"jerarquia_label\": \"SUBOFICIALES\"}'),
-(297, 1, '25384474', NULL, '1975-12-11', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, '1', 'SUBOFICIAL', 'SP', 'Mec Ing', 'VIRGILIO Maximiliano Abel', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 3, '2026-02-26 01:26:03', '2026-02-26 01:26:11', 156, '{\"jerarquia\": \"SUBOFICIAL\", \"jerarquia_label\": \"SUBOFICIALES\"}');
-
--- --------------------------------------------------------
-
---
--- Estructura de tabla para la tabla `red_dispositivos`
---
-
-CREATE TABLE `red_dispositivos` (
-  `id` int(11) NOT NULL,
-  `piso_id` int(11) NOT NULL,
-  `tipo` varchar(30) NOT NULL,
-  `nombre` varchar(120) NOT NULL,
-  `ip` varchar(45) DEFAULT NULL,
-  `mac` varchar(32) DEFAULT NULL,
-  `nota` text DEFAULT NULL,
-  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
---
--- Volcado de datos para la tabla `red_dispositivos`
---
-
-INSERT INTO `red_dispositivos` (`id`, `piso_id`, `tipo`, `nombre`, `ip`, `mac`, `nota`, `created_at`) VALUES
-(3, 1, 'pc', 'pc lopez', '192.168.10.1', NULL, 'hjgkjh', '2026-02-07 16:54:29'),
-(4, 1, 'switch', 'U2285', '192.168.10.2', NULL, NULL, '2026-02-07 16:54:55'),
-(6, 1, 'pc', 'pc 2', NULL, NULL, NULL, '2026-02-08 19:44:25');
-
--- --------------------------------------------------------
-
---
--- Estructura de tabla para la tabla `red_edificios`
---
-
-CREATE TABLE `red_edificios` (
-  `id` int(11) NOT NULL,
-  `it_edificio_id` int(11) DEFAULT NULL,
-  `unidad_id` int(11) DEFAULT NULL,
-  `numero` int(11) DEFAULT NULL,
-  `nombre` varchar(120) NOT NULL,
-  `descripcion` text DEFAULT NULL,
-  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
---
--- Volcado de datos para la tabla `red_edificios`
---
-
-INSERT INTO `red_edificios` (`id`, `it_edificio_id`, `unidad_id`, `numero`, `nombre`, `descripcion`, `created_at`) VALUES
-(1, NULL, 1, NULL, 'Edificio Principal', NULL, '2026-02-07 15:32:26'),
-(2, NULL, 1, NULL, 'Plana Mayor', NULL, '2026-02-07 17:33:27'),
-(4, NULL, 1, 20, 'Plana Prueba', 'Edificio N°18 - Plana Mayor', '2026-02-08 19:49:24');
-
--- --------------------------------------------------------
-
---
--- Estructura de tabla para la tabla `red_edificio_meta`
---
-
-CREATE TABLE `red_edificio_meta` (
-  `id` int(11) NOT NULL,
-  `unidad_id` int(11) NOT NULL,
-  `edificio_id` int(11) NOT NULL,
-  `max_dispositivos` int(11) DEFAULT NULL,
-  `ip_desde` varchar(45) DEFAULT NULL,
-  `ip_hasta` varchar(45) DEFAULT NULL,
-  `nota` varchar(255) DEFAULT NULL,
-  `updated_at` timestamp NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
---
--- Volcado de datos para la tabla `red_edificio_meta`
---
-
-INSERT INTO `red_edificio_meta` (`id`, `unidad_id`, `edificio_id`, `max_dispositivos`, `ip_desde`, `ip_hasta`, `nota`, `updated_at`) VALUES
-(1, 1, 1, NULL, '192.168.10.1', '192.168.10.254', NULL, '2026-02-07 17:10:15');
-
--- --------------------------------------------------------
-
---
--- Estructura de tabla para la tabla `red_enlaces`
---
-
-CREATE TABLE `red_enlaces` (
-  `id` int(11) NOT NULL,
-  `plano_id` int(11) NOT NULL,
-  `origen_id` int(11) NOT NULL,
-  `destino_id` int(11) NOT NULL,
-  `tipo` varchar(20) NOT NULL DEFAULT 'cable',
-  `etiqueta` varchar(120) DEFAULT NULL,
-  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
--- --------------------------------------------------------
-
---
--- Estructura de tabla para la tabla `red_oficinas`
---
-
-CREATE TABLE `red_oficinas` (
-  `id` int(11) NOT NULL,
-  `edificio_id` int(11) NOT NULL,
-  `nombre` varchar(120) NOT NULL,
-  `codigo` varchar(40) DEFAULT NULL,
-  `destino_id` int(11) DEFAULT NULL,
-  `tipo` varchar(30) NOT NULL DEFAULT 'oficina',
-  `orden` int(11) NOT NULL DEFAULT 0,
-  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
---
--- Volcado de datos para la tabla `red_oficinas`
---
-
-INSERT INTO `red_oficinas` (`id`, `edificio_id`, `nombre`, `codigo`, `destino_id`, `tipo`, `orden`, `created_at`) VALUES
-(1, 4, 'Subdirector', 'SUBDIR', NULL, 'oficina', 10, '2026-02-08 19:49:24'),
-(2, 4, 'Operaciones', 'S3', 3, 'oficina', 20, '2026-02-08 19:49:24'),
-(3, 4, 'Personal', 'S1', 1, 'oficina', 30, '2026-02-08 19:49:24'),
-(4, 4, 'Materiales', 'S4', 4, 'oficina', 40, '2026-02-08 19:49:24');
-
--- --------------------------------------------------------
-
---
--- Estructura de tabla para la tabla `red_pisos`
---
-
-CREATE TABLE `red_pisos` (
-  `id` int(11) NOT NULL,
-  `edificio_id` int(11) NOT NULL,
-  `nombre` varchar(80) NOT NULL,
-  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
---
--- Volcado de datos para la tabla `red_pisos`
---
-
-INSERT INTO `red_pisos` (`id`, `edificio_id`, `nombre`, `created_at`) VALUES
-(1, 1, 'PB', '2026-02-07 15:32:26'),
-(2, 1, '1° Piso', '2026-02-07 15:32:26'),
-(3, 2, 'PB', '2026-02-07 17:33:27'),
-(4, 4, 'PB', '2026-02-08 19:54:37');
-
--- --------------------------------------------------------
-
---
--- Estructura de tabla para la tabla `red_planos`
---
-
-CREATE TABLE `red_planos` (
-  `id` int(11) NOT NULL,
-  `piso_id` int(11) NOT NULL,
-  `archivo` varchar(255) NOT NULL,
-  `ancho` int(11) DEFAULT NULL,
-  `alto` int(11) DEFAULT NULL,
-  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
---
--- Volcado de datos para la tabla `red_planos`
---
-
-INSERT INTO `red_planos` (`id`, `piso_id`, `archivo`, `ancho`, `alto`, `created_at`) VALUES
-(1, 1, 'ed_1_20260207_171328_c6e5bfbb.png', 172, 132, '2026-02-07 16:13:28'),
-(2, 1, 'ed_1_20260207_173454_d9d1b023.png', 1280, 810, '2026-02-07 16:34:54');
-
--- --------------------------------------------------------
-
---
--- Estructura de tabla para la tabla `red_posiciones`
---
-
-CREATE TABLE `red_posiciones` (
-  `dispositivo_id` int(11) NOT NULL,
-  `plano_id` int(11) NOT NULL,
-  `x` float NOT NULL DEFAULT 0,
-  `y` float NOT NULL DEFAULT 0,
-  `rot` float NOT NULL DEFAULT 0,
-  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
---
--- Volcado de datos para la tabla `red_posiciones`
---
-
-INSERT INTO `red_posiciones` (`dispositivo_id`, `plano_id`, `x`, `y`, `rot`, `updated_at`) VALUES
-(3, 2, 375, 223.295, 0, '2026-02-07 16:55:12'),
-(4, 2, 56.9091, 76.3864, 0, '2026-02-08 19:44:38'),
-(6, 2, 58.8438, 187.234, 0, '2026-02-08 19:44:38');
-
--- --------------------------------------------------------
-
---
--- Estructura de tabla para la tabla `red_posiciones_ext`
---
-
-CREATE TABLE `red_posiciones_ext` (
-  `id` int(11) NOT NULL,
-  `dispositivo_id` int(11) NOT NULL,
-  `plano_id` int(11) NOT NULL,
-  `scale` decimal(6,3) NOT NULL DEFAULT 1.000
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
---
--- Volcado de datos para la tabla `red_posiciones_ext`
---
-
-INSERT INTO `red_posiciones_ext` (`id`, `dispositivo_id`, `plano_id`, `scale`) VALUES
-(1, 3, 2, 1.000),
-(2, 4, 2, 1.000),
-(6, 6, 2, 1.000);
-
--- --------------------------------------------------------
-
---
--- Estructura de tabla para la tabla `red_tipos_dispositivo`
---
-
-CREATE TABLE `red_tipos_dispositivo` (
-  `id` int(11) NOT NULL,
-  `unidad_id` int(11) NOT NULL,
-  `tipo` varchar(64) NOT NULL,
-  `label` varchar(32) NOT NULL,
-  `color` varchar(20) NOT NULL DEFAULT '#8ecae6',
-  `icon_svg` mediumtext DEFAULT NULL,
-  `is_builtin` tinyint(1) NOT NULL DEFAULT 0,
-  `created_at` timestamp NULL DEFAULT current_timestamp()
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
---
--- Volcado de datos para la tabla `red_tipos_dispositivo`
---
-
-INSERT INTO `red_tipos_dispositivo` (`id`, `unidad_id`, `tipo`, `label`, `color`, `icon_svg`, `is_builtin`, `created_at`) VALUES
-(1, 1, 'pc', 'PC', '#8ecae6', '<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\"><path fill=\"currentColor\" d=\"M4 5a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-5v2h2a1 1 0 1 1 0 2H7a1 1 0 1 1 0-2h2v-2H6a2 2 0 0 1-2-2V5Zm2 0v9h12V5H6Z\"/></svg>', 1, '2026-02-07 16:49:19'),
-(2, 1, 'switch', 'SW', '#ffd166', '<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\"><path fill=\"currentColor\" d=\"M4 7a3 3 0 0 1 3-3h10a3 3 0 0 1 3 3v10a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3V7Zm3-1a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V7a1 1 0 0 0-1-1H7Zm1 3h2v2H8V9Zm4 0h2v2h-2V9Zm4 0h2v2h-2V9Z\"/></svg>', 1, '2026-02-07 16:49:19'),
-(3, 1, 'router', 'RTR', '#f8961e', '<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\"><path fill=\"currentColor\" d=\"M3 14a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4Zm2 0v4h14v-4H5Zm2 1h2v2H7v-2Zm-1-9a1 1 0 0 1 1-1c3.314 0 6 2.686 6 6a1 1 0 1 1-2 0 4 4 0 0 0-4-4 1 1 0 0 1-1-1Zm8 0a1 1 0 0 1 1-1c3.314 0 6 2.686 6 6a1 1 0 1 1-2 0 4 4 0 0 0-4-4 1 1 0 0 1-1-1Z\"/></svg>', 1, '2026-02-07 16:49:19'),
-(4, 1, 'ap', 'AP', '#90be6d', '<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\"><path fill=\"currentColor\" d=\"M12 3a8 8 0 0 1 8 8 1 1 0 1 1-2 0 6 6 0 0 0-12 0 1 1 0 1 1-2 0 8 8 0 0 1 8-8Zm0 5a3 3 0 0 1 3 3 1 1 0 1 1-2 0 1 1 0 0 0-2 0 1 1 0 1 1-2 0 3 3 0 0 1 3-3Zm-5 9a5 5 0 0 1 10 0v3H7v-3Zm2 0v1h6v-1a3 3 0 0 0-6 0Z\"/></svg>', 1, '2026-02-07 16:49:19'),
-(5, 1, 'servidor', 'SRV', '#577590', '<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\"><path fill=\"currentColor\" d=\"M4 5a3 3 0 0 1 3-3h10a3 3 0 0 1 3 3v4a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3V5Zm3-1a1 1 0 0 0-1 1v4a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V5a1 1 0 0 0-1-1H7Zm-3 11a3 3 0 0 1 3-3h10a3 3 0 0 1 3 3v4a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3v-4Zm3-1a1 1 0 0 0-1 1v4a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1v-4a1 1 0 0 0-1-1H7ZM8 6h2v2H8V6Zm0 10h2v2H8v-2Z\"/></svg>', 1, '2026-02-07 16:49:19'),
-(6, 1, 'impresora', 'IMP', '#cdb4db', '<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\"><path fill=\"currentColor\" d=\"M7 3h10v4H7V3Zm-2 6a3 3 0 0 1 3-3h8a3 3 0 0 1 3 3v1h1a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2h-1v2H6v-2H5a2 2 0 0 1-2-2v-6a2 2 0 0 1 2-2h0V9Zm3 10h10v-5H8v5Zm12-7h-2v-1a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v1H5v6h1v-2h14v2h1v-6Z\"/></svg>', 1, '2026-02-07 16:49:19'),
-(7, 1, 'camara', 'CAM', '#f94144', '<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\"><path fill=\"currentColor\" d=\"M6 7a3 3 0 0 1 3-3h6a3 3 0 0 1 3 3v10a3 3 0 0 1-3 3H9a3 3 0 0 1-3-3V7Zm3-1a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V7a1 1 0 0 0-1-1H9Zm3 2a4 4 0 1 1 0 8 4 4 0 0 1 0-8Zm0 2a2 2 0 1 0 0 4 2 2 0 0 0 0-4Z\"/></svg>', 1, '2026-02-07 16:49:19'),
-(8, 1, 'rack', 'RACK', '#adb5bd', '<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\"><path fill=\"currentColor\" d=\"M6 2h12a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2Zm0 2v4h12V4H6Zm2 1h2v2H8V5Zm-2 7h12a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2Zm0 2v4h12v-4H6Zm2 1h2v2H8v-2Z\"/></svg>', 1, '2026-02-07 16:49:19');
-
--- --------------------------------------------------------
-
---
--- Estructura de tabla para la tabla `respuestas`
---
-
-CREATE TABLE `respuestas` (
-  `id` int(11) NOT NULL,
-  `unidad_id` int(11) NOT NULL,
-  `file_rel` varchar(512) NOT NULL,
-  `row_idx` int(11) NOT NULL,
-  `estado` enum('si','no') DEFAULT NULL,
-  `observacion` text DEFAULT NULL,
-  `evidencia_path` text DEFAULT NULL,
-  `updated_at` timestamp NULL DEFAULT NULL,
-  `caracter` varchar(100) DEFAULT NULL,
-  `updated_by_id` int(11) DEFAULT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
--- --------------------------------------------------------
-
---
--- Estructura de tabla para la tabla `roles`
---
-
-CREATE TABLE `roles` (
-  `id` int(11) NOT NULL,
-  `codigo` varchar(40) NOT NULL,
-  `nombre` varchar(120) NOT NULL,
-  `nivel` int(11) NOT NULL DEFAULT 0,
-  `descripcion` varchar(255) DEFAULT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
---
--- Volcado de datos para la tabla `roles`
---
-
-INSERT INTO `roles` (`id`, `codigo`, `nombre`, `nivel`, `descripcion`) VALUES
-(1, 'SUPERADMIN', 'Superadministrador', 100, 'Control total del sistema'),
-(2, 'ADMIN', 'Administrador', 50, 'Administra módulos/usuarios'),
-(3, 'USUARIO', 'Usuario', 10, 'Acceso estándar');
-
--- --------------------------------------------------------
-
---
--- Estructura de tabla para la tabla `roles_locales`
---
-
-CREATE TABLE `roles_locales` (
-  `id` int(11) NOT NULL,
-  `dni` varchar(20) NOT NULL,
-  `unidad_id` int(11) DEFAULT NULL,
-  `areas_acceso` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL CHECK (json_valid(`areas_acceso`)),
-  `role_id` int(11) DEFAULT NULL,
-  `rol_app` enum('admin','usuario') NOT NULL DEFAULT 'usuario',
-  `updated_at` timestamp NULL DEFAULT NULL,
-  `updated_by` varchar(100) DEFAULT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
--- --------------------------------------------------------
-
---
--- Estructura de tabla para la tabla `rol_combate`
---
-
-CREATE TABLE `rol_combate` (
-  `id` int(11) NOT NULL,
-  `unidad_id` int(11) NOT NULL,
-  `categoria` varchar(120) DEFAULT NULL,
-  `rol` varchar(255) NOT NULL,
-  `orden` int(11) DEFAULT 0
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
---
--- Volcado de datos para la tabla `rol_combate`
---
-
-INSERT INTO `rol_combate` (`id`, `unidad_id`, `categoria`, `rol`, `orden`) VALUES
-(1, 2, 'elemento', 'Rol de Combate de la Jefatura', 1),
-(2, 2, 'elemento', 'Rol de Combate de la Plana Mayor', 2),
-(3, 2, 'elemento', 'Rol de Combate de la Compañía Comando y Servicio', 3),
-(4, 2, 'elemento', 'Rol de Combate de la Compañía CCIG del EMGE', 4),
-(5, 2, 'elemento', 'Rol de Combate de la Compañía Redes y Sistemas', 5),
-(6, 2, 'elemento', 'Rol de Combate de la Compañía Infraestructura de Red', 6),
-(7, 2, 'elemento', 'Rol de Combate de la Compañía Telepuerto Satelital', 7),
-(8, 2, 'elemento', 'Personal en Comisión', 8),
-(9, 1, 'elemento', 'Rol de Combate de la Jefatura', 1),
-(10, 1, 'elemento', 'Rol de Combate de la Plana Mayor', 2),
-(11, 1, 'elemento', 'Rol de Combate de la Compañía Comando y Servicio', 3),
-(12, 1, 'elemento', 'Rol de Combate de la Compañía CCIG del EMGE', 4),
-(13, 1, 'elemento', 'Rol de Combate de la Compañía Redes y Sistemas', 5),
-(14, 1, 'elemento', 'Rol de Combate de la Compañía Infraestructura de Red', 6),
-(15, 1, 'elemento', 'Rol de Combate de la Compañía Telepuerto Satelital', 7),
-(16, 1, 'elemento', 'Personal en Comisión', 8);
-
--- --------------------------------------------------------
-
---
--- Estructura de tabla para la tabla `rol_combate_asignaciones`
---
-
-CREATE TABLE `rol_combate_asignaciones` (
-  `id` int(11) NOT NULL,
-  `unidad_id` int(11) NOT NULL,
-  `rol_id` int(11) NOT NULL,
-  `personal_id` int(11) NOT NULL,
-  `desde` date DEFAULT NULL,
-  `hasta` date DEFAULT NULL,
-  `nota` text DEFAULT NULL,
-  `created_at` timestamp NULL DEFAULT current_timestamp(),
-  `created_by_id` int(11) DEFAULT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
--- --------------------------------------------------------
-
---
--- Estructura de tabla para la tabla `s3_alocuciones`
---
-
-CREATE TABLE `s3_alocuciones` (
-  `id` int(11) NOT NULL,
-  `nro` int(11) DEFAULT NULL,
-  `fecha` varchar(100) DEFAULT NULL,
-  `acontecimiento` text DEFAULT NULL,
-  `responsable` varchar(255) DEFAULT NULL,
-  `cumplio` enum('','si','no','en_ejecucion') DEFAULT '',
-  `documento` varchar(255) DEFAULT NULL,
-  `updated_at` timestamp NULL DEFAULT NULL,
-  `updated_by` varchar(100) DEFAULT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
--- --------------------------------------------------------
-
---
--- Estructura de tabla para la tabla `s3_clases`
---
-
-CREATE TABLE `s3_clases` (
-  `id` int(11) NOT NULL,
-  `semana` varchar(10) DEFAULT NULL,
-  `fecha` varchar(50) DEFAULT NULL,
-  `clase_trabajo` varchar(100) DEFAULT NULL,
-  `tema` text DEFAULT NULL,
-  `responsable` varchar(255) DEFAULT NULL,
-  `participantes` varchar(255) DEFAULT NULL,
-  `lugar` varchar(255) DEFAULT NULL,
-  `cumplio` enum('','si','no','en_ejecucion') DEFAULT '',
-  `documento` varchar(255) DEFAULT NULL,
-  `updated_at` timestamp NULL DEFAULT NULL,
-  `updated_by` varchar(100) DEFAULT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
--- --------------------------------------------------------
-
---
--- Estructura de tabla para la tabla `s3_cursos_regulares`
---
-
-CREATE TABLE `s3_cursos_regulares` (
-  `id` int(11) NOT NULL,
-  `sigla` varchar(20) DEFAULT NULL,
-  `denominacion` varchar(255) DEFAULT NULL,
-  `participantes` text DEFAULT NULL,
-  `desde` varchar(50) DEFAULT NULL,
-  `hasta` varchar(50) DEFAULT NULL,
-  `cumplio` enum('','si','no','en_ejecucion') DEFAULT 'en_ejecucion',
-  `documento` varchar(255) DEFAULT NULL,
-  `updated_at` timestamp NULL DEFAULT NULL,
-  `updated_by` varchar(100) DEFAULT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
--- --------------------------------------------------------
-
---
--- Estructura de tabla para la tabla `s3_tiro_ami`
---
-
-CREATE TABLE `s3_tiro_ami` (
-  `id` int(11) NOT NULL,
-  `grado` varchar(50) DEFAULT NULL,
-  `nombre` varchar(255) DEFAULT NULL,
-  `ejercicio` varchar(100) DEFAULT NULL,
-  `resultado` enum('APROBO','NO_APROBO') DEFAULT 'NO_APROBO',
-  `observaciones` text DEFAULT NULL,
-  `fecha` date DEFAULT NULL,
-  `documento` varchar(255) DEFAULT NULL,
-  `creado_en` timestamp NULL DEFAULT current_timestamp(),
-  `actualizado_en` timestamp NULL DEFAULT NULL ON UPDATE current_timestamp(),
-  `actualizado_por` varchar(150) DEFAULT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
--- --------------------------------------------------------
-
---
--- Estructura de tabla para la tabla `s3_tiro_b9`
---
-
-CREATE TABLE `s3_tiro_b9` (
-  `id` int(11) NOT NULL,
-  `grado` varchar(50) DEFAULT NULL,
-  `nombre` varchar(255) DEFAULT NULL,
-  `ejercicio` varchar(100) DEFAULT NULL,
-  `resultado` enum('APROBO','NO_APROBO') DEFAULT 'NO_APROBO',
-  `observaciones` text DEFAULT NULL,
-  `fecha` date DEFAULT NULL,
-  `documento` varchar(255) DEFAULT NULL,
-  `creado_en` timestamp NULL DEFAULT current_timestamp(),
-  `actualizado_en` timestamp NULL DEFAULT NULL ON UPDATE current_timestamp(),
-  `actualizado_por` varchar(150) DEFAULT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
--- --------------------------------------------------------
-
---
--- Estructura de tabla para la tabla `s3_tiro_ejercicios`
---
-
-CREATE TABLE `s3_tiro_ejercicios` (
-  `id` int(11) NOT NULL,
-  `codigo` varchar(50) DEFAULT NULL,
-  `descripcion` varchar(255) DEFAULT NULL,
-  `participantes` varchar(100) DEFAULT NULL,
-  `resultado` enum('APROBO','NO_APROBO') DEFAULT 'NO_APROBO',
-  `fecha` date DEFAULT NULL,
-  `documento` varchar(255) DEFAULT NULL,
-  `creado_en` timestamp NULL DEFAULT current_timestamp(),
-  `actualizado_en` timestamp NULL DEFAULT NULL ON UPDATE current_timestamp(),
-  `actualizado_por` varchar(150) DEFAULT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
--- --------------------------------------------------------
-
---
--- Estructura de tabla para la tabla `s3_tiro_municion`
---
-
-CREATE TABLE `s3_tiro_municion` (
-  `id` int(11) NOT NULL,
-  `calibre` varchar(50) DEFAULT NULL,
-  `cantidad` int(11) DEFAULT NULL,
-  `fecha` date DEFAULT NULL,
-  `uso` varchar(255) DEFAULT NULL,
-  `documento` varchar(255) DEFAULT NULL,
-  `creado_en` timestamp NULL DEFAULT current_timestamp(),
-  `actualizado_en` timestamp NULL DEFAULT NULL ON UPDATE current_timestamp(),
-  `actualizado_por` varchar(150) DEFAULT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
--- --------------------------------------------------------
-
---
--- Estructura de tabla para la tabla `s3_trabajos_gabinete`
---
-
-CREATE TABLE `s3_trabajos_gabinete` (
-  `id` int(11) NOT NULL,
-  `semana` varchar(10) DEFAULT NULL,
-  `tema` text DEFAULT NULL,
-  `responsable_grado` varchar(50) DEFAULT NULL,
-  `responsable_nombre` varchar(255) DEFAULT NULL,
-  `cumplio` enum('','si','no','en_ejecucion') DEFAULT '',
-  `documento` varchar(255) DEFAULT NULL,
-  `updated_at` timestamp NULL DEFAULT NULL,
-  `updated_by` varchar(100) DEFAULT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
--- --------------------------------------------------------
-
---
--- Estructura de tabla para la tabla `sanidad_partes_enfermo`
---
-
-CREATE TABLE `sanidad_partes_enfermo` (
-  `id` int(11) NOT NULL,
-  `unidad_id` int(11) NOT NULL,
-  `personal_id` int(11) NOT NULL,
-  `tiene_parte` enum('si','no') NOT NULL DEFAULT 'no',
-  `evento` enum('parte','alta') NOT NULL DEFAULT 'parte',
-  `inicio` date DEFAULT NULL,
-  `fin` date DEFAULT NULL,
-  `cantidad` int(11) NOT NULL DEFAULT 0,
-  `observaciones` text DEFAULT NULL,
-  `created_at` timestamp NULL DEFAULT current_timestamp(),
-  `created_by_id` int(11) DEFAULT NULL,
-  `updated_at` timestamp NULL DEFAULT NULL,
-  `updated_by_id` int(11) DEFAULT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
--- --------------------------------------------------------
-
---
--- Estructura de tabla para la tabla `unidades`
---
-
-CREATE TABLE `unidades` (
-  `id` int(11) NOT NULL,
-  `slug` varchar(60) NOT NULL,
-  `nombre_corto` varchar(120) NOT NULL,
-  `nombre_completo` varchar(255) DEFAULT NULL,
-  `subnombre` varchar(255) DEFAULT NULL,
-  `logo_path` varchar(512) DEFAULT NULL,
-  `escudo_path` varchar(512) DEFAULT NULL,
-  `bg_path` varchar(512) DEFAULT NULL,
-  `activa` tinyint(1) NOT NULL DEFAULT 1,
-  `created_at` timestamp NULL DEFAULT current_timestamp(),
-  `updated_at` timestamp NULL DEFAULT NULL ON UPDATE current_timestamp()
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
---
--- Volcado de datos para la tabla `unidades`
---
-
-INSERT INTO `unidades` (`id`, `slug`, `nombre_corto`, `nombre_completo`, `subnombre`, `logo_path`, `escudo_path`, `bg_path`, `activa`, `created_at`, `updated_at`) VALUES
-(1, 'ecmilm', 'EC MIL M', 'Escuela Militar de Montaña', '“La montaña nos une”', 'storage/unidades/ec_mil_m/branding/logo.png', 'storage/unidades/ec_mil_m/branding/escudo.png', 'storage/unidades/ec_mil_m/branding/bg.png', 1, '2026-01-31 17:20:21', '2026-01-31 23:04:46'),
-(2, 'bcom602', 'B Com 602', 'Batallón de Comunicaciones 602', 'Hogar de las Comunicaciones Fijas del Ejército', 'storage/unidades/bcom602/branding/logo.png', NULL, NULL, 0, '2026-01-31 17:20:21', '2026-01-31 22:48:13'),
-(3, 'ccig_pdl', 'CCIG Pdl', 'CCIG Paso de los Libres', NULL, NULL, NULL, NULL, 0, '2026-01-31 17:20:21', '2026-01-31 19:31:26');
-
--- --------------------------------------------------------
-
---
--- Estructura de tabla para la tabla `usuario_roles`
---
-
-CREATE TABLE `usuario_roles` (
-  `id` bigint(20) NOT NULL,
-  `personal_id` int(11) NOT NULL,
-  `role_id` int(11) NOT NULL,
-  `unidad_id` int(11) DEFAULT NULL,
-  `destino_id` int(11) DEFAULT NULL,
-  `areas_acceso` longtext DEFAULT NULL,
-  `granted_by_id` int(11) DEFAULT NULL,
-  `created_at` timestamp NULL DEFAULT current_timestamp()
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
--- --------------------------------------------------------
-
---
--- Estructura Stand-in para la vista `v_personal_rol_actual`
--- (Véase abajo para la vista actual)
---
-CREATE TABLE `v_personal_rol_actual` (
-`personal_id` int(11)
-,`dni` varchar(20)
-,`unidad_id` int(11)
-,`unidad_slug` varchar(60)
-,`unidad_nombre` varchar(120)
-,`apellido` varchar(120)
-,`nombre` varchar(120)
-,`grado` varchar(60)
-,`arma` varchar(60)
-,`destino_id` int(11)
-,`destino_codigo` varchar(30)
-,`destino_nombre` varchar(255)
-,`role_id` int(11)
-,`role_codigo` varchar(40)
-,`role_nombre` varchar(120)
-,`funcion` varchar(255)
-);
-
--- --------------------------------------------------------
-
---
--- Estructura de tabla para la tabla `xlsx_prefs`
---
-
-CREATE TABLE `xlsx_prefs` (
-  `unidad_id` int(11) NOT NULL,
-  `file_rel` varchar(512) NOT NULL,
-  `sheet_idx` int(11) NOT NULL DEFAULT 0,
-  `row_start` int(11) NOT NULL DEFAULT 1,
-  `col_estado` varchar(10) DEFAULT NULL,
-  `col_obs` varchar(10) DEFAULT NULL,
-  `col_caracter` varchar(10) DEFAULT NULL,
-  `updated_at` timestamp NULL DEFAULT NULL,
-  `updated_by_id` int(11) DEFAULT NULL,
-  `table_fmt` enum('classic','form') NOT NULL DEFAULT 'classic',
-  `mode_num_is` enum('title','item') NOT NULL DEFAULT 'item'
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
--- --------------------------------------------------------
-
---
--- Estructura para la vista `v_personal_rol_actual`
---
-DROP TABLE IF EXISTS `v_personal_rol_actual`;
-
-CREATE ALGORITHM=UNDEFINED DEFINER=`root`@`localhost` SQL SECURITY DEFINER VIEW `v_personal_rol_actual`  AS SELECT `pu`.`id` AS `personal_id`, `pu`.`dni` AS `dni`, `pu`.`unidad_id` AS `unidad_id`, `u`.`slug` AS `unidad_slug`, `u`.`nombre_corto` AS `unidad_nombre`, `pu`.`apellido` AS `apellido`, `pu`.`nombre` AS `nombre`, `pu`.`grado` AS `grado`, `pu`.`arma` AS `arma`, `d`.`id` AS `destino_id`, `d`.`codigo` AS `destino_codigo`, `d`.`nombre` AS `destino_nombre`, `r`.`id` AS `role_id`, `r`.`codigo` AS `role_codigo`, `r`.`nombre` AS `role_nombre`, `pu`.`funcion` AS `funcion` FROM (((`personal_unidad` `pu` join `unidades` `u` on(`u`.`id` = `pu`.`unidad_id`)) left join `destino` `d` on(`d`.`id` = `pu`.`destino_id`)) join `roles` `r` on(`r`.`id` = `pu`.`role_id`)) ;
-
---
--- Índices para tablas volcadas
---
-
---
--- Indices de la tabla `calendario_diario`
---
-ALTER TABLE `calendario_diario`
-  ADD PRIMARY KEY (`id`),
-  ADD KEY `idx_unidad` (`unidad_id`),
-  ADD KEY `idx_area` (`area_code`),
-  ADD KEY `idx_fecha` (`fecha`),
-  ADD KEY `idx_uaf` (`unidad_id`,`area_code`,`fecha`);
-
---
--- Indices de la tabla `calendario_tareas`
---
-ALTER TABLE `calendario_tareas`
-  ADD PRIMARY KEY (`id`),
-  ADD KEY `idx_unidad` (`unidad_id`),
-  ADD KEY `idx_area` (`area_code`),
-  ADD KEY `idx_estado` (`estado`),
-  ADD KEY `idx_inicio` (`inicio`),
-  ADD KEY `idx_venc` (`fecha_vencimiento`);
-
---
--- Indices de la tabla `checklist`
---
-ALTER TABLE `checklist`
-  ADD PRIMARY KEY (`id`),
-  ADD KEY `idx_checklist_lookup` (`unidad_id`,`file_rel`,`row_idx`),
-  ADD KEY `idx_checklist_updated_by` (`updated_by_id`);
-
---
--- Indices de la tabla `checklist_form`
---
-ALTER TABLE `checklist_form`
-  ADD PRIMARY KEY (`id`),
-  ADD UNIQUE KEY `uk_checklist_form_file` (`unidad_id`,`file_rel`),
-  ADD KEY `idx_cf_updated_by` (`updated_by_id`);
-
---
--- Indices de la tabla `destino`
---
-ALTER TABLE `destino`
-  ADD PRIMARY KEY (`id`),
-  ADD UNIQUE KEY `uk_destino_unidad_codigo` (`unidad_id`,`codigo`),
-  ADD KEY `idx_destino_unidad` (`unidad_id`),
-  ADD KEY `idx_destino_unidad_activo` (`unidad_id`,`activo`),
-  ADD KEY `idx_destino_unidad_orden` (`unidad_id`);
-
---
--- Indices de la tabla `documentos`
---
-ALTER TABLE `documentos`
-  ADD PRIMARY KEY (`id`),
-  ADD KEY `idx_documentos_unidad_destino` (`unidad_id`,`destino_id`),
-  ADD KEY `idx_documentos_created_by` (`created_by_id`),
-  ADD KEY `fk_documentos_destino` (`destino_id`),
-  ADD KEY `idx_documentos_sha256` (`sha256`),
-  ADD KEY `idx_documentos_path` (`unidad_id`,`path`),
-  ADD KEY `fk_documentos_updated_by` (`updated_by_id`);
-
---
--- Indices de la tabla `educacion_tropa_actividades`
---
-ALTER TABLE `educacion_tropa_actividades`
-  ADD PRIMARY KEY (`id`),
-  ADD KEY `idx_ciclo_unidad` (`unidad_id`,`ciclo`),
-  ADD KEY `idx_fecha` (`fecha`);
-
---
--- Indices de la tabla `educacion_tropa_personal_ciclos`
---
-ALTER TABLE `educacion_tropa_personal_ciclos`
-  ADD PRIMARY KEY (`id`),
-  ADD UNIQUE KEY `uq_personal_ciclo_unidad` (`unidad_id`,`personal_unidad_id`,`ciclo`),
-  ADD KEY `idx_ciclo_unidad` (`unidad_id`,`ciclo`);
-
---
--- Indices de la tabla `inf_cat_estado_dispositivo`
---
-ALTER TABLE `inf_cat_estado_dispositivo`
-  ADD PRIMARY KEY (`id`),
-  ADD UNIQUE KEY `uk_codigo` (`codigo`);
-
---
--- Indices de la tabla `inf_dispositivo_detalle`
---
-ALTER TABLE `inf_dispositivo_detalle`
-  ADD PRIMARY KEY (`id`),
-  ADD UNIQUE KEY `uq_detalle_red` (`red_dispositivo_id`),
-  ADD KEY `idx_det_unidad` (`unidad_id`),
-  ADD KEY `idx_det_estado` (`estado_id`),
-  ADD KEY `idx_det_personal` (`asignado_personal_id`),
-  ADD KEY `fk_det_edificio` (`edificio_id`),
-  ADD KEY `fk_det_piso` (`piso_id`),
-  ADD KEY `fk_det_oficina` (`oficina_id`);
-
---
--- Indices de la tabla `inf_redes`
---
-ALTER TABLE `inf_redes`
-  ADD PRIMARY KEY (`id`),
-  ADD UNIQUE KEY `uq_unidad_nombre` (`unidad_id`,`nombre`),
-  ADD KEY `idx_inf_redes_unidad` (`unidad_id`);
-
---
--- Indices de la tabla `items`
---
-ALTER TABLE `items`
-  ADD PRIMARY KEY (`id`),
-  ADD KEY `idx_items_lookup` (`unidad_id`,`file_rel`,`row_idx`);
-
---
--- Indices de la tabla `it_activos`
---
-ALTER TABLE `it_activos`
-  ADD PRIMARY KEY (`id`),
-  ADD KEY `idx_it_activos_u` (`unidad_id`,`tipo`,`condicion`,`estado`),
-  ADD KEY `idx_it_activos_loc` (`unidad_id`,`edificio_id`,`area_id`),
-  ADD KEY `idx_it_activos_asig` (`unidad_id`,`asignado_personal_id`),
-  ADD KEY `fk_it_activos_edif` (`edificio_id`),
-  ADD KEY `fk_it_activos_fuente` (`fuente_fondos_id`),
-  ADD KEY `idx_it_activos_area` (`area_id`),
-  ADD KEY `idx_it_activos_asignado` (`asignado_personal_id`),
-  ADD KEY `idx_it_activos_edificio` (`edificio_id`),
-  ADD KEY `idx_it_activos_ip` (`ip`),
-  ADD KEY `idx_it_activos_mac` (`mac`),
-  ADD KEY `idx_it_activos_disp` (`dispositivo_tipo`);
-
---
--- Indices de la tabla `it_edificios`
---
-ALTER TABLE `it_edificios`
-  ADD PRIMARY KEY (`id`),
-  ADD UNIQUE KEY `uq_it_edif` (`unidad_id`,`nombre`),
-  ADD UNIQUE KEY `uq_it_edif_unidad_numero` (`unidad_id`,`numero`);
-
---
--- Indices de la tabla `it_fuentes_fondos`
---
-ALTER TABLE `it_fuentes_fondos`
-  ADD PRIMARY KEY (`id`),
-  ADD UNIQUE KEY `uq_it_fuente` (`unidad_id`,`nombre`);
-
---
--- Indices de la tabla `it_internet`
---
-ALTER TABLE `it_internet`
-  ADD PRIMARY KEY (`id`),
-  ADD KEY `idx_it_internet_unidad` (`unidad_id`),
-  ADD KEY `idx_it_internet_edificio` (`edificio_id`);
-
---
--- Indices de la tabla `it_mantenimientos`
---
-ALTER TABLE `it_mantenimientos`
-  ADD PRIMARY KEY (`id`),
-  ADD KEY `idx_it_mant_unidad` (`unidad_id`),
-  ADD KEY `idx_it_mant_edificio` (`edificio_id`),
-  ADD KEY `idx_it_mant_activo` (`activo_id`);
-
---
--- Indices de la tabla `personal_documentos`
---
-ALTER TABLE `personal_documentos`
-  ADD PRIMARY KEY (`id`),
-  ADD UNIQUE KEY `uk_pd_unidad_path` (`unidad_id`,`path`),
-  ADD KEY `idx_pd_unidad_personal` (`unidad_id`,`personal_id`),
-  ADD KEY `idx_pd_created_by` (`created_by_id`),
-  ADD KEY `fk_pd_personal` (`personal_id`),
-  ADD KEY `idx_pd_sanidad` (`sanidad_id`),
-  ADD KEY `idx_pd_evento` (`evento_id`),
-  ADD KEY `idx_pd_tipo_fecha` (`unidad_id`,`personal_id`,`tipo`,`fecha`),
-  ADD KEY `idx_pd_path` (`unidad_id`,`path`),
-  ADD KEY `idx_pd_sha256` (`sha256`);
-
---
--- Indices de la tabla `personal_eventos`
---
-ALTER TABLE `personal_eventos`
-  ADD PRIMARY KEY (`id`),
-  ADD KEY `idx_pe_unidad_personal` (`unidad_id`,`personal_id`),
-  ADD KEY `idx_pe_tipo_fechas` (`unidad_id`,`tipo`,`desde`,`hasta`),
-  ADD KEY `idx_pe_created_by` (`created_by_id`),
-  ADD KEY `idx_pe_updated_by` (`updated_by_id`),
-  ADD KEY `fk_pe_personal` (`personal_id`);
-
---
--- Indices de la tabla `personal_unidad`
---
-ALTER TABLE `personal_unidad`
-  ADD PRIMARY KEY (`id`),
-  ADD UNIQUE KEY `uk_personal_unidad_dni` (`unidad_id`,`dni`),
-  ADD KEY `idx_personal_unidad` (`unidad_id`),
-  ADD KEY `idx_personal_destino` (`destino_id`),
-  ADD KEY `idx_personal_role` (`role_id`),
-  ADD KEY `idx_personal_updated_by` (`updated_by_id`),
-  ADD KEY `idx_pu_apellido_nombre` (`apellido_nombre`),
-  ADD KEY `idx_pu_cuil` (`cuil`),
-  ADD KEY `idx_pu_destino_interno` (`destino_interno`),
-  ADD KEY `idx_pu_parte_estado` (`unidad_id`,`tiene_parte_enfermo`,`parte_enfermo_desde`,`parte_enfermo_hasta`),
-  ADD KEY `idx_pu_unidad_jerarquia` (`unidad_id`,`jerarquia`);
-
---
--- Indices de la tabla `red_dispositivos`
---
-ALTER TABLE `red_dispositivos`
-  ADD PRIMARY KEY (`id`),
-  ADD KEY `piso_id` (`piso_id`);
-
---
--- Indices de la tabla `red_edificios`
---
-ALTER TABLE `red_edificios`
-  ADD PRIMARY KEY (`id`),
-  ADD UNIQUE KEY `uq_red_edif_unidad_numero` (`unidad_id`,`numero`),
-  ADD UNIQUE KEY `uq_red_edif_unidad_nombre` (`unidad_id`,`nombre`),
-  ADD UNIQUE KEY `uq_red_edif_it` (`it_edificio_id`),
-  ADD KEY `idx_red_edif_it` (`it_edificio_id`);
-
---
--- Indices de la tabla `red_edificio_meta`
---
-ALTER TABLE `red_edificio_meta`
-  ADD PRIMARY KEY (`id`),
-  ADD UNIQUE KEY `uq_meta_unidad_edificio` (`unidad_id`,`edificio_id`),
-  ADD KEY `idx_meta_unidad` (`unidad_id`),
-  ADD KEY `idx_meta_edificio` (`edificio_id`);
-
---
--- Indices de la tabla `red_enlaces`
---
-ALTER TABLE `red_enlaces`
-  ADD PRIMARY KEY (`id`),
-  ADD KEY `plano_id` (`plano_id`),
-  ADD KEY `origen_id` (`origen_id`),
-  ADD KEY `destino_id` (`destino_id`);
-
---
--- Indices de la tabla `red_oficinas`
---
-ALTER TABLE `red_oficinas`
-  ADD PRIMARY KEY (`id`),
-  ADD UNIQUE KEY `uq_red_ofi_edif_nombre` (`edificio_id`,`nombre`),
-  ADD KEY `edificio_id` (`edificio_id`),
-  ADD KEY `idx_red_ofi_destino` (`destino_id`);
-
---
--- Indices de la tabla `red_pisos`
---
-ALTER TABLE `red_pisos`
-  ADD PRIMARY KEY (`id`),
-  ADD KEY `edificio_id` (`edificio_id`);
-
---
--- Indices de la tabla `red_planos`
---
-ALTER TABLE `red_planos`
-  ADD PRIMARY KEY (`id`),
-  ADD KEY `piso_id` (`piso_id`);
-
---
--- Indices de la tabla `red_posiciones`
---
-ALTER TABLE `red_posiciones`
-  ADD PRIMARY KEY (`dispositivo_id`),
-  ADD KEY `plano_id` (`plano_id`);
-
---
--- Indices de la tabla `red_posiciones_ext`
---
-ALTER TABLE `red_posiciones_ext`
-  ADD PRIMARY KEY (`id`),
-  ADD UNIQUE KEY `uq_pos_ext` (`dispositivo_id`,`plano_id`),
-  ADD KEY `idx_ext_plano` (`plano_id`),
-  ADD KEY `idx_ext_disp` (`dispositivo_id`);
-
---
--- Indices de la tabla `red_tipos_dispositivo`
---
-ALTER TABLE `red_tipos_dispositivo`
-  ADD PRIMARY KEY (`id`),
-  ADD UNIQUE KEY `uq_tipo_unidad` (`unidad_id`,`tipo`),
-  ADD KEY `idx_unidad` (`unidad_id`);
-
---
--- Indices de la tabla `respuestas`
---
-ALTER TABLE `respuestas`
-  ADD PRIMARY KEY (`id`),
-  ADD KEY `idx_respuestas_lookup` (`unidad_id`,`file_rel`,`row_idx`),
-  ADD KEY `idx_respuestas_updated_by` (`updated_by_id`);
-
---
--- Indices de la tabla `roles`
---
-ALTER TABLE `roles`
-  ADD PRIMARY KEY (`id`),
-  ADD UNIQUE KEY `uk_roles_codigo` (`codigo`);
-
---
--- Indices de la tabla `roles_locales`
---
-ALTER TABLE `roles_locales`
-  ADD PRIMARY KEY (`id`),
-  ADD UNIQUE KEY `uk_roles_locales` (`dni`,`unidad_id`),
-  ADD KEY `idx_roles_locales_dni` (`dni`),
-  ADD KEY `idx_roles_locales_unidad` (`unidad_id`),
-  ADD KEY `idx_roles_locales_role` (`role_id`);
-
---
--- Indices de la tabla `rol_combate`
---
-ALTER TABLE `rol_combate`
-  ADD PRIMARY KEY (`id`),
-  ADD KEY `idx_rc_unidad` (`unidad_id`);
-
---
--- Indices de la tabla `rol_combate_asignaciones`
---
-ALTER TABLE `rol_combate_asignaciones`
-  ADD PRIMARY KEY (`id`),
-  ADD KEY `idx_rca_unidad` (`unidad_id`),
-  ADD KEY `idx_rca_rol` (`rol_id`),
-  ADD KEY `idx_rca_personal` (`personal_id`),
-  ADD KEY `idx_rca_created_by` (`created_by_id`);
-
---
--- Indices de la tabla `s3_alocuciones`
---
-ALTER TABLE `s3_alocuciones`
-  ADD PRIMARY KEY (`id`);
-
---
--- Indices de la tabla `s3_clases`
---
-ALTER TABLE `s3_clases`
-  ADD PRIMARY KEY (`id`);
-
---
--- Indices de la tabla `s3_cursos_regulares`
---
-ALTER TABLE `s3_cursos_regulares`
-  ADD PRIMARY KEY (`id`);
-
---
--- Indices de la tabla `s3_tiro_ami`
---
-ALTER TABLE `s3_tiro_ami`
-  ADD PRIMARY KEY (`id`);
-
---
--- Indices de la tabla `s3_tiro_b9`
---
-ALTER TABLE `s3_tiro_b9`
-  ADD PRIMARY KEY (`id`);
-
---
--- Indices de la tabla `s3_tiro_ejercicios`
---
-ALTER TABLE `s3_tiro_ejercicios`
-  ADD PRIMARY KEY (`id`);
-
---
--- Indices de la tabla `s3_tiro_municion`
---
-ALTER TABLE `s3_tiro_municion`
-  ADD PRIMARY KEY (`id`);
-
---
--- Indices de la tabla `s3_trabajos_gabinete`
---
-ALTER TABLE `s3_trabajos_gabinete`
-  ADD PRIMARY KEY (`id`);
-
---
--- Indices de la tabla `sanidad_partes_enfermo`
---
-ALTER TABLE `sanidad_partes_enfermo`
-  ADD PRIMARY KEY (`id`),
-  ADD KEY `idx_sanidad_unidad` (`unidad_id`),
-  ADD KEY `idx_sanidad_personal` (`personal_id`),
-  ADD KEY `idx_sanidad_updated_by` (`updated_by_id`),
-  ADD KEY `fk_sanidad_created_by` (`created_by_id`),
-  ADD KEY `idx_sanidad_evento_fecha` (`unidad_id`,`personal_id`,`evento`,`inicio`,`fin`),
-  ADD KEY `idx_sanidad_created_at` (`created_at`);
-
---
--- Indices de la tabla `unidades`
---
-ALTER TABLE `unidades`
-  ADD PRIMARY KEY (`id`),
-  ADD UNIQUE KEY `uk_unidades_slug` (`slug`);
-
---
--- Indices de la tabla `usuario_roles`
---
-ALTER TABLE `usuario_roles`
-  ADD PRIMARY KEY (`id`),
-  ADD UNIQUE KEY `uk_usuario_role` (`personal_id`,`role_id`,`unidad_id`,`destino_id`),
-  ADD KEY `idx_ur_personal` (`personal_id`),
-  ADD KEY `idx_ur_role` (`role_id`),
-  ADD KEY `idx_ur_unidad` (`unidad_id`),
-  ADD KEY `idx_ur_destino` (`destino_id`),
-  ADD KEY `idx_ur_granted_by` (`granted_by_id`);
-
---
--- Indices de la tabla `xlsx_prefs`
---
-ALTER TABLE `xlsx_prefs`
-  ADD PRIMARY KEY (`unidad_id`,`file_rel`),
-  ADD KEY `idx_xlsx_updated_by` (`updated_by_id`);
-
---
--- AUTO_INCREMENT de las tablas volcadas
---
-
---
--- AUTO_INCREMENT de la tabla `calendario_diario`
---
-ALTER TABLE `calendario_diario`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
-
---
--- AUTO_INCREMENT de la tabla `calendario_tareas`
---
-ALTER TABLE `calendario_tareas`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
-
---
--- AUTO_INCREMENT de la tabla `checklist`
---
-ALTER TABLE `checklist`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
-
---
--- AUTO_INCREMENT de la tabla `checklist_form`
---
-ALTER TABLE `checklist_form`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
-
---
--- AUTO_INCREMENT de la tabla `destino`
---
-ALTER TABLE `destino`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=24;
-
---
--- AUTO_INCREMENT de la tabla `documentos`
---
-ALTER TABLE `documentos`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
-
---
--- AUTO_INCREMENT de la tabla `educacion_tropa_actividades`
---
-ALTER TABLE `educacion_tropa_actividades`
-  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT;
-
---
--- AUTO_INCREMENT de la tabla `educacion_tropa_personal_ciclos`
---
-ALTER TABLE `educacion_tropa_personal_ciclos`
-  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=10;
-
---
--- AUTO_INCREMENT de la tabla `inf_cat_estado_dispositivo`
---
-ALTER TABLE `inf_cat_estado_dispositivo`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
-
---
--- AUTO_INCREMENT de la tabla `inf_dispositivo_detalle`
---
-ALTER TABLE `inf_dispositivo_detalle`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
-
---
--- AUTO_INCREMENT de la tabla `inf_redes`
---
-ALTER TABLE `inf_redes`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
-
---
--- AUTO_INCREMENT de la tabla `items`
---
-ALTER TABLE `items`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
-
---
--- AUTO_INCREMENT de la tabla `it_activos`
---
-ALTER TABLE `it_activos`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
-
---
--- AUTO_INCREMENT de la tabla `it_edificios`
---
-ALTER TABLE `it_edificios`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
-
---
--- AUTO_INCREMENT de la tabla `it_fuentes_fondos`
---
-ALTER TABLE `it_fuentes_fondos`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
-
---
--- AUTO_INCREMENT de la tabla `it_internet`
---
-ALTER TABLE `it_internet`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
-
---
--- AUTO_INCREMENT de la tabla `it_mantenimientos`
---
-ALTER TABLE `it_mantenimientos`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
-
---
--- AUTO_INCREMENT de la tabla `personal_documentos`
---
-ALTER TABLE `personal_documentos`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=8;
-
---
--- AUTO_INCREMENT de la tabla `personal_eventos`
---
-ALTER TABLE `personal_eventos`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
-
---
--- AUTO_INCREMENT de la tabla `personal_unidad`
---
-ALTER TABLE `personal_unidad`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=439;
-
---
--- AUTO_INCREMENT de la tabla `red_dispositivos`
---
-ALTER TABLE `red_dispositivos`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=7;
-
---
--- AUTO_INCREMENT de la tabla `red_edificios`
---
-ALTER TABLE `red_edificios`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
-
---
--- AUTO_INCREMENT de la tabla `red_edificio_meta`
---
-ALTER TABLE `red_edificio_meta`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
-
---
--- AUTO_INCREMENT de la tabla `red_enlaces`
---
-ALTER TABLE `red_enlaces`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
-
---
--- AUTO_INCREMENT de la tabla `red_oficinas`
---
-ALTER TABLE `red_oficinas`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
-
---
--- AUTO_INCREMENT de la tabla `red_pisos`
---
-ALTER TABLE `red_pisos`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
-
---
--- AUTO_INCREMENT de la tabla `red_planos`
---
-ALTER TABLE `red_planos`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
-
---
--- AUTO_INCREMENT de la tabla `red_posiciones_ext`
---
-ALTER TABLE `red_posiciones_ext`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=11;
-
---
--- AUTO_INCREMENT de la tabla `red_tipos_dispositivo`
---
-ALTER TABLE `red_tipos_dispositivo`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=417;
-
---
--- AUTO_INCREMENT de la tabla `respuestas`
---
-ALTER TABLE `respuestas`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
-
---
--- AUTO_INCREMENT de la tabla `roles`
---
-ALTER TABLE `roles`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
-
---
--- AUTO_INCREMENT de la tabla `roles_locales`
---
-ALTER TABLE `roles_locales`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
-
---
--- AUTO_INCREMENT de la tabla `rol_combate`
---
-ALTER TABLE `rol_combate`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=17;
-
---
--- AUTO_INCREMENT de la tabla `rol_combate_asignaciones`
---
-ALTER TABLE `rol_combate_asignaciones`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
-
---
--- AUTO_INCREMENT de la tabla `s3_alocuciones`
---
-ALTER TABLE `s3_alocuciones`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
-
---
--- AUTO_INCREMENT de la tabla `s3_clases`
---
-ALTER TABLE `s3_clases`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
-
---
--- AUTO_INCREMENT de la tabla `s3_cursos_regulares`
---
-ALTER TABLE `s3_cursos_regulares`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
-
---
--- AUTO_INCREMENT de la tabla `s3_tiro_ami`
---
-ALTER TABLE `s3_tiro_ami`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
-
---
--- AUTO_INCREMENT de la tabla `s3_tiro_b9`
---
-ALTER TABLE `s3_tiro_b9`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
-
---
--- AUTO_INCREMENT de la tabla `s3_tiro_ejercicios`
---
-ALTER TABLE `s3_tiro_ejercicios`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
-
---
--- AUTO_INCREMENT de la tabla `s3_tiro_municion`
---
-ALTER TABLE `s3_tiro_municion`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
-
---
--- AUTO_INCREMENT de la tabla `s3_trabajos_gabinete`
---
-ALTER TABLE `s3_trabajos_gabinete`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
-
---
--- AUTO_INCREMENT de la tabla `sanidad_partes_enfermo`
---
-ALTER TABLE `sanidad_partes_enfermo`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
-
---
--- AUTO_INCREMENT de la tabla `unidades`
---
-ALTER TABLE `unidades`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
-
---
--- AUTO_INCREMENT de la tabla `usuario_roles`
---
-ALTER TABLE `usuario_roles`
-  MODIFY `id` bigint(20) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
-
---
--- Restricciones para tablas volcadas
---
-
---
--- Filtros para la tabla `checklist`
---
-ALTER TABLE `checklist`
-  ADD CONSTRAINT `fk_checklist_unidad` FOREIGN KEY (`unidad_id`) REFERENCES `unidades` (`id`) ON UPDATE CASCADE,
-  ADD CONSTRAINT `fk_checklist_updated_by` FOREIGN KEY (`updated_by_id`) REFERENCES `personal_unidad` (`id`) ON DELETE SET NULL ON UPDATE CASCADE;
-
---
--- Filtros para la tabla `checklist_form`
---
-ALTER TABLE `checklist_form`
-  ADD CONSTRAINT `fk_cf_unidad` FOREIGN KEY (`unidad_id`) REFERENCES `unidades` (`id`) ON UPDATE CASCADE,
-  ADD CONSTRAINT `fk_cf_updated_by` FOREIGN KEY (`updated_by_id`) REFERENCES `personal_unidad` (`id`) ON DELETE SET NULL ON UPDATE CASCADE;
-
---
--- Filtros para la tabla `destino`
---
-ALTER TABLE `destino`
-  ADD CONSTRAINT `fk_destino_unidad` FOREIGN KEY (`unidad_id`) REFERENCES `unidades` (`id`) ON DELETE CASCADE ON UPDATE CASCADE;
-
---
--- Filtros para la tabla `documentos`
---
-ALTER TABLE `documentos`
-  ADD CONSTRAINT `fk_documentos_created_by` FOREIGN KEY (`created_by_id`) REFERENCES `personal_unidad` (`id`) ON DELETE SET NULL ON UPDATE CASCADE,
-  ADD CONSTRAINT `fk_documentos_destino` FOREIGN KEY (`destino_id`) REFERENCES `destino` (`id`) ON DELETE SET NULL ON UPDATE CASCADE,
-  ADD CONSTRAINT `fk_documentos_unidad` FOREIGN KEY (`unidad_id`) REFERENCES `unidades` (`id`) ON UPDATE CASCADE,
-  ADD CONSTRAINT `fk_documentos_updated_by` FOREIGN KEY (`updated_by_id`) REFERENCES `personal_unidad` (`id`) ON DELETE SET NULL ON UPDATE CASCADE;
-
---
--- Filtros para la tabla `inf_dispositivo_detalle`
---
-ALTER TABLE `inf_dispositivo_detalle`
-  ADD CONSTRAINT `fk_det_edificio` FOREIGN KEY (`edificio_id`) REFERENCES `red_edificios` (`id`) ON DELETE SET NULL ON UPDATE CASCADE,
-  ADD CONSTRAINT `fk_det_estado` FOREIGN KEY (`estado_id`) REFERENCES `inf_cat_estado_dispositivo` (`id`) ON DELETE SET NULL ON UPDATE CASCADE,
-  ADD CONSTRAINT `fk_det_oficina` FOREIGN KEY (`oficina_id`) REFERENCES `red_oficinas` (`id`) ON DELETE SET NULL ON UPDATE CASCADE,
-  ADD CONSTRAINT `fk_det_personal` FOREIGN KEY (`asignado_personal_id`) REFERENCES `personal_unidad` (`id`) ON DELETE SET NULL ON UPDATE CASCADE,
-  ADD CONSTRAINT `fk_det_piso` FOREIGN KEY (`piso_id`) REFERENCES `red_pisos` (`id`) ON DELETE SET NULL ON UPDATE CASCADE,
-  ADD CONSTRAINT `fk_det_red` FOREIGN KEY (`red_dispositivo_id`) REFERENCES `red_dispositivos` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
-  ADD CONSTRAINT `fk_det_unidad` FOREIGN KEY (`unidad_id`) REFERENCES `unidades` (`id`) ON DELETE CASCADE ON UPDATE CASCADE;
-
---
--- Filtros para la tabla `inf_redes`
---
-ALTER TABLE `inf_redes`
-  ADD CONSTRAINT `fk_inf_redes_unidad` FOREIGN KEY (`unidad_id`) REFERENCES `unidades` (`id`) ON DELETE CASCADE ON UPDATE CASCADE;
-
---
--- Filtros para la tabla `items`
---
-ALTER TABLE `items`
-  ADD CONSTRAINT `fk_items_unidad` FOREIGN KEY (`unidad_id`) REFERENCES `unidades` (`id`) ON UPDATE CASCADE;
-
---
--- Filtros para la tabla `it_activos`
---
-ALTER TABLE `it_activos`
-  ADD CONSTRAINT `fk_it_activos_edif` FOREIGN KEY (`edificio_id`) REFERENCES `it_edificios` (`id`) ON DELETE SET NULL,
-  ADD CONSTRAINT `fk_it_activos_edificio` FOREIGN KEY (`edificio_id`) REFERENCES `red_edificios` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
-  ADD CONSTRAINT `fk_it_activos_fuente` FOREIGN KEY (`fuente_fondos_id`) REFERENCES `it_fuentes_fondos` (`id`) ON DELETE SET NULL;
-
---
--- Filtros para la tabla `it_internet`
---
-ALTER TABLE `it_internet`
-  ADD CONSTRAINT `fk_it_internet_edificio` FOREIGN KEY (`edificio_id`) REFERENCES `red_edificios` (`id`) ON DELETE CASCADE ON UPDATE CASCADE;
-
---
--- Filtros para la tabla `it_mantenimientos`
---
-ALTER TABLE `it_mantenimientos`
-  ADD CONSTRAINT `fk_it_mant_activo` FOREIGN KEY (`activo_id`) REFERENCES `it_activos` (`id`) ON DELETE SET NULL ON UPDATE CASCADE,
-  ADD CONSTRAINT `fk_it_mant_edificio` FOREIGN KEY (`edificio_id`) REFERENCES `red_edificios` (`id`) ON DELETE CASCADE ON UPDATE CASCADE;
-
---
--- Filtros para la tabla `personal_documentos`
---
-ALTER TABLE `personal_documentos`
-  ADD CONSTRAINT `fk_pd_created_by` FOREIGN KEY (`created_by_id`) REFERENCES `personal_unidad` (`id`) ON DELETE SET NULL ON UPDATE CASCADE,
-  ADD CONSTRAINT `fk_pd_evento` FOREIGN KEY (`evento_id`) REFERENCES `personal_eventos` (`id`) ON DELETE SET NULL ON UPDATE CASCADE,
-  ADD CONSTRAINT `fk_pd_personal` FOREIGN KEY (`personal_id`) REFERENCES `personal_unidad` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
-  ADD CONSTRAINT `fk_pd_sanidad` FOREIGN KEY (`sanidad_id`) REFERENCES `sanidad_partes_enfermo` (`id`) ON DELETE SET NULL ON UPDATE CASCADE,
-  ADD CONSTRAINT `fk_pd_unidad` FOREIGN KEY (`unidad_id`) REFERENCES `unidades` (`id`) ON UPDATE CASCADE;
-
---
--- Filtros para la tabla `personal_eventos`
---
-ALTER TABLE `personal_eventos`
-  ADD CONSTRAINT `fk_pe_created_by` FOREIGN KEY (`created_by_id`) REFERENCES `personal_unidad` (`id`) ON DELETE SET NULL ON UPDATE CASCADE,
-  ADD CONSTRAINT `fk_pe_personal` FOREIGN KEY (`personal_id`) REFERENCES `personal_unidad` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
-  ADD CONSTRAINT `fk_pe_unidad` FOREIGN KEY (`unidad_id`) REFERENCES `unidades` (`id`) ON UPDATE CASCADE,
-  ADD CONSTRAINT `fk_pe_updated_by` FOREIGN KEY (`updated_by_id`) REFERENCES `personal_unidad` (`id`) ON DELETE SET NULL ON UPDATE CASCADE;
-
---
--- Filtros para la tabla `personal_unidad`
---
-ALTER TABLE `personal_unidad`
-  ADD CONSTRAINT `fk_personal_unidad_destino` FOREIGN KEY (`destino_id`) REFERENCES `destino` (`id`) ON DELETE SET NULL ON UPDATE CASCADE,
-  ADD CONSTRAINT `fk_personal_unidad_role` FOREIGN KEY (`role_id`) REFERENCES `roles` (`id`) ON UPDATE CASCADE,
-  ADD CONSTRAINT `fk_personal_unidad_unidad` FOREIGN KEY (`unidad_id`) REFERENCES `unidades` (`id`) ON UPDATE CASCADE,
-  ADD CONSTRAINT `fk_personal_unidad_updated_by` FOREIGN KEY (`updated_by_id`) REFERENCES `personal_unidad` (`id`) ON DELETE SET NULL ON UPDATE CASCADE;
-
---
--- Filtros para la tabla `red_dispositivos`
---
-ALTER TABLE `red_dispositivos`
-  ADD CONSTRAINT `fk_red_disp_piso` FOREIGN KEY (`piso_id`) REFERENCES `red_pisos` (`id`) ON DELETE CASCADE;
-
---
--- Filtros para la tabla `red_edificios`
---
-ALTER TABLE `red_edificios`
-  ADD CONSTRAINT `fk_red_edif_it` FOREIGN KEY (`it_edificio_id`) REFERENCES `it_edificios` (`id`) ON DELETE SET NULL ON UPDATE CASCADE;
-
---
--- Filtros para la tabla `red_enlaces`
---
-ALTER TABLE `red_enlaces`
-  ADD CONSTRAINT `fk_red_enl_destino` FOREIGN KEY (`destino_id`) REFERENCES `red_dispositivos` (`id`) ON DELETE CASCADE,
-  ADD CONSTRAINT `fk_red_enl_origen` FOREIGN KEY (`origen_id`) REFERENCES `red_dispositivos` (`id`) ON DELETE CASCADE,
-  ADD CONSTRAINT `fk_red_enl_plano` FOREIGN KEY (`plano_id`) REFERENCES `red_planos` (`id`) ON DELETE CASCADE;
-
---
--- Filtros para la tabla `red_oficinas`
---
-ALTER TABLE `red_oficinas`
-  ADD CONSTRAINT `fk_red_ofi_destino` FOREIGN KEY (`destino_id`) REFERENCES `destino` (`id`) ON DELETE SET NULL ON UPDATE CASCADE,
-  ADD CONSTRAINT `fk_red_oficinas_edificio` FOREIGN KEY (`edificio_id`) REFERENCES `red_edificios` (`id`) ON DELETE CASCADE;
-
---
--- Filtros para la tabla `red_pisos`
---
-ALTER TABLE `red_pisos`
-  ADD CONSTRAINT `fk_red_pisos_edificio` FOREIGN KEY (`edificio_id`) REFERENCES `red_edificios` (`id`) ON DELETE CASCADE;
-
---
--- Filtros para la tabla `red_planos`
---
-ALTER TABLE `red_planos`
-  ADD CONSTRAINT `fk_red_planos_piso` FOREIGN KEY (`piso_id`) REFERENCES `red_pisos` (`id`) ON DELETE CASCADE;
-
---
--- Filtros para la tabla `red_posiciones`
---
-ALTER TABLE `red_posiciones`
-  ADD CONSTRAINT `fk_red_pos_disp` FOREIGN KEY (`dispositivo_id`) REFERENCES `red_dispositivos` (`id`) ON DELETE CASCADE,
-  ADD CONSTRAINT `fk_red_pos_plano` FOREIGN KEY (`plano_id`) REFERENCES `red_planos` (`id`) ON DELETE CASCADE;
-
---
--- Filtros para la tabla `respuestas`
---
-ALTER TABLE `respuestas`
-  ADD CONSTRAINT `fk_respuestas_unidad` FOREIGN KEY (`unidad_id`) REFERENCES `unidades` (`id`) ON UPDATE CASCADE,
-  ADD CONSTRAINT `fk_respuestas_updated_by` FOREIGN KEY (`updated_by_id`) REFERENCES `personal_unidad` (`id`) ON DELETE SET NULL ON UPDATE CASCADE;
-
---
--- Filtros para la tabla `roles_locales`
---
-ALTER TABLE `roles_locales`
-  ADD CONSTRAINT `fk_roles_locales_role` FOREIGN KEY (`role_id`) REFERENCES `roles` (`id`) ON DELETE SET NULL ON UPDATE CASCADE,
-  ADD CONSTRAINT `fk_roles_locales_unidad` FOREIGN KEY (`unidad_id`) REFERENCES `unidades` (`id`) ON DELETE SET NULL ON UPDATE CASCADE;
-
---
--- Filtros para la tabla `rol_combate`
---
-ALTER TABLE `rol_combate`
-  ADD CONSTRAINT `fk_rc_unidad` FOREIGN KEY (`unidad_id`) REFERENCES `unidades` (`id`) ON UPDATE CASCADE;
-
---
--- Filtros para la tabla `rol_combate_asignaciones`
---
-ALTER TABLE `rol_combate_asignaciones`
-  ADD CONSTRAINT `fk_rca_created_by` FOREIGN KEY (`created_by_id`) REFERENCES `personal_unidad` (`id`) ON DELETE SET NULL ON UPDATE CASCADE,
-  ADD CONSTRAINT `fk_rca_personal` FOREIGN KEY (`personal_id`) REFERENCES `personal_unidad` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
-  ADD CONSTRAINT `fk_rca_rol` FOREIGN KEY (`rol_id`) REFERENCES `rol_combate` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
-  ADD CONSTRAINT `fk_rca_unidad` FOREIGN KEY (`unidad_id`) REFERENCES `unidades` (`id`) ON UPDATE CASCADE;
-
---
--- Filtros para la tabla `sanidad_partes_enfermo`
---
-ALTER TABLE `sanidad_partes_enfermo`
-  ADD CONSTRAINT `fk_sanidad_created_by` FOREIGN KEY (`created_by_id`) REFERENCES `personal_unidad` (`id`) ON DELETE SET NULL ON UPDATE CASCADE,
-  ADD CONSTRAINT `fk_sanidad_personal` FOREIGN KEY (`personal_id`) REFERENCES `personal_unidad` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
-  ADD CONSTRAINT `fk_sanidad_unidad` FOREIGN KEY (`unidad_id`) REFERENCES `unidades` (`id`) ON UPDATE CASCADE,
-  ADD CONSTRAINT `fk_sanidad_updated_by` FOREIGN KEY (`updated_by_id`) REFERENCES `personal_unidad` (`id`) ON DELETE SET NULL ON UPDATE CASCADE;
-
---
--- Filtros para la tabla `usuario_roles`
---
-ALTER TABLE `usuario_roles`
-  ADD CONSTRAINT `fk_ur_destino` FOREIGN KEY (`destino_id`) REFERENCES `destino` (`id`) ON DELETE SET NULL ON UPDATE CASCADE,
-  ADD CONSTRAINT `fk_ur_granted_by` FOREIGN KEY (`granted_by_id`) REFERENCES `personal_unidad` (`id`) ON DELETE SET NULL ON UPDATE CASCADE,
-  ADD CONSTRAINT `fk_ur_personal` FOREIGN KEY (`personal_id`) REFERENCES `personal_unidad` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
-  ADD CONSTRAINT `fk_ur_role` FOREIGN KEY (`role_id`) REFERENCES `roles` (`id`) ON UPDATE CASCADE,
-  ADD CONSTRAINT `fk_ur_unidad` FOREIGN KEY (`unidad_id`) REFERENCES `unidades` (`id`) ON DELETE SET NULL ON UPDATE CASCADE;
-
---
--- Filtros para la tabla `xlsx_prefs`
---
-ALTER TABLE `xlsx_prefs`
-  ADD CONSTRAINT `fk_xlsx_unidad` FOREIGN KEY (`unidad_id`) REFERENCES `unidades` (`id`) ON UPDATE CASCADE,
-  ADD CONSTRAINT `fk_xlsx_updated_by` FOREIGN KEY (`updated_by_id`) REFERENCES `personal_unidad` (`id`) ON DELETE SET NULL ON UPDATE CASCADE;
-COMMIT;
-
-/*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
-/*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
-/*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
+<?php declare(strict_types=1);
+/**
+ * public/personal/personal_ficha.php
+ * Ficha individual — versión mejorada
+ * Cambios:
+ *   - Fotos en storage/unidades/ecmilm/PERSONAL/fotos/{nombre}_{fecha}_{id}.ext
+ *   - Sin foto: storage/unidades/ecmilm/PERSONAL/fotos/sinfoto.png
+ *   - Tab Eventos mejorado con rol operacional y badges por tipo
+ *   - Ficha datos incluye jerarquía + selector de destino
+ */
+
+$ROOT = realpath(__DIR__ . '/../../');
+if (!$ROOT) { http_response_code(500); exit('No se pudo resolver ROOT.'); }
+
+$BOOT = $ROOT . '/auth/bootstrap.php';
+$DB   = $ROOT . '/config/db.php';
+if (!is_file($BOOT)) { http_response_code(500); exit('Falta: ' . $BOOT); }
+if (!is_file($DB))   { http_response_code(500); exit('Falta: ' . $DB); }
+
+require_once $BOOT;
+require_login();
+require_once $DB;
+/** @var PDO $pdo */
+
+/* ═══════════════════════ HELPERS ═══════════════════════════════════════ */
+function e($v): string { return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'); }
+function norm_dni(string $d): string { return preg_replace('/\D+/', '', $d) ?? ''; }
+function csrf_if_exists(): void { if (function_exists('csrf_input')) { $o=csrf_input(); if(is_string($o)&&$o!=='') echo $o; } }
+function table_exists(PDO $pdo, string $t): bool {
+    $s=$pdo->prepare("SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME=:t");
+    $s->execute([':t'=>$t]); return ((int)$s->fetchColumn())>0;
+}
+function columns(PDO $pdo, string $t): array {
+    $s=$pdo->prepare("SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME=:t");
+    $s->execute([':t'=>$t]); $m=[]; foreach($s->fetchAll(PDO::FETCH_COLUMN) as $c) $m[$c]=true; return $m;
+}
+function date_or_null(string $v): ?string {
+    $v=trim($v); if($v==='') return null; $ts=strtotime($v); return $ts!==false?date('Y-m-d',$ts):null;
+}
+function detect_mime(string $f): string {
+    try { if(class_exists('finfo')){ $i=new finfo(FILEINFO_MIME_TYPE); $m=$i->file($f); return is_string($m)?$m:'application/octet-stream'; } } catch(Throwable $e){}
+    $m=@mime_content_type($f); return is_string($m)?$m:'application/octet-stream';
+}
+function fmt_date(?string $y): string {
+    if(!$y) return '—'; $ts=strtotime($y); return $ts!==false?date('d/m/Y',$ts):'—';
+}
+function fmt_bytes(?int $b): string {
+    if(!$b||$b<=0) return '—';
+    $u=['B','KB','MB','GB']; $i=0; $v=(float)$b;
+    while($v>=1024&&$i<3){$v/=1024;$i++;} return rtrim(rtrim(number_format($v,2,'.',''),'0'),'.') .' '.$u[$i];
+}
+
+/** Nombre de archivo para foto: APELLIDO_NOMBRE_YYYYMMDD_id.ext */
+function foto_filename(string $apellidoNombre, int $pid, string $ext): string {
+    $safe = strtoupper(trim($apellidoNombre));
+    $safe = preg_replace('/[^A-ZÁÉÍÓÚÜÑ0-9]/i', '_', $safe);
+    $safe = preg_replace('/_+/', '_', $safe);
+    $safe = trim($safe, '_');
+    if ($safe === '') $safe = 'PERSONAL';
+    return $safe . '_' . date('Ymd') . '_' . $pid . '.' . $ext;
+}
+
+/* ═══════════════════════ BASE URLs ══════════════════════════════════════ */
+$SELF_WEB        = (string)($_SERVER['SCRIPT_NAME'] ?? $_SERVER['PHP_SELF'] ?? '');
+$BASE_DIR_WEB    = rtrim(str_replace('\\','/',dirname($SELF_WEB)),'/');
+$BASE_PUBLIC_WEB = rtrim(str_replace('\\','/',dirname($BASE_DIR_WEB)),'/');
+$BASE_APP_WEB    = rtrim(str_replace('\\','/',dirname($BASE_PUBLIC_WEB)),'/');
+$ASSETS_WEB      = $BASE_APP_WEB . '/assets';
+$IMG_BG  = $ASSETS_WEB . '/img/fondo.png';
+$ESCUDO  = $ASSETS_WEB . '/img/ecmilm.png';
+
+/* ═══════════════════════ USUARIO / ROL ══════════════════════════════════ */
+$user = function_exists('current_user') ? current_user() : ($_SESSION['user'] ?? null);
+$dniNormUser = norm_dni((string)($user['dni'] ?? $user['username'] ?? ''));
+
+$personalId = 0; $unidadPropia = 1; $fullNameDB = '';
+try {
+    if ($dniNormUser !== '') {
+        $st = $pdo->prepare("SELECT id, unidad_id, CONCAT_WS(' ', grado, arma, apellido_nombre) AS nc
+                             FROM personal_unidad
+                             WHERE REPLACE(REPLACE(REPLACE(dni,'.',''),'-',''),' ','')=:d LIMIT 1");
+        $st->execute([':d'=>$dniNormUser]);
+        if ($r=$st->fetch(PDO::FETCH_ASSOC)) {
+            $personalId=(int)$r['id']; $unidadPropia=(int)$r['unidad_id']; $fullNameDB=(string)$r['nc'];
+        }
+    }
+} catch(Throwable $e){}
+
+$roleCodigo='USUARIO';
+try {
+    if ($personalId>0) {
+        $st=$pdo->prepare("SELECT r.codigo FROM personal_unidad pu INNER JOIN roles r ON r.id=pu.role_id WHERE pu.id=:p LIMIT 1");
+        $st->execute([':p'=>$personalId]);
+        $c=$st->fetchColumn(); if(is_string($c)&&$c!=='') $roleCodigo=$c;
+    }
+} catch(Throwable $e){}
+
+$esSuperAdmin = ($roleCodigo==='SUPERADMIN');
+$esAdmin      = ($roleCodigo==='ADMIN')||$esSuperAdmin;
+$unidadActiva = $unidadPropia;
+if ($esSuperAdmin) { $uSel=(int)($_SESSION['unidad_id']??0); if($uSel>0) $unidadActiva=$uSel; }
+
+/* Branding */
+$NOMBRE='Unidad'; $LEYENDA='';
+try {
+    $st=$pdo->prepare("SELECT nombre_completo, subnombre FROM unidades WHERE id=:id LIMIT 1");
+    $st->execute([':id'=>$unidadActiva]);
+    if ($u=$st->fetch(PDO::FETCH_ASSOC)) {
+        if(!empty($u['nombre_completo'])) $NOMBRE=(string)$u['nombre_completo'];
+        if(!empty($u['subnombre']))       $LEYENDA=trim((string)$u['subnombre']);
+    }
+} catch(Throwable $e){}
+
+/* ═══════════════════════ RUTAS DE STORAGE ═══════════════════════════════
+ * Fotos: storage/unidades/ecmilm/PERSONAL/fotos/
+ * Docs:  storage/unidades/{slug}/personal_docs/{pid}/
+ */
+$colsPD  = columns($pdo,'personal_documentos');
+$colsSan = columns($pdo,'sanidad_partes_enfermo');
+$colsPE  = table_exists($pdo,'personal_eventos') ? columns($pdo,'personal_eventos') : [];
+
+// Obtener slug de la unidad
+$unidadSlug = 'unidad_' . $unidadActiva;
+try {
+    $st=$pdo->prepare("SELECT slug FROM unidades WHERE id=:id LIMIT 1");
+    $st->execute([':id'=>$unidadActiva]);
+    $s=$st->fetchColumn(); if(is_string($s)&&trim($s)!=='') $unidadSlug=trim($s);
+} catch(Throwable $e){}
+
+// Ruta docs genéricos
+$DOCS_REL_DIR = 'storage/unidades/' . $unidadSlug . '/personal_docs';
+$DOCS_ABS_DIR = $ROOT . '/' . $DOCS_REL_DIR;
+if (!is_dir($DOCS_ABS_DIR)) @mkdir($DOCS_ABS_DIR, 0775, true);
+
+// Ruta FOTOS — siempre en ecmilm/PERSONAL/fotos
+$FOTOS_REL_DIR = 'storage/unidades/' . $unidadSlug . '/PERSONAL/fotos';
+$FOTOS_ABS_DIR = $ROOT . '/' . $FOTOS_REL_DIR;
+if (!is_dir($FOTOS_ABS_DIR)) @mkdir($FOTOS_ABS_DIR, 0775, true);
+
+// Sin foto placeholder en la misma carpeta
+$SINFOTO_ABS = $FOTOS_ABS_DIR . '/sinfoto.png';
+$SINFOTO_URL = $BASE_APP_WEB . '/' . $FOTOS_REL_DIR . '/sinfoto.png';
+// Fallback al assets si no existe el custom
+if (!is_file($SINFOTO_ABS)) {
+    $SINFOTO_URL = $ASSETS_WEB . '/img/sinfoto.png';
+    if (!is_file($ROOT . '/assets/img/sinfoto.png'))
+        $SINFOTO_URL = ''; // se mostrará placeholder CSS
+}
+
+/* ═══════════════════════ PARAMS ═════════════════════════════════════════ */
+$id  = (int)($_GET['id']  ?? 0);
+$q   = trim((string)($_GET['q'] ?? ''));
+$tab = trim((string)($_GET['tab'] ?? 'ficha'));
+
+$mensajeOk = ''; $mensajeError = '';
+
+/* ═══════════════════════ ACCIONES POST ══════════════════════════════════ */
+if ($_SERVER['REQUEST_METHOD']==='POST') {
+    $accion=(string)($_POST['accion']??'');
+    try {
+        if (!$esAdmin) throw new RuntimeException('Acceso restringido. Solo ADMIN/SUPERADMIN.');
+
+        /* ── Guardar datos personales ── */
+        if ($accion==='guardar_personal') {
+            $pid=(int)($_POST['personal_id']??0);
+            if($pid<=0) throw new RuntimeException('ID inválido.');
+
+            $grado    = trim((string)($_POST['grado']       ??''));
+            $arma     = trim((string)($_POST['arma']        ??''));
+            $apnom    = trim((string)($_POST['apellido_nombre']??''));
+            $dni      = norm_dni((string)($_POST['dni']     ??''));
+            $cuil     = trim((string)($_POST['cuil']        ??''));
+            $fnac     = date_or_null((string)($_POST['fecha_nac']??''));
+            $sexo     = trim((string)($_POST['sexo']        ??''));
+            $dom      = trim((string)($_POST['domicilio']   ??''));
+            $ec       = trim((string)($_POST['estado_civil']??''));
+            $hijos    = ($_POST['hijos']??'')===''?null:(int)$_POST['hijos'];
+            $dest     = trim((string)($_POST['destino_interno']??''));
+            $destId   = ($_POST['destino_id']??'')===''?null:(int)$_POST['destino_id'];
+            $jerarq   = trim((string)($_POST['jerarquia']   ??''));
+            $func     = trim((string)($_POST['funcion']     ??''));
+            $tel      = trim((string)($_POST['telefono']    ??''));
+            $cor      = trim((string)($_POST['correo']      ??''));
+            $obs      = trim((string)($_POST['observaciones']??''));
+            $fnacAlt  = date_or_null((string)($_POST['fecha_alta']??''));
+
+            if($apnom==='') throw new RuntimeException('Apellido y Nombre es obligatorio.');
+            if($dni==='')   throw new RuntimeException('DNI es obligatorio.');
+
+            $pdo->prepare("
+                UPDATE personal_unidad SET
+                  grado=:grado, arma=:arma, apellido_nombre=:apnom, dni=:dni, cuil=:cuil,
+                  fecha_nac=:fnac, sexo=:sexo, domicilio=:dom, estado_civil=:ec, hijos=:hijos,
+                  destino_interno=:dest, destino_id=:destId, jerarquia=:jer,
+                  funcion=:fun, telefono=:tel, correo=:cor,
+                  fecha_alta=:falta, observaciones=:obs,
+                  updated_at=NOW(), updated_by_id=:ubid
+                WHERE id=:id AND unidad_id=:uid LIMIT 1
+            ")->execute([
+                ':grado'=>$grado?:null, ':arma'=>$arma?:null, ':apnom'=>$apnom,
+                ':dni'=>$dni, ':cuil'=>$cuil?:null, ':fnac'=>$fnac,
+                ':sexo'=>$sexo?:null, ':dom'=>$dom?:null, ':ec'=>$ec?:null,
+                ':hijos'=>$hijos, ':dest'=>$dest?:null, ':destId'=>$destId,
+                ':jer'=>$jerarq?:null, ':fun'=>$func?:null,
+                ':tel'=>$tel?:null, ':cor'=>$cor?:null,
+                ':falta'=>$fnacAlt, ':obs'=>$obs?:null,
+                ':ubid'=>$personalId?:null, ':id'=>$pid, ':uid'=>$unidadActiva,
+            ]);
+            $mensajeOk='Datos actualizados correctamente.'; $id=$pid; $tab='ficha';
+        }
+
+        /* ── Subir foto ── */
+        if ($accion==='subir_foto') {
+            $pid=(int)($_POST['personal_id']??0);
+            if($pid<=0) throw new RuntimeException('ID inválido.');
+            if(!isset($_FILES['foto_archivo'])||$_FILES['foto_archivo']['error']===UPLOAD_ERR_NO_FILE)
+                throw new RuntimeException('Seleccioná una foto.');
+            $file=$_FILES['foto_archivo'];
+            if($file['error']!==UPLOAD_ERR_OK) throw new RuntimeException('Error al subir (cód '.$file['error'].').');
+            if((int)$file['size']>8*1024*1024) throw new RuntimeException('La foto supera 8MB.');
+
+            $origName=(string)($file['name']??'foto');
+            $ext=strtolower(pathinfo($origName,PATHINFO_EXTENSION));
+            if(!in_array($ext,['jpg','jpeg','png','webp'],true)) throw new RuntimeException('Solo JPG/PNG/WEBP para fotos.');
+
+            // Nombre del archivo con apellido_nombre
+            $st=$pdo->prepare("SELECT apellido_nombre FROM personal_unidad WHERE id=:id AND unidad_id=:uid LIMIT 1");
+            $st->execute([':id'=>$pid,':uid'=>$unidadActiva]);
+            $row=$st->fetch(PDO::FETCH_ASSOC);
+            $apnom=(string)($row['apellido_nombre']??'PERSONAL');
+
+            $filename  = foto_filename($apnom, $pid, $ext);
+            $destAbs   = $FOTOS_ABS_DIR . '/' . $filename;
+            $destRel   = $FOTOS_REL_DIR . '/' . $filename;
+
+            if(!move_uploaded_file((string)$file['tmp_name'], $destAbs))
+                throw new RuntimeException('No se pudo guardar la foto.');
+
+            // Registrar en personal_documentos (tipo=foto_perfil)
+            // Primero marcar la foto anterior como deleted si existe deleted_at
+            $whereDel = isset($colsPD['deleted_at']) ? " AND deleted_at IS NULL" : "";
+            if(isset($colsPD['deleted_at'])) {
+                $pdo->prepare("UPDATE personal_documentos SET deleted_at=NOW()
+                               WHERE unidad_id=:uid AND personal_id=:pid AND tipo='foto_perfil' $whereDel")
+                    ->execute([':uid'=>$unidadActiva,':pid'=>$pid]);
+            } else {
+                $pdo->prepare("DELETE FROM personal_documentos WHERE unidad_id=:uid AND personal_id=:pid AND tipo='foto_perfil'")
+                    ->execute([':uid'=>$unidadActiva,':pid'=>$pid]);
+            }
+
+            $mime  = detect_mime($destAbs);
+            $bytes = @filesize($destAbs);
+            $sha   = function_exists('hash_file') ? @hash_file('sha256',$destAbs) : null;
+
+            $fields=['unidad_id','personal_id','tipo','titulo','path','fecha','created_at','created_by_id'];
+            $vals=[':uid',':pid','foto_perfil',':tit',':path',':fecha','NOW()',':cbid'];
+            $params=[':uid'=>$unidadActiva,':pid'=>$pid,
+                     ':tit'=>$filename,':path'=>$destRel,
+                     ':fecha'=>date('Y-m-d'),':cbid'=>$personalId?:null];
+            if(isset($colsPD['original_name'])){$fields[]='original_name';$vals[]=':on';$params[':on']=$origName;}
+            if(isset($colsPD['mime'])){$fields[]='mime';$vals[]=':mm';$params[':mm']=$mime;}
+            if(isset($colsPD['bytes'])){$fields[]='bytes';$vals[]=':by';$params[':by']=$bytes!==false?(int)$bytes:null;}
+            if(isset($colsPD['sha256'])){$fields[]='sha256';$vals[]=':sh';$params[':sh']=is_string($sha)?$sha:null;}
+
+            $sql="INSERT INTO personal_documentos (".implode(',',$fields).") VALUES (".implode(',',$vals).")";
+            $pdo->prepare($sql)->execute($params);
+
+            $mensajeOk='Foto actualizada.'; $id=$pid; $tab='ficha';
+        }
+
+        /* ── Subir documento genérico ── */
+        if ($accion==='subir_documento') {
+            $pid=(int)($_POST['personal_id']??0);
+            if($pid<=0) throw new RuntimeException('ID inválido.');
+            if(!isset($_FILES['archivo'])||$_FILES['archivo']['error']===UPLOAD_ERR_NO_FILE)
+                throw new RuntimeException('Seleccioná un archivo.');
+            $file=$_FILES['archivo'];
+            if($file['error']!==UPLOAD_ERR_OK) throw new RuntimeException('Error al subir (cód '.$file['error'].').');
+            if((int)$file['size']>20*1024*1024) throw new RuntimeException('El archivo supera 20MB.');
+
+            $origName=(string)($file['name']??'doc');
+            $ext=strtolower(pathinfo($origName,PATHINFO_EXTENSION));
+            if(!in_array($ext,['pdf','jpg','jpeg','png','webp','doc','docx'],true))
+                throw new RuntimeException('Extensión no permitida: .'.$ext);
+
+            $tipo   = trim((string)($_POST['tipo']  ??'otros'));
+            $titulo = trim((string)($_POST['titulo']??''));
+            $nota   = trim((string)($_POST['nota']  ??''));
+            $fecha  = date_or_null((string)($_POST['fecha']??''));
+            $evId   = isset($colsPD['evento_id'])?(int)($_POST['evento_id']??0):0;
+            if($evId<=0) $evId=null;
+
+            $carpRel = $DOCS_REL_DIR . '/' . $pid;
+            $carpAbs = $ROOT . '/' . $carpRel;
+            if(!is_dir($carpAbs)) @mkdir($carpAbs,0775,true);
+
+            $safe    = preg_replace('/[^A-Za-z0-9_\.-]/','_',$origName);
+            $destRel = $carpRel . '/' . time() . '_' . $safe;
+            $destAbs = $ROOT . '/' . $destRel;
+
+            if(!move_uploaded_file((string)$file['tmp_name'],$destAbs))
+                throw new RuntimeException('No se pudo mover el archivo.');
+
+            $mime=$det=detect_mime($destAbs);
+            $bytes=@filesize($destAbs);
+            $sha=function_exists('hash_file')?@hash_file('sha256',$destAbs):null;
+
+            $fields=['unidad_id','personal_id','tipo','titulo','path','nota','fecha','created_at','created_by_id'];
+            $vals=[':uid',':pid',':tipo',':tit',':path',':nota',':fecha','NOW()',':cbid'];
+            $params=[':uid'=>$unidadActiva,':pid'=>$pid,':tipo'=>$tipo?:null,
+                     ':tit'=>$titulo?:null,':path'=>$destRel,':nota'=>$nota?:null,
+                     ':fecha'=>$fecha,':cbid'=>$personalId?:null];
+            if(isset($colsPD['evento_id'])){$fields[]='evento_id';$vals[]=':eid';$params[':eid']=$evId;}
+            if(isset($colsPD['original_name'])){$fields[]='original_name';$vals[]=':on';$params[':on']=$origName;}
+            if(isset($colsPD['mime'])){$fields[]='mime';$vals[]=':mm';$params[':mm']=$mime;}
+            if(isset($colsPD['bytes'])){$fields[]='bytes';$vals[]=':by';$params[':by']=$bytes!==false?(int)$bytes:null;}
+            if(isset($colsPD['sha256'])){$fields[]='sha256';$vals[]=':sh';$params[':sh']=is_string($sha)?$sha:null;}
+
+            $pdo->prepare("INSERT INTO personal_documentos (".implode(',',$fields).") VALUES (".implode(',',$vals).")")
+                ->execute($params);
+
+            $mensajeOk='Documento subido.'; $id=$pid; $tab='docs';
+        }
+
+        /* ── Guardar sanidad ── */
+        if ($accion==='guardar_sanidad') {
+            $pid=(int)($_POST['personal_id']??0);
+            if($pid<=0) throw new RuntimeException('ID inválido.');
+
+            $tiene = (string)($_POST['tiene_parte']??'no')==='si'?'si':'no';
+            $inicio = date_or_null((string)($_POST['inicio']??''));
+            $fin    = date_or_null((string)($_POST['fin']??''));
+            $obsSan = trim((string)($_POST['observaciones_sanidad']??''));
+
+            $hayEvid=false;
+            if(isset($_FILES['sanidad_evidencias'])) {
+                $e0=$_FILES['sanidad_evidencias']['error']??UPLOAD_ERR_NO_FILE;
+                if(is_array($e0)){foreach($e0 as $er){if((int)$er!==UPLOAD_ERR_NO_FILE){$hayEvid=true;break;}}}
+                else{$hayEvid=((int)$e0!==UPLOAD_ERR_NO_FILE);}
+            }
+
+            $pdo->beginTransaction();
+            $stCur=$pdo->prepare("SELECT COALESCE(cantidad_parte_enfermo,0) AS cant,
+                                  parte_enfermo_desde, parte_enfermo_hasta
+                                  FROM personal_unidad WHERE id=:p AND unidad_id=:u LIMIT 1");
+            $stCur->execute([':p'=>$pid,':u'=>$unidadActiva]);
+            $cur=$stCur->fetch(PDO::FETCH_ASSOC);
+            if(!$cur) throw new RuntimeException('No se encontró el registro en personal_unidad.');
+
+            $cantActual=(int)($cur['cant']??0);
+            $iniFinal=$inicio?:($cur['parte_enfermo_desde']??null)?:($tiene==='si'?date('Y-m-d'):null);
+            $finFinal=$fin?:($cur['parte_enfermo_hasta']??null)?:null;
+
+            // Determinar si hay archivo a subir
+            $allowedExt=['pdf','jpg','jpeg','png','webp','doc','docx'];
+
+            if(!$hayEvid) {
+                // Solo ajustar/crear registro sin incrementar
+                $stSel=$pdo->prepare("SELECT id FROM sanidad_partes_enfermo
+                                      WHERE unidad_id=:u AND personal_id=:p ORDER BY id DESC LIMIT 1");
+                $stSel->execute([':u'=>$unidadActiva,':p'=>$pid]);
+                $sid=(int)($stSel->fetchColumn()?:0);
+
+                if($sid>0) {
+                    $pdo->prepare("UPDATE sanidad_partes_enfermo
+                                   SET tiene_parte=:t, inicio=:i, fin=:f, cantidad=:c, observaciones=:o,
+                                       updated_at=NOW(), updated_by_id=:ub
+                                   WHERE id=:id AND unidad_id=:u AND personal_id=:p LIMIT 1")
+                        ->execute([':t'=>$tiene,':i'=>$iniFinal,':f'=>$finFinal,':c'=>$cantActual,
+                                   ':o'=>$obsSan?:null,':ub'=>$personalId?:null,
+                                   ':id'=>$sid,':u'=>$unidadActiva,':p'=>$pid]);
+                } else {
+                    $ev=$tiene==='si'?'parte':'alta';
+                    $fields=['unidad_id','personal_id','tiene_parte','inicio','fin','cantidad','observaciones','updated_at','updated_by_id'];
+                    $vals=[':u',':p',':t',':i',':f',':c',':o','NOW()',':ub'];
+                    $params=[':u'=>$unidadActiva,':p'=>$pid,':t'=>$tiene,':i'=>$iniFinal,
+                             ':f'=>$finFinal,':c'=>$cantActual,':o'=>$obsSan?:null,':ub'=>$personalId?:null];
+                    if(isset($colsSan['evento'])){$fields[]='evento';$vals[]=':ev';$params[':ev']=$ev;}
+                    if(isset($colsSan['created_at'])){$fields[]='created_at';$vals[]='NOW()';}
+                    if(isset($colsSan['created_by_id'])){$fields[]='created_by_id';$vals[]=':cb';$params[':cb']=$personalId?:null;}
+                    $pdo->prepare("INSERT INTO sanidad_partes_enfermo (".implode(',',$fields).") VALUES (".implode(',',$vals).")")
+                        ->execute($params);
+                }
+
+                // Sync canónico
+                _sync_sanidad($pdo,$colsPD,$colsSan,$unidadActiva,$pid,$personalId?:null);
+                $pdo->commit();
+                $mensajeOk='Sanidad actualizada (sin evidencia).';
+            } else {
+                // Con evidencia: nuevo evento
+                if($tiene==='si') {
+                    $pdo->prepare("UPDATE personal_unidad
+                                   SET tiene_parte_enfermo=1,
+                                       parte_enfermo_desde=COALESCE(:i, parte_enfermo_desde, CURDATE()),
+                                       parte_enfermo_hasta=COALESCE(:f, parte_enfermo_hasta),
+                                       cantidad_parte_enfermo=COALESCE(cantidad_parte_enfermo,0)+1,
+                                       updated_at=NOW(), updated_by_id=:ub
+                                   WHERE id=:p AND unidad_id=:u LIMIT 1")
+                        ->execute([':i'=>$iniFinal,':f'=>$finFinal,':ub'=>$personalId?:null,':p'=>$pid,':u'=>$unidadActiva]);
+
+                    $stRe=$pdo->prepare("SELECT COALESCE(cantidad_parte_enfermo,0) FROM personal_unidad WHERE id=:p AND unidad_id=:u LIMIT 1");
+                    $stRe->execute([':p'=>$pid,':u'=>$unidadActiva]);
+                    $cantFinal=(int)($stRe->fetchColumn()?:$cantActual+1);
+
+                    $fields=['unidad_id','personal_id','tiene_parte','inicio','fin','cantidad','observaciones','updated_at','updated_by_id'];
+                    $vals=[':u',':p','si',':i',':f',':c',':o','NOW()',':ub'];
+                    $params=[':u'=>$unidadActiva,':p'=>$pid,':i'=>$iniFinal,':f'=>$finFinal,
+                             ':c'=>$cantFinal,':o'=>$obsSan?:null,':ub'=>$personalId?:null];
+                    if(isset($colsSan['evento'])){$fields[]='evento';$vals[]='parte';}
+                    if(isset($colsSan['created_at'])){$fields[]='created_at';$vals[]='NOW()';}
+                    if(isset($colsSan['created_by_id'])){$fields[]='created_by_id';$vals[]=':cb';$params[':cb']=$personalId?:null;}
+                    $pdo->prepare("INSERT INTO sanidad_partes_enfermo (".implode(',',$fields).") VALUES (".implode(',',$vals).")")
+                        ->execute($params);
+                    $sanidadId=(int)$pdo->lastInsertId();
+
+                    $nUp=_upload_evid($pdo,$colsPD,$ROOT,$DOCS_REL_DIR,$unidadActiva,$pid,$personalId,
+                                      'sanidad_evidencias','parte_enfermo','Parte de enfermo',$iniFinal,$obsSan?:null,$sanidadId);
+                    _sync_sanidad($pdo,$colsPD,$colsSan,$unidadActiva,$pid,$personalId?:null);
+                    $pdo->commit();
+                    $mensajeOk="Parte cargado. Evidencias: {$nUp}. Total partes: {$cantFinal}.";
+                } else {
+                    $finAlta=$finFinal?:date('Y-m-d');
+                    $pdo->prepare("UPDATE personal_unidad SET tiene_parte_enfermo=0, parte_enfermo_hasta=:f,
+                                   updated_at=NOW(), updated_by_id=:ub WHERE id=:p AND unidad_id=:u LIMIT 1")
+                        ->execute([':f'=>$finAlta,':ub'=>$personalId?:null,':p'=>$pid,':u'=>$unidadActiva]);
+
+                    $fields=['unidad_id','personal_id','tiene_parte','inicio','fin','cantidad','observaciones','updated_at','updated_by_id'];
+                    $vals=[':u',':p','no',':i',':f',':c',':o','NOW()',':ub'];
+                    $params=[':u'=>$unidadActiva,':p'=>$pid,':i'=>$iniFinal,':f'=>$finAlta,
+                             ':c'=>$cantActual,':o'=>$obsSan?:null,':ub'=>$personalId?:null];
+                    if(isset($colsSan['evento'])){$fields[]='evento';$vals[]='alta';}
+                    if(isset($colsSan['created_at'])){$fields[]='created_at';$vals[]='NOW()';}
+                    if(isset($colsSan['created_by_id'])){$fields[]='created_by_id';$vals[]=':cb';$params[':cb']=$personalId?:null;}
+                    $pdo->prepare("INSERT INTO sanidad_partes_enfermo (".implode(',',$fields).") VALUES (".implode(',',$vals).")")
+                        ->execute($params);
+                    $sanidadId=(int)$pdo->lastInsertId();
+
+                    $nUp=_upload_evid($pdo,$colsPD,$ROOT,$DOCS_REL_DIR,$unidadActiva,$pid,$personalId,
+                                      'sanidad_evidencias','alta_parte_enfermo','Alta parte de enfermo',$finAlta,$obsSan?:null,$sanidadId);
+                    _sync_sanidad($pdo,$colsPD,$colsSan,$unidadActiva,$pid,$personalId?:null);
+                    $pdo->commit();
+                    $mensajeOk="Alta cargada. Evidencias: {$nUp}.";
+                }
+            }
+            $id=$pid; $tab='sanidad';
+        }
+
+        /* ── Crear evento ── */
+        if ($accion==='crear_evento' && table_exists($pdo,'personal_eventos')) {
+            $pid=(int)($_POST['personal_id']??0);
+            if($pid<=0) throw new RuntimeException('ID inválido.');
+
+            $tipo  = trim((string)($_POST['ev_tipo'] ??''));
+            $desde = date_or_null((string)($_POST['ev_desde']??''));
+            $hasta = date_or_null((string)($_POST['ev_hasta']??''));
+            $est   = trim((string)($_POST['ev_estado']??''));
+            $tit   = trim((string)($_POST['ev_titulo']??''));
+            $desc  = trim((string)($_POST['ev_desc']??''));
+
+            if($tipo==='') throw new RuntimeException('El tipo de evento es obligatorio.');
+
+            // data_json: campos extra según tipo
+            $dataJson=null;
+            if(!empty($colsPE['data_json'])) {
+                $raw=trim((string)($_POST['ev_json']??''));
+                if($raw!==''){
+                    $t=json_decode($raw,true);
+                    if(json_last_error()!==JSON_ERROR_NONE) throw new RuntimeException('JSON inválido.');
+                    $dataJson=$raw;
+                }
+            }
+
+            $fields=['unidad_id','personal_id','tipo','desde','hasta','estado','titulo','descripcion','created_at','created_by_id'];
+            $vals=[':u',':p',':t',':de',':ha',':es',':ti',':ds','NOW()',':cb'];
+            $params=[':u'=>$unidadActiva,':p'=>$pid,':t'=>$tipo,':de'=>$desde,':ha'=>$hasta,
+                     ':es'=>$est?:null,':ti'=>$tit?:null,':ds'=>$desc?:null,':cb'=>$personalId?:null];
+            if(!empty($colsPE['data_json'])){$fields[]='data_json';$vals[]=':js';$params[':js']=$dataJson;}
+
+            $pdo->prepare("INSERT INTO personal_eventos (".implode(',',$fields).") VALUES (".implode(',',$vals).")")
+                ->execute($params);
+
+            $mensajeOk='Evento creado.'; $id=$pid; $tab='eventos';
+        }
+
+        /* ── Eliminar evento ── */
+        if ($accion==='eliminar_evento' && table_exists($pdo,'personal_eventos')) {
+            $eid=(int)($_POST['evento_id']??0);
+            $pid=(int)($_POST['personal_id']??0);
+            if($eid<=0||$pid<=0) throw new RuntimeException('Parámetros inválidos.');
+            $pdo->prepare("DELETE FROM personal_eventos WHERE id=:id AND unidad_id=:u AND personal_id=:p LIMIT 1")
+                ->execute([':id'=>$eid,':u'=>$unidadActiva,':p'=>$pid]);
+            $mensajeOk='Evento eliminado.'; $id=$pid; $tab='eventos';
+        }
+
+        /* ── Eliminar documento ── */
+        if ($accion==='eliminar_documento') {
+            $docId=(int)($_POST['doc_id']??0);
+            $pid=(int)($_POST['personal_id']??0);
+            if($docId<=0||$pid<=0) throw new RuntimeException('Parámetros inválidos.');
+
+            $st=$pdo->prepare("SELECT id, path, sanidad_id FROM personal_documentos
+                               WHERE id=:id AND unidad_id=:u AND personal_id=:p LIMIT 1");
+            $st->execute([':id'=>$docId,':u'=>$unidadActiva,':p'=>$pid]);
+            $doc=$st->fetch(PDO::FETCH_ASSOC);
+            if(!$doc) throw new RuntimeException('Documento no encontrado.');
+
+            $path=(string)($doc['path']??'');
+            $sid=isset($colsPD['sanidad_id'])?(int)($doc['sanidad_id']??0):0;
+
+            $pdo->beginTransaction();
+            if(isset($colsPD['deleted_at'])) {
+                $pdo->prepare("UPDATE personal_documentos SET deleted_at=NOW()
+                               WHERE id=:id AND unidad_id=:u AND personal_id=:p LIMIT 1")
+                    ->execute([':id'=>$docId,':u'=>$unidadActiva,':p'=>$pid]);
+            } else {
+                $pdo->prepare("DELETE FROM personal_documentos WHERE id=:id AND unidad_id=:u AND personal_id=:p LIMIT 1")
+                    ->execute([':id'=>$docId,':u'=>$unidadActiva,':p'=>$pid]);
+            }
+            if($sid>0) _sync_sanidad($pdo,$colsPD,$colsSan,$unidadActiva,$pid,$personalId?:null);
+            $pdo->commit();
+            if($path!=='') { $abs=$ROOT.'/'.ltrim($path,'/'); if(is_file($abs)) @unlink($abs); }
+            $mensajeOk='Documento eliminado.'; $id=$pid;
+        }
+
+    } catch(Throwable $ex) {
+        if($pdo instanceof PDO && $pdo->inTransaction()) $pdo->rollBack();
+        $mensajeError=$ex->getMessage();
+    }
+}
+
+/* ═══════════════════════ FUNCIONES INTERNAS ═════════════════════════════ */
+function _upload_evid(PDO $pdo, array $colsPD, string $root, string $docsRelDir,
+    int $uid, int $pid, int $cbid, string $inputName, string $tipo, string $titulo,
+    ?string $fecha, ?string $nota, ?int $sanidadId): int
+{
+    if(!isset($_FILES[$inputName])) return 0;
+    $files=$_FILES[$inputName];
+    $names=$files['name']??[]; $tmp=$files['tmp_name']??[]; $errs=$files['error']??[]; $sizes=$files['size']??[];
+    if(!is_array($names)){$names=[$names];$tmp=[$tmp];$errs=[$errs];$sizes=[$sizes];}
+    $allowedExt=['pdf','jpg','jpeg','png','webp','doc','docx'];
+    $carpRel=rtrim($docsRelDir,'/').'/'.$pid;
+    $carpAbs=$root.'/'.$carpRel;
+    if(!is_dir($carpAbs)) @mkdir($carpAbs,0775,true);
+    $n=0; $fecha=$fecha?:date('Y-m-d');
+    foreach($names as $i=>$origName){
+        $err=$errs[$i]??UPLOAD_ERR_NO_FILE;
+        if($err===UPLOAD_ERR_NO_FILE) continue;
+        if($err!==UPLOAD_ERR_OK) throw new RuntimeException('Error subiendo evidencia (cód '.$err.').');
+        $size=(int)($sizes[$i]??0);
+        if($size>20*1024*1024) throw new RuntimeException('Evidencia supera 20MB.');
+        $tmpName=(string)($tmp[$i]??'');
+        if($tmpName===''||!is_file($tmpName)) throw new RuntimeException('Archivo temporal inválido.');
+        $ext=strtolower(pathinfo((string)$origName,PATHINFO_EXTENSION));
+        if(!in_array($ext,$allowedExt,true)) throw new RuntimeException('Extensión no permitida: .'.$ext);
+        $safe=preg_replace('/[^A-Za-z0-9_\.-]/','_',(string)$origName)?:$tipo.'.'.$ext;
+        $filename=time().'_'.$pid.'_'.$i.'_'.$safe;
+        $destRel=$carpRel.'/'.$filename;
+        $destAbs=$root.'/'.$destRel;
+        if(!move_uploaded_file($tmpName,$destAbs)) throw new RuntimeException('No se pudo mover evidencia.');
+        $mime=detect_mime($destAbs);
+        $bytes=@filesize($destAbs);
+        $sha=function_exists('hash_file')?@hash_file('sha256',$destAbs):null;
+        $fields=['unidad_id','personal_id','tipo','titulo','path','nota','fecha','created_at','created_by_id'];
+        $vals=[':u',':p',':ti',':tit',':pa',':no',':fe','NOW()',':cb'];
+        $params=[':u'=>$uid,':p'=>$pid,':ti'=>$tipo,':tit'=>$titulo,':pa'=>$destRel,
+                 ':no'=>$nota?:null,':fe'=>$fecha,':cb'=>$cbid>0?$cbid:null];
+        if(isset($colsPD['sanidad_id'])){$fields[]='sanidad_id';$vals[]=':sid';$params[':sid']=$sanidadId;}
+        if(isset($colsPD['original_name'])){$fields[]='original_name';$vals[]=':on';$params[':on']=(string)$origName;}
+        if(isset($colsPD['mime'])){$fields[]='mime';$vals[]=':mm';$params[':mm']=$mime;}
+        if(isset($colsPD['bytes'])){$fields[]='bytes';$vals[]=':by';$params[':by']=$bytes!==false?(int)$bytes:null;}
+        if(isset($colsPD['sha256'])){$fields[]='sha256';$vals[]=':sh';$params[':sh']=is_string($sha)?$sha:null;}
+        $pdo->prepare("INSERT INTO personal_documentos (".implode(',',$fields).") VALUES (".implode(',',$vals).")")
+            ->execute($params);
+        $n++;
+    }
+    return $n;
+}
+
+function _sync_sanidad(PDO $pdo, array $colsPD, array $colsSan, int $uid, int $pid, ?int $ubid): void {
+    $orderParts=[];
+    if(isset($colsSan['created_at'])) $orderParts[]="created_at DESC";
+    $orderParts[]="updated_at DESC"; $orderParts[]="id DESC";
+    $orderBy=implode(', ',$orderParts);
+    $st=$pdo->prepare("SELECT * FROM sanidad_partes_enfermo WHERE unidad_id=:u AND personal_id=:p ORDER BY $orderBy LIMIT 1");
+    $st->execute([':u'=>$uid,':p'=>$pid]);
+    $last=$st->fetch(PDO::FETCH_ASSOC);
+    if(!$last){
+        $pdo->prepare("UPDATE personal_unidad SET tiene_parte_enfermo=0, parte_enfermo_desde=NULL, parte_enfermo_hasta=NULL,
+                       updated_at=NOW(), updated_by_id=:ub WHERE id=:p AND unidad_id=:u LIMIT 1")
+            ->execute([':ub'=>$ubid,':p'=>$pid,':u'=>$uid]);
+        return;
+    }
+    $ev=null;
+    if(isset($colsSan['evento'])&&!empty($last['evento'])) $ev=(string)$last['evento'];
+    else $ev=((string)($last['tiene_parte']??'no')==='si')?'parte':'alta';
+    $ini=!empty($last['inicio'])?(string)$last['inicio']:null;
+    $fin=!empty($last['fin'])?(string)$last['fin']:null;
+    $tiene=0;
+    if($ev==='parte'){
+        if(isset($colsPD['sanidad_id'])){
+            $whereDel=isset($colsPD['deleted_at'])?" AND deleted_at IS NULL ":'';
+            $stE=$pdo->prepare("SELECT COUNT(*) FROM personal_documentos WHERE unidad_id=:u AND personal_id=:p AND sanidad_id=:s $whereDel");
+            $stE->execute([':u'=>$uid,':p'=>$pid,':s'=>(int)$last['id']]);
+            $tiene=(int)$stE->fetchColumn()>0?1:0;
+        } else { $tiene=1; }
+    }
+    $cant=isset($last['cantidad'])?(int)$last['cantidad']:null;
+    if($tiene===1){
+        $pdo->prepare("UPDATE personal_unidad SET tiene_parte_enfermo=1, parte_enfermo_desde=:i, parte_enfermo_hasta=:f,
+                       cantidad_parte_enfermo=COALESCE(:c, cantidad_parte_enfermo), updated_at=NOW(), updated_by_id=:ub
+                       WHERE id=:p AND unidad_id=:u LIMIT 1")
+            ->execute([':i'=>$ini,':f'=>$fin,':c'=>$cant,':ub'=>$ubid,':p'=>$pid,':u'=>$uid]);
+    } else {
+        $hasta=($ev==='alta')?($fin?:date('Y-m-d')):null;
+        $pdo->prepare("UPDATE personal_unidad SET tiene_parte_enfermo=0, parte_enfermo_hasta=:hasta,
+                       parte_enfermo_desde=CASE WHEN :ev='alta' THEN parte_enfermo_desde ELSE NULL END,
+                       cantidad_parte_enfermo=COALESCE(:c, cantidad_parte_enfermo), updated_at=NOW(), updated_by_id=:ub
+                       WHERE id=:p AND unidad_id=:u LIMIT 1")
+            ->execute([':hasta'=>$hasta,':ev'=>$ev,':c'=>$cant,':ub'=>$ubid,':p'=>$pid,':u'=>$uid]);
+    }
+}
+
+/* ═══════════════════════ CARGA DE DATOS ═════════════════════════════════ */
+$persona=null; $fotoUrl=''; $listado=[];
+$docs=[]; $sanidadUltimo=null; $sanidadHist=[]; $evidBySanidad=[]; $eventos=[];
+$destinosAll=[]; // Para el select de destino en ficha
+
+try {
+    // Destinos de la unidad (para el selector)
+    $st=$pdo->prepare("SELECT id, codigo, nombre FROM destino WHERE unidad_id=:u AND activo=1 ORDER BY nombre ASC");
+    $st->execute([':u'=>$unidadActiva]);
+    $destinosAll=$st->fetchAll(PDO::FETCH_ASSOC)?:[];
+
+    if ($id<=0) {
+        $sql="SELECT id, grado, arma, apellido_nombre, dni, destino_interno, tiene_parte_enfermo
+              FROM personal_unidad WHERE unidad_id=:u";
+        $params=[':u'=>$unidadActiva];
+        if($q!==''){$sql.=" AND (apellido_nombre LIKE :q OR dni LIKE :q)";$params[':q']='%'.$q.'%';}
+        $sql.=" ORDER BY apellido_nombre ASC";
+        $st=$pdo->prepare($sql);$st->execute($params);
+        $listado=$st->fetchAll(PDO::FETCH_ASSOC)?:[];
+    } else {
+        $st=$pdo->prepare("SELECT * FROM personal_unidad WHERE id=:id AND unidad_id=:u LIMIT 1");
+        $st->execute([':id'=>$id,':u'=>$unidadActiva]);
+        $persona=$st->fetch(PDO::FETCH_ASSOC);
+        if(!$persona) throw new RuntimeException("No se encontró el personal (ID={$id}).");
+
+        $whereDel=isset($colsPD['deleted_at'])?" AND deleted_at IS NULL":"";
+        $st=$pdo->prepare("SELECT * FROM personal_documentos WHERE unidad_id=:u AND personal_id=:p $whereDel
+                           ORDER BY CASE WHEN tipo='foto_perfil' THEN 0 ELSE 1 END, fecha DESC, id DESC");
+        $st->execute([':u'=>$unidadActiva,':p'=>$id]);
+        $docs=$st->fetchAll(PDO::FETCH_ASSOC)?:[];
+
+        // Foto
+        $fotoPath='';
+        foreach($docs as $d){if(($d['tipo']??'')==='foto_perfil'&&!empty($d['path'])){$fotoPath=(string)$d['path'];break;}}
+        $fotoUrl=$fotoPath!==''?($BASE_APP_WEB.'/'.ltrim($fotoPath,'/')):$SINFOTO_URL;
+
+        // Sanidad
+        $order=[];
+        if(isset($colsSan['created_at'])) $order[]="created_at DESC";
+        $order[]="updated_at DESC"; $order[]="id DESC";
+        $ob=implode(', ',$order);
+        $st=$pdo->prepare("SELECT * FROM sanidad_partes_enfermo WHERE unidad_id=:u AND personal_id=:p ORDER BY $ob LIMIT 1");
+        $st->execute([':u'=>$unidadActiva,':p'=>$id]);
+        $sanidadUltimo=$st->fetch(PDO::FETCH_ASSOC)?:null;
+
+        $st=$pdo->prepare("SELECT * FROM sanidad_partes_enfermo WHERE unidad_id=:u AND personal_id=:p ORDER BY $ob LIMIT 10");
+        $st->execute([':u'=>$unidadActiva,':p'=>$id]);
+        $sanidadHist=$st->fetchAll(PDO::FETCH_ASSOC)?:[];
+
+        // Evidencias por sanidad_id
+        if(!empty($sanidadHist)&&isset($colsPD['sanidad_id'])){
+            $ids=array_values(array_unique(array_filter(array_map(fn($s)=>(int)($s['id']??0),$sanidadHist))));
+            if($ids){
+                $in=implode(',',array_fill(0,count($ids),'?'));
+                $st=$pdo->prepare("SELECT * FROM personal_documentos WHERE unidad_id=? AND personal_id=? AND sanidad_id IN ($in) $whereDel ORDER BY fecha DESC,id DESC");
+                $st->execute(array_merge([$unidadActiva,$id],$ids));
+                foreach($st->fetchAll(PDO::FETCH_ASSOC)?:[] as $r){
+                    $sid=(int)($r['sanidad_id']??0);
+                    if($sid>0){if(!isset($evidBySanidad[$sid]))$evidBySanidad[$sid]=[];$evidBySanidad[$sid][]=$r;}
+                }
+            }
+        }
+
+        // Eventos
+        if(table_exists($pdo,'personal_eventos')){
+            $st=$pdo->prepare("SELECT * FROM personal_eventos WHERE unidad_id=:u AND personal_id=:p
+                               ORDER BY COALESCE(desde,'9999-12-31') DESC, id DESC LIMIT 50");
+            $st->execute([':u'=>$unidadActiva,':p'=>$id]);
+            $eventos=$st->fetchAll(PDO::FETCH_ASSOC)?:[];
+        }
+    }
+} catch(Throwable $ex){ $mensajeError=$ex->getMessage(); }
+
+/* ═══════════════════════ HELPERS PARA LA VISTA ══════════════════════════ */
+// Badge de color por tipo de evento
+function evento_badge(string $tipo): string {
+    $tipo = strtolower(trim($tipo));
+    $cfg = [
+        'rol_operacional' => ['bg'=>'rgba(14,165,233,.2)','border'=>'rgba(14,165,233,.6)','color'=>'#7dd3fc','label'=>'ROL OPERACIONAL','icon'=>'bi-shield-fill'],
+        'vacaciones'      => ['bg'=>'rgba(34,197,94,.2)', 'border'=>'rgba(34,197,94,.6)', 'color'=>'#86efac','label'=>'VACACIONES','icon'=>'bi-sun'],
+        'licencia'        => ['bg'=>'rgba(251,191,36,.2)','border'=>'rgba(251,191,36,.6)','color'=>'#fcd34d','label'=>'LICENCIA','icon'=>'bi-calendar-check'],
+        'comision'        => ['bg'=>'rgba(168,85,247,.2)','border'=>'rgba(168,85,247,.6)','color'=>'#d8b4fe','label'=>'COMISIÓN','icon'=>'bi-geo-alt'],
+        'plan_llamada'    => ['bg'=>'rgba(239,68,68,.2)', 'border'=>'rgba(239,68,68,.6)', 'color'=>'#fca5a5','label'=>'PLAN LLAMADA','icon'=>'bi-telephone'],
+        'retiro'          => ['bg'=>'rgba(100,116,139,.2)','border'=>'rgba(100,116,139,.6)','color'=>'#94a3b8','label'=>'RETIRO','icon'=>'bi-door-open'],
+    ];
+    $c = $cfg[$tipo] ?? ['bg'=>'rgba(148,163,184,.15)','border'=>'rgba(148,163,184,.4)','color'=>'#94a3b8','label'=>strtoupper($tipo),'icon'=>'bi-tag'];
+    return "<span style=\"display:inline-flex;align-items:center;gap:.3rem;padding:.2rem .55rem;border-radius:6px;font-size:.72rem;font-weight:900;
+             background:{$c['bg']};border:1px solid {$c['border']};color:{$c['color']};\">"
+          ."<i class=\"bi {$c['icon']}\"></i> ".e($c['label'])."</span>";
+}
+?>
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Personal · Ficha</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+<link rel="stylesheet" href="<?= e($ASSETS_WEB) ?>/css/theme-602.css">
+<link rel="icon" href="<?= e($ESCUDO) ?>">
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<style>
+  body {
+    background: url("<?= e($IMG_BG) ?>") no-repeat center center fixed;
+    background-size:cover; background-color:#020617;
+    color:#e5e7eb; font-family:system-ui,-apple-system,"Segoe UI",sans-serif; margin:0; padding:0;
+  }
+  .page-wrap { padding:16px; }
+  .container-main { max-width:1500px; margin:auto; }
+  .panel {
+    background:rgba(15,17,23,.94); border:1px solid rgba(148,163,184,.38);
+    border-radius:18px; padding:18px 22px;
+    box-shadow:0 18px 40px rgba(0,0,0,.75),inset 0 1px 0 rgba(255,255,255,.04);
+  }
+  .brand-hero { padding:10px 0; }
+  .hero-inner  { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+  .help-small  { font-size:.78rem; color:#b7c3d6; }
+  .card-sub {
+    background:rgba(15,23,42,.96); border-radius:14px;
+    border:1px solid rgba(148,163,184,.32); padding:12px 14px; margin-bottom:12px;
+  }
+  .section-title { font-size:.92rem; font-weight:800; margin-bottom:4px; }
+  .section-sub   { font-size:.78rem; color:#9ca3af; margin-bottom:10px; }
+  .tbl { --bs-table-bg:rgba(15,23,42,.9); --bs-table-striped-bg:rgba(30,64,175,.22);
+         --bs-table-border-color:rgba(148,163,184,.38); color:#e5e7eb; font-size:.82rem; }
+  .tbl th, .tbl td { white-space:nowrap; }
+
+  /* Foto */
+  .foto-wrap {
+    width:180px; height:180px; border-radius:12px; overflow:hidden;
+    border:1px solid rgba(148,163,184,.6); background:#020617;
+    display:flex; align-items:center; justify-content:center; position:relative;
+    box-shadow:0 0 0 1px rgba(15,23,42,1),0 8px 20px rgba(0,0,0,.7);
+  }
+  .foto-wrap img { width:100%; height:100%; object-fit:cover; display:block; }
+  .foto-ph { font-size:.75rem; color:#6b7280; text-align:center; padding:6px; }
+  .foto-overlay {
+    position:absolute; bottom:0; left:0; right:0; background:rgba(15,23,42,.8);
+    font-size:.65rem; color:#e5e7eb; text-align:center; padding:3px 4px; pointer-events:none;
+  }
+
+  /* Tabs */
+  .tab-pill {
+    display:inline-flex; align-items:center; gap:6px;
+    padding:.42rem .85rem; border-radius:999px; border:1px solid rgba(148,163,184,.32);
+    background:rgba(15,23,42,.7); color:#e5e7eb; font-weight:800; font-size:.78rem;
+    text-decoration:none; transition:border-color .15s;
+  }
+  .tab-pill.active { border-color:rgba(34,197,94,.65); box-shadow:0 0 0 1px rgba(34,197,94,.2); }
+  .tab-pill:hover  { border-color:rgba(148,163,184,.6); color:#fff; }
+
+  /* Inputs dark */
+  .form-control,.form-select {
+    background:rgba(255,255,255,.06); border:1px solid rgba(148,163,184,.28); color:#e5e7eb;
+  }
+  .form-control:focus,.form-select:focus {
+    background:rgba(255,255,255,.09); color:#fff;
+    border-color:rgba(120,170,255,.5); box-shadow:0 0 0 .18rem rgba(90,140,255,.12);
+  }
+  .form-select option { background:#0f172a; color:#e5e7eb; }
+  .form-label { font-size:.78rem; color:#9ca3af; margin-bottom:.3rem; }
+
+  /* Evento card */
+  .ev-card {
+    background:rgba(15,23,42,.8); border:1px solid rgba(148,163,184,.22);
+    border-radius:10px; padding:10px 12px; margin-bottom:8px;
+  }
+  .ev-card:hover { border-color:rgba(148,163,184,.4); }
+
+  code { color:#dbeafe; }
+</style>
+</head>
+<body>
+
+<header class="brand-hero">
+  <div class="hero-inner container-main px-3">
+    <div class="d-flex align-items-center gap-3">
+      <img src="<?= e($ESCUDO) ?>" alt="Escudo" style="height:50px;width:auto;" onerror="this.style.display='none'">
+      <div>
+        <div style="font-weight:900;font-size:1.05rem;"><?= e($NOMBRE) ?></div>
+        <div style="color:#cbd5f5;font-size:.82rem;"><?= e($LEYENDA) ?></div>
+      </div>
+    </div>
+    <div class="d-flex gap-2">
+      <a href="personal_lista.php" class="btn btn-success btn-sm fw-bold">Volver</a>
+      <a href="../inicio.php"      class="btn btn-success btn-sm fw-bold">Inicio</a>
+    </div>
+  </div>
+</header>
+
+<div class="page-wrap"><div class="container-main">
+<div class="panel">
+
+<?php if($mensajeOk!==''): ?>
+  <div class="alert alert-success py-2 mb-3"><?= e($mensajeOk) ?></div>
+<?php endif; ?>
+<?php if($mensajeError!==''): ?>
+  <div class="alert alert-danger py-2 mb-3"><?= e($mensajeError) ?></div>
+<?php endif; ?>
+
+<?php if($id<=0): /* ════ LISTADO ════ */ ?>
+
+  <div class="d-flex justify-content-between align-items-end flex-wrap gap-2 mb-3">
+    <div>
+      <div style="font-weight:900;font-size:1.05rem;">Seleccionar personal</div>
+      <div class="help-small">Buscá y hacé click en "Ver ficha".</div>
+    </div>
+    <form method="get" class="d-flex gap-2" style="max-width:380px;">
+      <input class="form-control form-control-sm" name="q" value="<?= e($q) ?>" placeholder="Nombre o DNI...">
+      <button class="btn btn-sm btn-success" type="submit">Buscar</button>
+    </form>
+  </div>
+  <div class="table-responsive">
+    <table class="table table-sm table-dark table-striped tbl align-middle">
+      <thead><tr>
+        <th>#</th><th>Grado</th><th>Arma</th><th>Apellido y Nombre</th>
+        <th>DNI</th><th>Destino</th><th>Parte</th><th class="text-end">Acción</th>
+      </tr></thead>
+      <tbody>
+      <?php if(!$listado): ?>
+        <tr><td colspan="8" class="text-center text-muted py-4">Sin registros.</td></tr>
+      <?php else: foreach($listado as $i=>$p): ?>
+        <tr>
+          <td><?= $i+1 ?></td>
+          <td><?= e($p['grado']??'') ?></td>
+          <td><?= e($p['arma']??'') ?></td>
+          <td><?= e($p['apellido_nombre']??'') ?></td>
+          <td><?= e($p['dni']??'') ?></td>
+          <td><?= e($p['destino_interno']??'') ?></td>
+          <td>
+            <?php if((int)($p['tiene_parte_enfermo']??0)): ?>
+              <span class="badge bg-warning text-dark">PARTE</span>
+            <?php else: ?>
+              <span class="badge bg-secondary">—</span>
+            <?php endif; ?>
+          </td>
+          <td class="text-end">
+            <a class="btn btn-sm btn-outline-info" href="?id=<?= (int)$p['id'] ?>&tab=ficha">Ver ficha</a>
+          </td>
+        </tr>
+      <?php endforeach; endif; ?>
+      </tbody>
+    </table>
+  </div>
+
+<?php else: /* ════ FICHA ════ */
+    $linea = trim(($persona['grado']??'').' '.($persona['arma']??'').' '.($persona['apellido_nombre']??''));
+    $tieneParte  = ((int)($persona['tiene_parte_enfermo']??0)===1);
+    $parteIni    = $persona['parte_enfermo_desde']??null;
+    $parteFin    = $persona['parte_enfermo_hasta']??null;
+    $cantParte   = (int)($persona['cantidad_parte_enfermo']??0);
+    $destinoId   = (int)($persona['destino_id']??0);
+?>
+
+  <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-2">
+    <div>
+      <div style="font-weight:900;font-size:1.1rem;">Ficha de personal</div>
+      <div class="help-small">
+        <?= e($linea) ?> · DNI: <b><?= e($persona['dni']??'') ?></b>
+        <?php if(!empty($persona['destino_interno'])): ?> · Destino: <b><?= e($persona['destino_interno']) ?></b><?php endif; ?>
+      </div>
+    </div>
+  </div>
+
+  <!-- TABS -->
+  <div class="d-flex flex-wrap gap-2 my-3">
+    <a class="tab-pill <?= $tab==='ficha'?'active':'' ?>" href="?id=<?= $id ?>&tab=ficha"><i class="bi bi-person-vcard"></i> Datos</a>
+    <a class="tab-pill <?= $tab==='sanidad'?'active':'' ?>" href="?id=<?= $id ?>&tab=sanidad"><i class="bi bi-heart-pulse"></i> Sanidad</a>
+    <a class="tab-pill <?= $tab==='docs'?'active':'' ?>" href="?id=<?= $id ?>&tab=docs"><i class="bi bi-folder2"></i> Documentos</a>
+    <?php if(table_exists($pdo,'personal_eventos')): ?>
+    <a class="tab-pill <?= $tab==='eventos'?'active':'' ?>" href="?id=<?= $id ?>&tab=eventos"><i class="bi bi-calendar-event"></i> Eventos y Roles</a>
+    <?php endif; ?>
+  </div>
+
+  <!-- ┌─ FOTO ─────────────────────────────────────────────────────────────┐ -->
+  <div class="d-flex flex-column align-items-center gap-2 mb-4">
+    <div class="foto-wrap">
+      <?php if($fotoUrl): ?>
+        <img src="<?= e($fotoUrl) ?>" alt="Foto de <?= e($linea) ?>">
+        <div class="foto-overlay">4×4</div>
+      <?php else: ?>
+        <div class="foto-ph"><i class="bi bi-person-circle" style="font-size:3rem;opacity:.3;display:block;"></i>Sin foto</div>
+      <?php endif; ?>
+    </div>
+    <?php if($esAdmin): ?>
+    <form method="post" enctype="multipart/form-data" class="text-center" style="max-width:300px;">
+      <?php csrf_if_exists(); ?>
+      <input type="hidden" name="accion" value="subir_foto">
+      <input type="hidden" name="personal_id" value="<?= $id ?>">
+      <input type="file" name="foto_archivo" class="form-control form-control-sm mb-2"
+             accept="image/jpeg,image/png,image/webp" required style="font-size:.76rem;">
+      <button class="btn btn-sm btn-outline-success w-100" type="submit">
+        <i class="bi bi-camera me-1"></i> Actualizar foto
+      </button>
+      <div class="help-small mt-1">Se guarda como <code>APELLIDO_NOMBRE_YYYYMMDD_id.ext</code></div>
+    </form>
+    <?php endif; ?>
+  </div>
+  <!-- └──────────────────────────────────────────────────────────────────── -->
+
+  <!-- ══════════════════════════ TAB: DATOS ══════════════════════════════ -->
+  <?php if($tab==='ficha'): ?>
+  <div class="card-sub">
+    <div class="section-title"><i class="bi bi-person-lines-fill me-1 text-info"></i> Datos del personal</div>
+
+    <?php if($esAdmin): ?>
+    <form method="post" class="row g-2">
+      <?php csrf_if_exists(); ?>
+      <input type="hidden" name="accion" value="guardar_personal">
+      <input type="hidden" name="personal_id" value="<?= $id ?>">
+
+      <!-- Jerarquía / Grado / Arma -->
+      <div class="col-md-3">
+        <label class="form-label">Jerarquía</label>
+        <select name="jerarquia" class="form-select form-select-sm">
+          <option value="">— —</option>
+          <?php foreach(['OFICIAL','SUBOFICIAL','SOLDADO','AGENTE_CIVIL'] as $j): ?>
+            <option value="<?= $j ?>" <?= ($persona['jerarquia']??'')===$j?'selected':'' ?>><?= $j ?></option>
+          <?php endforeach; ?>
+        </select>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label">Grado</label>
+        <input class="form-control form-control-sm" name="grado" value="<?= e($persona['grado']??'') ?>">
+      </div>
+      <div class="col-md-2">
+        <label class="form-label">Arma / Cuerpo</label>
+        <input class="form-control form-control-sm" name="arma" value="<?= e($persona['arma']??'') ?>">
+      </div>
+      <div class="col-md-5">
+        <label class="form-label">Apellido y Nombre <span class="text-danger">*</span></label>
+        <input class="form-control form-control-sm" name="apellido_nombre" required value="<?= e($persona['apellido_nombre']??'') ?>">
+      </div>
+
+      <!-- DNI / CUIL / Fecha nac / Sexo -->
+      <div class="col-md-2">
+        <label class="form-label">DNI <span class="text-danger">*</span></label>
+        <input class="form-control form-control-sm" name="dni" required value="<?= e($persona['dni']??'') ?>">
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">CUIL</label>
+        <input class="form-control form-control-sm" name="cuil" value="<?= e($persona['cuil']??'') ?>">
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">Fecha de nacimiento</label>
+        <input type="date" class="form-control form-control-sm" name="fecha_nac" value="<?= e($persona['fecha_nac']??'') ?>">
+      </div>
+      <div class="col-md-2">
+        <label class="form-label">Sexo</label>
+        <select class="form-select form-select-sm" name="sexo">
+          <option value="">—</option>
+          <option value="M" <?= ($persona['sexo']??'')==='M'?'selected':'' ?>>Masculino</option>
+          <option value="F" <?= ($persona['sexo']??'')==='F'?'selected':'' ?>>Femenino</option>
+        </select>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label">Estado civil</label>
+        <input class="form-control form-control-sm" name="estado_civil" value="<?= e($persona['estado_civil']??'') ?>">
+      </div>
+
+      <!-- Destino / Función -->
+      <div class="col-md-3">
+        <label class="form-label">Área / Destino</label>
+        <select class="form-select form-select-sm" name="destino_id">
+          <option value="">— Sin asignar —</option>
+          <?php foreach($destinosAll as $dst): ?>
+            <option value="<?= (int)$dst['id'] ?>" <?= $destinoId===(int)$dst['id']?'selected':'' ?>>
+              <?= e($dst['codigo']??'') ?> · <?= e($dst['nombre']) ?>
+            </option>
+          <?php endforeach; ?>
+        </select>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Destino interno / Dependencia</label>
+        <input class="form-control form-control-sm" name="destino_interno" value="<?= e($persona['destino_interno']??'') ?>">
+      </div>
+      <div class="col-md-5">
+        <label class="form-label">Función</label>
+        <input class="form-control form-control-sm" name="funcion" value="<?= e($persona['funcion']??'') ?>">
+      </div>
+
+      <!-- Domicilio / Hijos / Fecha alta -->
+      <div class="col-md-6">
+        <label class="form-label">Domicilio</label>
+        <input class="form-control form-control-sm" name="domicilio" value="<?= e($persona['domicilio']??'') ?>">
+      </div>
+      <div class="col-md-2">
+        <label class="form-label">Hijos</label>
+        <input type="number" class="form-control form-control-sm" name="hijos" min="0" value="<?= e($persona['hijos']??'') ?>">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Fecha de alta en la unidad</label>
+        <input type="date" class="form-control form-control-sm" name="fecha_alta" value="<?= e($persona['fecha_alta']??'') ?>">
+      </div>
+
+      <!-- Teléfono / Correo -->
+      <div class="col-md-4">
+        <label class="form-label">Teléfono</label>
+        <input class="form-control form-control-sm" name="telefono" value="<?= e($persona['telefono']??'') ?>">
+      </div>
+      <div class="col-md-8">
+        <label class="form-label">Correo electrónico</label>
+        <input class="form-control form-control-sm" name="correo" value="<?= e($persona['correo']??'') ?>">
+      </div>
+
+      <!-- Observaciones -->
+      <div class="col-12">
+        <label class="form-label">Observaciones</label>
+        <textarea class="form-control form-control-sm" name="observaciones" rows="2"><?= e($persona['observaciones']??'') ?></textarea>
+      </div>
+
+      <div class="col-12 text-end">
+        <button class="btn btn-sm btn-success fw-bold" type="submit">
+          <i class="bi bi-floppy me-1"></i> Guardar datos
+        </button>
+      </div>
+    </form>
+    <?php else: ?>
+      <div class="help-small">Solo lectura (sin permisos de edición).</div>
+    <?php endif; ?>
+  </div>
+  <?php endif; ?>
+
+  <!-- ══════════════════════════ TAB: SANIDAD ═════════════════════════════ -->
+  <?php if($tab==='sanidad'): ?>
+  <div class="card-sub">
+    <div class="section-title"><i class="bi bi-heart-pulse me-1 text-danger"></i> Sanidad · Estado actual</div>
+    <div class="d-flex flex-wrap gap-3 mb-3 align-items-center">
+      <?php if($tieneParte): ?>
+        <span class="badge bg-warning text-dark px-3 py-2 fs-6">🩺 TIENE PARTE</span>
+      <?php else: ?>
+        <span class="badge bg-success px-3 py-2 fs-6">✓ SIN PARTE</span>
+      <?php endif; ?>
+      <span class="help-small">Inicio: <b><?= e(fmt_date($parteIni)) ?></b></span>
+      <span class="help-small">Fin: <b><?= e(fmt_date($parteFin)) ?></b></span>
+      <span class="help-small">Total partes: <b><?= $cantParte ?></b></span>
+    </div>
+
+    <?php if($esAdmin): ?>
+    <form method="post" enctype="multipart/form-data" class="row g-2">
+      <?php csrf_if_exists(); ?>
+      <input type="hidden" name="accion" value="guardar_sanidad">
+      <input type="hidden" name="personal_id" value="<?= $id ?>">
+      <div class="col-md-4">
+        <label class="form-label">Acción</label>
+        <select class="form-select form-select-sm" name="tiene_parte">
+          <option value="si">Registrar parte de enfermo</option>
+          <option value="no">Registrar alta de parte</option>
+        </select>
+        <div class="help-small mt-1">Sin evidencia: actualiza el último evento sin incrementar contador.</div>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">Inicio</label>
+        <input type="date" class="form-control form-control-sm" name="inicio">
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">Fin</label>
+        <input type="date" class="form-control form-control-sm" name="fin">
+      </div>
+      <div class="col-md-2">&nbsp;</div>
+      <div class="col-12">
+        <label class="form-label">Observaciones</label>
+        <input class="form-control form-control-sm" name="observaciones_sanidad" placeholder="Diagnóstico, detalle...">
+      </div>
+      <div class="col-12">
+        <label class="form-label">Evidencia (PDF / imagen — opcional)</label>
+        <input type="file" class="form-control form-control-sm" name="sanidad_evidencias[]" multiple
+               accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx">
+      </div>
+      <div class="col-12 text-end">
+        <button class="btn btn-sm btn-outline-success fw-bold" type="submit">
+          <i class="bi bi-floppy me-1"></i> Guardar sanidad
+        </button>
+      </div>
+    </form>
+    <?php else: ?>
+      <div class="help-small">Sin permisos de modificación.</div>
+    <?php endif; ?>
+  </div>
+
+  <div class="card-sub">
+    <div class="section-title">Historial de sanidad (últimos 10)</div>
+    <?php if(!$sanidadHist): ?>
+      <div class="text-muted">Sin historial.</div>
+    <?php else: ?>
+    <div class="accordion" id="accSan">
+      <?php foreach($sanidadHist as $s):
+          $sid=(int)($s['id']??0);
+          $ev=isset($colsSan['evento'])&&!empty($s['evento'])?(string)$s['evento']:
+              ((string)($s['tiene_parte']??'no')==='si'?'parte':'alta');
+          $badge=$ev==='parte'
+              ? '<span class="badge bg-warning text-dark">PARTE</span>'
+              : '<span class="badge bg-info text-dark">ALTA</span>';
+          $evids=$evidBySanidad[$sid]??[];
+      ?>
+      <div class="accordion-item" style="background:rgba(15,23,42,.85);border:1px solid rgba(148,163,184,.22);">
+        <h2 class="accordion-header">
+          <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse"
+                  data-bs-target="#san<?= $sid ?>" style="background:rgba(15,23,42,.92);color:#e5e7eb;">
+            <?= $badge ?>&nbsp;
+            <span style="font-weight:900;"><?= e(fmt_date($s['inicio']??null)) ?> → <?= e(fmt_date($s['fin']??null)) ?></span>
+            <span class="help-small ms-2">· Cant: <?= (int)($s['cantidad']??0) ?></span>
+            <span class="help-small ms-2">· <?= count($evids) ?> evidencia(s)</span>
+          </button>
+        </h2>
+        <div id="san<?= $sid ?>" class="accordion-collapse collapse">
+          <div class="accordion-body" style="color:#e5e7eb;">
+            <?php if(!empty($s['observaciones'])): ?><div class="help-small mb-2"><b>Obs:</b> <?= e($s['observaciones']) ?></div><?php endif; ?>
+            <?php if(!$evids): ?>
+              <div class="text-muted small">Sin evidencias vinculadas.</div>
+            <?php else: ?>
+            <div class="table-responsive">
+              <table class="table table-sm table-dark tbl align-middle mb-0">
+                <thead><tr><th>Tipo</th><th>Título</th><th>Fecha</th><th>Tamaño</th><th>Ver</th><th class="text-end">Acción</th></tr></thead>
+                <tbody>
+                  <?php foreach($evids as $d):
+                    $url=!empty($d['path'])?($BASE_APP_WEB.'/'.ltrim($d['path'],'/')):null;
+                  ?>
+                  <tr>
+                    <td><?= e($d['tipo']??'') ?></td>
+                    <td><?= e($d['titulo']??'(s/t)') ?></td>
+                    <td><?= e(fmt_date($d['fecha']??null)) ?></td>
+                    <td><?= e(fmt_bytes(isset($d['bytes'])?(int)$d['bytes']:null)) ?></td>
+                    <td><?php if($url): ?><a class="btn btn-sm btn-outline-light py-0 px-2" href="<?= e($url) ?>" target="_blank">Ver</a><?php else: ?>—<?php endif; ?></td>
+                    <td class="text-end">
+                      <?php if($esAdmin): ?>
+                      <form method="post" class="d-inline form-del-doc">
+                        <?php csrf_if_exists(); ?>
+                        <input type="hidden" name="accion" value="eliminar_documento">
+                        <input type="hidden" name="personal_id" value="<?= $id ?>">
+                        <input type="hidden" name="doc_id" value="<?= (int)($d['id']??0) ?>">
+                        <button type="button" class="btn btn-sm btn-outline-danger py-0 px-2 btn-del">Eliminar</button>
+                      </form>
+                      <?php endif; ?>
+                    </td>
+                  </tr>
+                  <?php endforeach; ?>
+                </tbody>
+              </table>
+            </div>
+            <?php endif; ?>
+          </div>
+        </div>
+      </div>
+      <?php endforeach; ?>
+    </div>
+    <?php endif; ?>
+  </div>
+  <?php endif; ?>
+
+  <!-- ══════════════════════════ TAB: DOCUMENTOS ══════════════════════════ -->
+  <?php if($tab==='docs'): ?>
+  <div class="card-sub">
+    <div class="section-title"><i class="bi bi-folder2-open me-1 text-warning"></i> Documentos del personal</div>
+    <?php if($esAdmin): ?>
+    <form method="post" enctype="multipart/form-data" class="row g-2 mb-4">
+      <?php csrf_if_exists(); ?>
+      <input type="hidden" name="accion" value="subir_documento">
+      <input type="hidden" name="personal_id" value="<?= $id ?>">
+      <div class="col-md-4">
+        <label class="form-label">Tipo</label>
+        <select class="form-select form-select-sm" name="tipo">
+          <option value="anexo27">Anexo 27</option>
+          <option value="administrativo">Administrativo</option>
+          <option value="otros" selected>Otros</option>
+        </select>
+      </div>
+      <div class="col-md-8">
+        <label class="form-label">Título</label>
+        <input class="form-control form-control-sm" name="titulo" placeholder="Ej: Certificado médico, Nota...">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Fecha</label>
+        <input type="date" class="form-control form-control-sm" name="fecha">
+      </div>
+      <div class="col-md-8">
+        <label class="form-label">Nota</label>
+        <input class="form-control form-control-sm" name="nota" placeholder="Observación breve...">
+      </div>
+      <?php if(isset($colsPD['evento_id'])&&table_exists($pdo,'personal_eventos')&&$eventos): ?>
+      <div class="col-12">
+        <label class="form-label">Vincular a evento (opcional)</label>
+        <select class="form-select form-select-sm" name="evento_id">
+          <option value="0">(sin evento)</option>
+          <?php foreach($eventos as $ev): ?>
+            <option value="<?= (int)$ev['id'] ?>">
+              <?= e(($ev['tipo']??'').' · '.fmt_date($ev['desde']??null).' → '.fmt_date($ev['hasta']??null).' · '.($ev['titulo']??'')) ?>
+            </option>
+          <?php endforeach; ?>
+        </select>
+      </div>
+      <?php endif; ?>
+      <div class="col-12">
+        <label class="form-label">Archivo (PDF / Word / Imagen)</label>
+        <input type="file" class="form-control form-control-sm" name="archivo" required accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx">
+      </div>
+      <div class="col-12 text-end">
+        <button class="btn btn-sm btn-outline-success fw-bold" type="submit">
+          <i class="bi bi-upload me-1"></i> Subir documento
+        </button>
+      </div>
+    </form>
+    <?php endif; ?>
+    <div class="table-responsive">
+      <table class="table table-sm table-dark tbl align-middle">
+        <thead><tr><th>Tipo</th><th>Título</th><th>Fecha</th><th>Tamaño</th><th>Ver</th><th class="text-end">Acción</th></tr></thead>
+        <tbody>
+        <?php if(!$docs): ?>
+          <tr><td colspan="6" class="text-center text-muted py-3">Sin documentos.</td></tr>
+        <?php else: foreach($docs as $d):
+          $url=!empty($d['path'])?($BASE_APP_WEB.'/'.ltrim($d['path'],'/')):null;
+        ?>
+          <tr>
+            <td><?= e($d['tipo']??'') ?></td>
+            <td>
+              <?= e($d['titulo']??'(s/t)') ?>
+              <?php if(!empty($d['nota'])): ?><div class="help-small"><?= e($d['nota']) ?></div><?php endif; ?>
+              <?php if(isset($d['sanidad_id'])&&(int)$d['sanidad_id']>0): ?>
+                <div class="help-small" style="color:#f87171;">Sanidad #<?= (int)$d['sanidad_id'] ?></div>
+              <?php endif; ?>
+            </td>
+            <td><?= e(fmt_date($d['fecha']??null)) ?></td>
+            <td><?= e(fmt_bytes(isset($d['bytes'])?(int)$d['bytes']:null)) ?></td>
+            <td><?php if($url): ?><a class="btn btn-sm btn-outline-light py-0 px-2" href="<?= e($url) ?>" target="_blank">Ver</a><?php else: ?>—<?php endif; ?></td>
+            <td class="text-end">
+              <?php if($esAdmin): ?>
+              <form method="post" class="d-inline form-del-doc">
+                <?php csrf_if_exists(); ?>
+                <input type="hidden" name="accion" value="eliminar_documento">
+                <input type="hidden" name="personal_id" value="<?= $id ?>">
+                <input type="hidden" name="doc_id" value="<?= (int)($d['id']??0) ?>">
+                <button type="button" class="btn btn-sm btn-outline-danger py-0 px-2 btn-del">Eliminar</button>
+              </form>
+              <?php else: ?>—<?php endif; ?>
+            </td>
+          </tr>
+        <?php endforeach; endif; ?>
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <?php endif; ?>
+
+  <!-- ══════════════════════════ TAB: EVENTOS Y ROLES ═════════════════════ -->
+  <?php if($tab==='eventos' && table_exists($pdo,'personal_eventos')): ?>
+  <div class="card-sub">
+    <div class="section-title"><i class="bi bi-calendar-event me-1 text-info"></i> Eventos y roles operacionales</div>
+    <div class="section-sub">
+      Tipos disponibles: <code>rol_operacional</code>, <code>vacaciones</code>, <code>licencia</code>,
+      <code>comision</code>, <code>plan_llamada</code>, <code>retiro</code>, o cualquier texto libre.
+    </div>
+
+    <?php if($esAdmin): ?>
+    <form method="post" class="row g-2 mb-4 p-3" style="background:rgba(2,6,23,.5);border-radius:10px;">
+      <?php csrf_if_exists(); ?>
+      <input type="hidden" name="accion" value="crear_evento">
+      <input type="hidden" name="personal_id" value="<?= $id ?>">
+
+      <div class="col-12"><div style="font-size:.82rem;font-weight:800;color:#93c5fd;margin-bottom:4px;">Nuevo evento / rol</div></div>
+
+      <div class="col-md-3">
+        <label class="form-label">Tipo <span class="text-danger">*</span></label>
+        <input class="form-control form-control-sm" name="ev_tipo" list="tiposEvento" placeholder="rol_operacional..." required>
+        <datalist id="tiposEvento">
+          <option value="rol_operacional">
+          <option value="vacaciones">
+          <option value="licencia">
+          <option value="comision">
+          <option value="plan_llamada">
+          <option value="retiro">
+        </datalist>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">Título / Rol</label>
+        <input class="form-control form-control-sm" name="ev_titulo" placeholder="Ej: Jefe de Guardia, Auxiliar S-1...">
+      </div>
+      <div class="col-md-2">
+        <label class="form-label">Desde</label>
+        <input type="date" class="form-control form-control-sm" name="ev_desde">
+      </div>
+      <div class="col-md-2">
+        <label class="form-label">Hasta</label>
+        <input type="date" class="form-control form-control-sm" name="ev_hasta">
+      </div>
+      <div class="col-md-2">
+        <label class="form-label">Estado</label>
+        <input class="form-control form-control-sm" name="ev_estado" placeholder="activo / cumplido...">
+      </div>
+      <div class="col-12">
+        <label class="form-label">Descripción / Detalle</label>
+        <input class="form-control form-control-sm" name="ev_desc" placeholder="Detalles adicionales, observaciones...">
+      </div>
+      <?php if(!empty($colsPE['data_json'])): ?>
+      <div class="col-12">
+        <label class="form-label">Datos extra (JSON opcional)</label>
+        <textarea class="form-control form-control-sm" name="ev_json" rows="2"
+                  placeholder='{"puesto":"Jefe","turno":"mañana"}'></textarea>
+      </div>
+      <?php endif; ?>
+      <div class="col-12 text-end">
+        <button class="btn btn-sm btn-success fw-bold" type="submit">
+          <i class="bi bi-plus-circle me-1"></i> Crear evento
+        </button>
+      </div>
+    </form>
+    <?php endif; ?>
+
+    <!-- Lista de eventos agrupados por tipo -->
+    <?php if(!$eventos): ?>
+      <div class="text-muted small">Sin eventos registrados.</div>
+    <?php else:
+      // Agrupar por tipo
+      $grupos = [];
+      foreach($eventos as $ev) {
+          $t = strtolower(trim((string)($ev['tipo']??'otros')));
+          $grupos[$t][] = $ev;
+      }
+      // Orden de display
+      $tiposOrden=['rol_operacional','plan_llamada','comision','vacaciones','licencia','retiro'];
+      foreach($tiposOrden as $to) if(!array_key_exists($to,$grupos)) {} // solo para orden
+      uksort($grupos, function($a,$b) use($tiposOrden){
+          $ia=array_search($a,$tiposOrden); $ib=array_search($b,$tiposOrden);
+          if($ia===false) $ia=99; if($ib===false) $ib=99; return $ia<=>$ib;
+      });
+    ?>
+    <?php foreach($grupos as $tipoGrupo => $evList): ?>
+      <div class="mb-3">
+        <div class="d-flex align-items-center gap-2 mb-2">
+          <?= evento_badge($tipoGrupo) ?>
+          <span class="help-small"><?= count($evList) ?> registro<?= count($evList)!==1?'s':'' ?></span>
+        </div>
+        <?php foreach($evList as $ev): ?>
+        <div class="ev-card">
+          <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
+            <div>
+              <?php if(!empty($ev['titulo'])): ?>
+                <div style="font-weight:700;font-size:.88rem;"><?= e($ev['titulo']) ?></div>
+              <?php endif; ?>
+              <div class="d-flex flex-wrap gap-2 mt-1">
+                <?php if($ev['desde']||$ev['hasta']): ?>
+                  <span class="help-small">
+                    <i class="bi bi-calendar3"></i>
+                    <?= e(fmt_date($ev['desde'])) ?> → <?= e(fmt_date($ev['hasta'])) ?>
+                  </span>
+                <?php endif; ?>
+                <?php if(!empty($ev['estado'])): ?>
+                  <span style="font-size:.72rem;padding:.15rem .45rem;border-radius:4px;background:rgba(34,197,94,.15);border:1px solid rgba(34,197,94,.4);color:#86efac;">
+                    <?= e($ev['estado']) ?>
+                  </span>
+                <?php endif; ?>
+              </div>
+              <?php if(!empty($ev['descripcion'])): ?>
+                <div class="help-small mt-1"><?= e($ev['descripcion']) ?></div>
+              <?php endif; ?>
+              <?php if(!empty($ev['data_json'])): ?>
+                <div class="help-small mt-1" style="color:#a5b4fc;">
+                  <code style="font-size:.7rem;"><?= e((string)$ev['data_json']) ?></code>
+                </div>
+              <?php endif; ?>
+            </div>
+            <?php if($esAdmin): ?>
+            <form method="post" class="d-inline form-del-ev flex-shrink-0">
+              <?php csrf_if_exists(); ?>
+              <input type="hidden" name="accion" value="eliminar_evento">
+              <input type="hidden" name="personal_id" value="<?= $id ?>">
+              <input type="hidden" name="evento_id" value="<?= (int)($ev['id']??0) ?>">
+              <button type="button" class="btn btn-sm btn-outline-danger py-0 px-2 btn-del-ev">
+                <i class="bi bi-trash3"></i>
+              </button>
+            </form>
+            <?php endif; ?>
+          </div>
+        </div>
+        <?php endforeach; ?>
+      </div>
+    <?php endforeach; endif; ?>
+  </div>
+  <?php endif; ?>
+
+<?php endif; /* fin FICHA */ ?>
+
+</div></div></div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  // Confirmar eliminación de documentos
+  document.querySelectorAll('.form-del-doc .btn-del').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.preventDefault();
+      const form = btn.closest('form');
+      Swal.fire({
+        title:'¿Eliminar documento?', text:'Esta acción no se puede deshacer.',
+        icon:'warning', showCancelButton:true,
+        confirmButtonText:'Sí, eliminar', cancelButtonText:'Cancelar',
+        confirmButtonColor:'#dc3545', cancelButtonColor:'#6c757d',
+        background:'#0f172a', color:'#e5e7eb'
+      }).then(r => { if(r.isConfirmed) form.submit(); });
+    });
+  });
+  // Confirmar eliminación de eventos
+  document.querySelectorAll('.form-del-ev .btn-del-ev').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.preventDefault();
+      const form = btn.closest('form');
+      Swal.fire({
+        title:'¿Eliminar evento?', text:'Se desvinculan documentos asociados (si los hay).',
+        icon:'warning', showCancelButton:true,
+        confirmButtonText:'Sí, eliminar', cancelButtonText:'Cancelar',
+        confirmButtonColor:'#dc3545', cancelButtonColor:'#6c757d',
+        background:'#0f172a', color:'#e5e7eb'
+      }).then(r => { if(r.isConfirmed) form.submit(); });
+    });
+  });
+});
+</script>
+</body>
+</html>

@@ -1,16 +1,28 @@
 <?php
-// public/s3_tiro_ami.php — AMI asignada
+// public/operaciones/operaciones_ami.php — AMI asignada
 declare(strict_types=1);
 
 $OFFLINE_MODE = false;
 require_once __DIR__ . '/../../auth/bootstrap.php';
-if(!$OFFLINE_MODE) require_login();
 require_once __DIR__ . '/../../config/db.php';
-require_once __DIR__ . '/./operaciones_tiro_tables_helper.php';
+require_once __DIR__ . '/../../includes/operaciones_helper.php';
+require_once __DIR__ . '/operaciones_tiro_tables_helper.php';
+
+if (!$OFFLINE_MODE) {
+    operaciones_require_login();
+}
 
 s3_tiro_ensure_tables($pdo);
 
-function e($v){ return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'); }
+$esAdmin = operaciones_es_admin($pdo);
+$modoResumido = !$esAdmin;
+
+$ASSET_WEB = operaciones_assets_url();
+$IMG_BG    = operaciones_assets_url('img/fondo.png');
+$ESCUDO    = operaciones_assets_url('img/escudo_bcom602.png');
+
+// Compatibility helper used in templates
+function e($v){ return operaciones_e($v); }
 
 /* Usuario (para dejar rastro si quisieras luego) */
 $user = $_SESSION['user']['username'] ?? null;
@@ -55,12 +67,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 $sql = "SELECT * FROM s3_tiro_ami ORDER BY fecha DESC, grado, nombre";
 $ami = $pdo->query($sql)->fetchAll(PDO::FETCH_ASSOC);
 
-/* Assets */
-$PUBLIC_URL = rtrim(str_replace("\\","/", dirname($_SERVER["SCRIPT_NAME"] ?? "")), "/");
-$APP_URL    = rtrim(dirname($PUBLIC_URL), "/");
-$ASSETS     = ($APP_URL==="" ? "" : $APP_URL)."/assets";
-$IMG_BG     = $ASSETS."/img/fondo.png";
-$ESCUDO     = $ASSETS."/img/escudo_bcom602.png";
 ?>
 <!doctype html>
 <html lang="es">
@@ -68,7 +74,7 @@ $ESCUDO     = $ASSETS."/img/escudo_bcom602.png";
 <meta charset="utf-8">
 <title>AMI asignada · S-3 Tiro</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<link rel="stylesheet" href="../assets/css/theme-602.css">
+<link rel="stylesheet" href="<?= e($ASSET_WEB) ?>/css/theme-602.css">
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 
 <style>
@@ -112,6 +118,10 @@ body{
 
 <div class="page-wrap">
 <div class="container-main">
+
+<?php if ($modoResumido): ?>
+  <div class="alert alert-warning">Vista resumida: acceso limitado para usuarios no administradores.</div>
+<?php endif; ?>
 
 <h3 class="fw-bold mb-3">AMI asignada · Resultados individuales</h3>
 
@@ -201,5 +211,6 @@ body{
 </div>
 </div>
 
+<?php operaciones_render_chat_widget($pdo); ?>
 </body>
 </html>

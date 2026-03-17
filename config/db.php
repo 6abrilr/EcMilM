@@ -4,7 +4,7 @@ $cfg = [
   'port' => 3306,
   'db'   => 'unidad',
   'user' => 'root',
-  'pass' => 'ContraseñaSegura123',
+  'pass' => '',
 ];
 
 $dsn = "mysql:host={$cfg['host']};port={$cfg['port']};dbname={$cfg['db']};charset=utf8mb4";
@@ -12,5 +12,3 @@ $pdo = new PDO($dsn, $cfg['user'], $cfg['pass'], [
   PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
   PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
 ]);
-
-

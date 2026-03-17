@@ -5,19 +5,24 @@ declare(strict_types=1);
 $OFFLINE_MODE = false;
 
 require_once __DIR__ . '/../../auth/bootstrap.php';
-if (!$OFFLINE_MODE) require_login();
 require_once __DIR__ . '/../config/db.php';
+require_once __DIR__ . '/../../includes/operaciones_helper.php';
 require_once __DIR__ . '/s3_educacion_tables_helper.php';
+
+if (!$OFFLINE_MODE) {
+    operaciones_require_login();
+}
 
 s3_ensure_tables($pdo);
 
-function e($v){ return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'); }
+$esAdmin = operaciones_es_admin($pdo);
+$modoResumido = !$esAdmin;
 
-$PUBLIC_URL = rtrim(str_replace('\\','/', dirname($_SERVER['SCRIPT_NAME'] ?? '')), '/');
-$APP_URL    = rtrim(dirname($PUBLIC_URL), '/');
-$ASSETS     = ($APP_URL==='' ? '' : $APP_URL).'/assets';
-$IMG_BG     = $ASSETS.'/img/fondo.png';
-$ESCUDO     = $ASSETS.'/img/escudo_bcom602.png';
+$ASSET_WEB = operaciones_assets_url();
+$IMG_BG    = operaciones_assets_url('img/fondo.png');
+$ESCUDO    = operaciones_assets_url('img/escudo_bcom602.png');
+
+function e($v){ return operaciones_e($v); }
 
 /* ===== KPIs ===== */
 function kpi(PDO $p, string $tbl): float {

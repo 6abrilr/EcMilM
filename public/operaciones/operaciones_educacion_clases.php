@@ -1,17 +1,17 @@
 <?php
-// public/s3_educacion_cursos.php — S-3 Educación · Cursos regulares
+// public/s3_educacion_cursos.php ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â S-3 EducaciÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³n ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· Cursos regulares
 declare(strict_types=1);
 
-// ========= MODO PRODUCCIÓN / EJÉRCITO =========
+// ========= MODO PRODUCCIÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œN / EJÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â°RCITO =========
 $OFFLINE_MODE = false;
 // ===================================
 
-require_once __DIR__ . '/../auth/bootstrap.php';
+require_once __DIR__ . '/../../auth/bootstrap.php';
 if (!$OFFLINE_MODE) {
     require_login();
 }
-require_once __DIR__ . '/../config/db.php';
-require_once __DIR__ . '/s3_educacion_tables_helper.php';
+require_once __DIR__ . '/../../config/db.php';
+require_once __DIR__ . '/operaciones_educacion_tables_helper.php';
 
 /** @var PDO $pdo */
 s3_ensure_tables($pdo);
@@ -50,11 +50,11 @@ if (!is_dir($BASE_DIR . '/' . $PDF_SUBDIR)) {
     @mkdir($BASE_DIR . '/' . $PDF_SUBDIR, 0775, true);
 }
 
-/* ===== Procesar altas / bajas rápidas (POST local a este mismo archivo) ===== */
+/* ===== Procesar altas / bajas rÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡pidas (POST local a este mismo archivo) ===== */
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $accion = $_POST['accion'] ?? '';
 
-    /* Alta rápida de nuevo curso regular */
+    /* Alta rÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡pida de nuevo curso regular */
     if ($accion === 'nuevo_curso') {
         $sigla        = trim((string)($_POST['nueva_sigla'] ?? ''));
         $denominacion = trim((string)($_POST['nueva_denominacion'] ?? ''));
@@ -92,7 +92,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // Solo inserto si tiene algo cargado
         if ($sigla !== '' || $denominacion !== '' || !empty($participantesArr)) {
 
-            // Inserto el curso (sin PDF de participantes; esta página no lo usa)
+            // Inserto el curso (sin PDF de participantes; esta pÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡gina no lo usa)
             $sqlIns = "
                 INSERT INTO s3_cursos_regulares
                     (sigla, denominacion, participantes, desde, hasta, participantes_pdf)
@@ -109,7 +109,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             ]);
         }
 
-        header('Location: s3_educacion_cursos.php?saved=1');
+        header('Location: operaciones_educacion_clases.php?saved=1');
         exit;
     }
 
@@ -120,19 +120,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmtDel = $pdo->prepare("DELETE FROM s3_cursos_regulares WHERE id = :id");
             $stmtDel->execute([':id' => $delId]);
         }
-        header('Location: s3_educacion_cursos.php?saved=1');
+        header('Location: operaciones_educacion_clases.php?saved=1');
         exit;
     }
 }
 
-/* ===== Assets ===== */
+/* ===== Branding / Assets ===== */
+$NOMBRE = 'Escuela Militar de Montana';
+$LEYENDA = '';
+try {
+    $stUnidad = $pdo->prepare("SELECT nombre_completo, subnombre FROM unidades WHERE id = :id LIMIT 1");
+    $stUnidad->execute([':id' => 1]);
+    if ($unidad = $stUnidad->fetch(PDO::FETCH_ASSOC)) {
+        if (!empty($unidad['nombre_completo'])) {
+            $NOMBRE = (string)$unidad['nombre_completo'];
+        }
+        if (!empty($unidad['subnombre'])) {
+            $LEYENDA = trim((string)$unidad['subnombre']);
+        }
+    }
+} catch (Throwable $e) {}
+
 $PUBLIC_URL = rtrim(str_replace('\\','/', dirname($_SERVER['SCRIPT_NAME'] ?? $_SERVER['PHP_SELF'])), '/');
 $APP_URL    = rtrim(str_replace('\\','/', dirname($PUBLIC_URL)), '/');
 $ASSETS_URL = ($APP_URL === '' ? '' : $APP_URL) . '/assets';
 $IMG_BG     = $ASSETS_URL . '/img/fondo.png';
-$ESCUDO     = $ASSETS_URL . '/img/escudo_bcom602.png';
+$ESCUDO     = $ASSETS_URL . '/img/ecmilm.png';
 
-/* ===== Filtros por Sigla / Denominación / Participantes (GET) ===== */
+/* ===== Filtros por Sigla / Denominacion / Participantes (GET) ===== */
 $filtroSigla        = trim((string)($_GET['sigla'] ?? ''));
 $filtroDenominacion = trim((string)($_GET['denominacion'] ?? ''));
 $filtroParticip     = trim((string)($_GET['participantes'] ?? ''));
@@ -173,7 +188,7 @@ $cursosCumplidos  = (int)$row['ok'];
 $cursosPendientes = max($totalCursos - $cursosCumplidos, 0);
 $porcCursos       = $totalCursos > 0 ? round($cursosCumplidos * 100.0 / $totalCursos, 1) : 0.0;
 
-/* ===== Listado de personal para autocomplete (igual que en s3_educacion_clases.php) ===== */
+/* ===== Listado de personal para autocomplete ===== */
 $personalUnidad = [];
 try {
     $personalUnidad = $pdo->query("
@@ -195,23 +210,45 @@ $savedFlag = ($_GET['saved'] ?? '') === '1';
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<title>Cursos regulares · Educación operacional · S-3 · B Com 602</title>
+<title>Cursos regulares - Educacion operacional - <?= e($NOMBRE) ?></title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 <link rel="stylesheet" href="../assets/css/theme-602.css">
-<link rel="icon" type="image/png" href="../assets/img/bcom602.png">
+<link rel="icon" type="image/png" href="../../assets/img/ecmilm.png">
 <style>
+  :root{
+    --bg-dark: #020617;
+    --card-bg: rgba(15,23,42,.94);
+    --card-border: rgba(148,163,184,.45);
+    --text-main: #e5e7eb;
+    --text-muted: #9ca3af;
+    --accent: #22c55e;
+  }
+
+  *{ box-sizing:border-box; }
+
   body{
     background: url("<?= e($IMG_BG) ?>") no-repeat center center fixed;
     background-size: cover;
     background-attachment: fixed;
-    background-color:#020617;
-    color:#e5e7eb;
+    background-color:var(--bg-dark);
+    color:var(--text-main);
     font-family:system-ui,-apple-system,"Segoe UI",Roboto,Ubuntu,sans-serif;
-    margin:0; padding:0;
+    margin:0;
+    padding:0;
+    position:relative;
+    overflow-x:hidden;
   }
-  .page-wrap{ padding:18px; }
-  .container-main{ max_width:1400px; margin:auto; }
+  body::before{
+    content:"";
+    position:fixed;
+    inset:0;
+    background:radial-gradient(circle at top, rgba(15,23,42,.75), rgba(15,23,42,.95));
+    pointer-events:none;
+    z-index:-1;
+  }
+  .page-wrap{ padding:24px 16px 32px; }
+  .container-main{ max-width:1200px; margin:auto; }
 
   .panel{
     background:rgba(15,17,23,.94);
@@ -236,28 +273,83 @@ $savedFlag = ($_GET['saved'] ?? '') === '1';
   }
 
   .brand-hero{
-    padding-top:10px;
-    padding-bottom:10px;
+    padding:14px 0 10px;
   }
-  .brand-hero .hero-inner{
-    align-items:center;
+  .hero-inner{
     display:flex;
+    align-items:center;
     justify-content:space-between;
-    gap:12px;
+    gap:16px;
+  }
+  .brand-left{
+    display:flex;
+    align-items:center;
+    gap:14px;
+  }
+  .brand-logo{
+    height:56px;
+    width:auto;
+    filter:drop-shadow(0 0 10px rgba(0,0,0,.8));
+  }
+  .brand-title{
+    font-weight:800;
+    font-size:1.1rem;
+    letter-spacing:.03em;
+  }
+  .brand-sub{
+    font-size:.8rem;
+    color:#cbd5f5;
   }
   .header-back{
     display:flex;
     gap:8px;
     flex-wrap:wrap;
   }
-
-  .brand-title{
-    font-weight:800;
-    font-size:1rem;
-  }
-  .brand-sub{
+  .btn-ghost{
+    border-radius:999px;
+    border:1px solid rgba(148,163,184,.55);
+    background:rgba(15,23,42,.8);
+    color:#e5e7eb;
     font-size:.8rem;
-    color:#9ca3af;
+    font-weight:700;
+    padding:.35rem 1rem;
+    box-shadow:0 10px 30px rgba(0,0,0,.55);
+    text-decoration:none;
+  }
+  .btn-ghost:hover{
+    background:rgba(30,64,175,.9);
+    border-color:rgba(129,140,248,.9);
+    color:#fff;
+  }
+
+  .section-header{
+    margin-bottom:22px;
+  }
+  .section-kicker{
+    margin-bottom:4px;
+  }
+  .section-kicker .sk-text{
+    font-size:1.05rem;
+    font-weight:900;
+    letter-spacing:.18em;
+    text-transform:uppercase;
+    background:linear-gradient(90deg,#38bdf8,#22c55e);
+    -webkit-background-clip:text;
+    -webkit-text-fill-color:transparent;
+    filter:drop-shadow(0 0 6px rgba(30,58,138,.55));
+    padding-bottom:3px;
+    border-bottom:2px solid rgba(34,197,94,.45);
+    display:inline-block;
+  }
+  .section-title{
+    font-size:1.6rem;
+    font-weight:800;
+    margin-top:2px;
+  }
+  .section-sub{
+    font-size:.9rem;
+    color:#cbd5f5;
+    max-width:680px;
   }
 
   .top-actions{
@@ -310,36 +402,23 @@ $savedFlag = ($_GET['saved'] ?? '') === '1';
     margin-bottom:2px;
   }
 
-  .text-muted{
-    color:#bfdbfe !important;
-  }
-  .text-secondary{
-    color:#bfdbfe !important;
-  }
-  label.form-label{
-    color:#bfdbfe;
-  }
+  .text-muted{ color:#bfdbfe !important; }
+  .text-secondary{ color:#bfdbfe !important; }
+  label.form-label{ color:#bfdbfe; }
 
   .col-sel-header,
-  .col-sel-cell{
-    display:none;
-  }
+  .col-sel-cell{ display:none; }
   .modo-eliminar .col-sel-header,
-  .modo-eliminar .col-sel-cell{
-    display:table-cell;
-  }
+  .modo-eliminar .col-sel-cell{ display:table-cell; }
 </style>
 </head>
 <body>
-<!-- Toast de confirmación -->
-<div class="position-fixed top-0 start-50 translate-middle-x p-3" style="z-index: 11000;">
+<div class="position-fixed top-0 start-50 translate-middle-x p-3" style="z-index:11000;">
   <div id="saveToast" class="toast align-items-center text-bg-success border-0 shadow"
        role="alert" aria-live="assertive" aria-atomic="true"
        data-bs-delay="2500">
     <div class="d-flex">
-      <div class="toast-body">
-        ✅ Cambios guardados correctamente.
-      </div>
+      <div class="toast-body">Cambios guardados correctamente.</div>
       <button type="button" class="btn-close btn-close-white me-2 m-auto"
               data-bs-dismiss="toast" aria-label="Cerrar"></button>
     </div>
@@ -348,20 +427,18 @@ $savedFlag = ($_GET['saved'] ?? '') === '1';
 
 <header class="brand-hero">
   <div class="hero-inner container-main">
-    <div class="d-flex align-items-center gap-3">
-      <img class="brand-logo" src="<?= e($ESCUDO) ?>" alt="Escudo 602" style="height:52px; width:auto;">
+    <div class="brand-left">
+      <img class="brand-logo" src="<?= e($ESCUDO) ?>" alt="Escudo Escuela Militar de Montana" onerror="this.style.display='none'">
       <div>
-        <div class="brand-title">Batallón de Comunicaciones 602</div>
-        <div class="brand-sub">“Hogar de las Comunicaciones Fijas del Ejército”</div>
+        <div class="brand-title"><?= e($NOMBRE) ?></div>
+        <?php if ($LEYENDA !== ''): ?>
+          <div class="brand-sub"><?= e($LEYENDA) ?></div>
+        <?php endif; ?>
       </div>
     </div>
     <div class="header-back">
-      <a href="s3_educacion_cuadros.php" class="btn btn-outline-light btn-sm" style="font-weight:700; padding:.35rem .9rem;">
-        ⬅ Volver a Educación de cuadros
-      </a>
-      <a href="areas.php" class="btn btn-secondary btn-sm" style="font-weight:700; padding:.35rem .9rem;">
-        Volver a Áreas
-      </a>
+      <a href="operaciones_educacion_cuadros.php" class="btn-ghost">Volver a Educaci&oacute;n de cuadros</a>
+      <a href="areas.php" class="btn-ghost">Volver a &Aacute;reas</a>
     </div>
   </div>
 </header>
@@ -369,31 +446,40 @@ $savedFlag = ($_GET['saved'] ?? '') === '1';
 <div class="page-wrap">
   <div class="container-main">
 
+    <div class="section-header">
+      <div class="section-kicker">
+        <span class="sk-text">S-3 &middot; OPERACIONES</span>
+      </div>
+      <div class="section-title">Cursos regulares</div>
+      <p class="section-sub mb-0">
+        Registro y seguimiento de cursos regulares, participantes y evidencias de la
+        Escuela Militar de Monta&ntilde;a.
+      </p>
+    </div>
+
     <div class="top-actions">
       <div class="text-muted small">
         Editor: <strong><?= e(user_display_name()) ?></strong>
       </div>
       <div>
         <button form="cursosForm" class="btn btn-success btn-sm" style="font-weight:700;">
-          💾 Guardar cambios
+          Guardar cambios
         </button>
       </div>
     </div>
 
-    <!-- KPI Cursos regulares -->
     <div class="kpi-card">
       <div class="kpi-title">Cursos regulares</div>
       <div class="kpi-main">
         <?= e($cursosCumplidos) ?>/<?= e($totalCursos) ?> cursos cumplidos
       </div>
       <div class="kpi-sub">
-        Cumplimiento: <?= e($porcCursos) ?>% · Pendientes: <?= e($cursosPendientes) ?>
+        Cumplimiento: <?= e($porcCursos) ?>% - Pendientes: <?= e($cursosPendientes) ?>
       </div>
       <div class="progress mt-2" style="height:6px;">
         <div class="progress-bar bg-success" role="progressbar" style="width: <?= e($porcCursos) ?>%;"></div>
       </div>
     </div>
-
     <div class="panel">
       <div class="panel-title">Buscar Cursos regulares</div>
 
@@ -412,7 +498,7 @@ $savedFlag = ($_GET['saved'] ?? '') === '1';
         <?php endforeach; ?>
       </datalist>
 
-      <!-- Filtros Sigla / Denominación + botón Eliminar -->
+      <!-- Filtros Sigla / Denominaci&oacute;n + bot&oacute;n Eliminar -->
       <div class="search-panel mb-3">
         <form method="get" class="row g-2 align-items-end">
           <div class="col-sm-3 col-md-3">
@@ -424,7 +510,7 @@ $savedFlag = ($_GET['saved'] ?? '') === '1';
                    value="<?= e($filtroSigla) ?>">
           </div>
           <div class="col-sm-5 col-md-5">
-            <label class="form-label">Denominación</label>
+            <label class="form-label">Denominaci&oacute;n</label>
             <input type="text"
                    name="denominacion"
                    class="form-control form-control-sm"
@@ -437,7 +523,7 @@ $savedFlag = ($_GET['saved'] ?? '') === '1';
                     style="font-weight:700;">
               Filtrar
             </button>
-            <a href="s3_educacion_cursos.php"
+            <a href="operaciones_educacion_clases.php"
                class="btn btn-outline-success btn-sm w-100"
                style="font-weight:600;">
               Limpiar
@@ -452,19 +538,19 @@ $savedFlag = ($_GET['saved'] ?? '') === '1';
         </form>
       </div>
 
-      <div class="panel-title">Crear Cursos regulares · Educación operacional de cuadros</div>
+      <div class="panel-title">Crear Cursos regulares &middot; Educaci&oacute;n operacional de cuadros</div>
       <div class="panel-sub">
-        Registro de los cursos regulares que impactan en la educación del personal de la unidad.
-        Podés actualizar los datos, listar los participantes y adjuntar la evidencia (orden, plan de curso,
+        Registro de los cursos regulares que impactan en la educaci&oacute;n del personal de la unidad.
+        Pod&eacute;s actualizar los datos, listar los participantes y adjuntar la evidencia (orden, plan de curso,
         certificados, etc.).
       </div>
 
-      <!-- Alta rápida de nuevo curso (con cantidad + participantes dinámicos, sin PDF) -->
+      <!-- Alta r&aacute;pida de nuevo curso (con cantidad + participantes din&aacute;micos, sin PDF) -->
       <form method="post" class="row g-2 align-items-end mb-3">
         <?php if (function_exists('csrf_input')) { echo csrf_input(); } ?>
         <input type="hidden" name="accion" value="nuevo_curso">
 
-        <!-- Primera fila: Sigla, Denominación, Cantidad -->
+        <!-- Primera fila: Sigla, Denominaci&oacute;n, Cantidad -->
         <div class="col-sm-2 col-md-2">
           <label class="form-label text-muted" style="font-size:.78rem;">Sigla</label>
           <input type="text"
@@ -474,7 +560,7 @@ $savedFlag = ($_GET['saved'] ?? '') === '1';
         </div>
 
         <div class="col-sm-5 col-md-5">
-          <label class="form-label text-muted" style="font-size:.78rem;">Denominación</label>
+          <label class="form-label text-muted" style="font-size:.78rem;">Denominaci&oacute;n</label>
           <input type="text"
                  name="nueva_denominacion"
                  class="form-control form-control-sm"
@@ -492,7 +578,7 @@ $savedFlag = ($_GET['saved'] ?? '') === '1';
                  placeholder="0">
         </div>
 
-        <!-- Desde / Hasta / Botón -->
+        <!-- Desde / Hasta / Bot&oacute;n -->
         <div class="col-sm-3 col-md-1">
           <label class="form-label text-muted" style="font-size:.78rem;">Desde</label>
           <input type="date"
@@ -515,11 +601,11 @@ $savedFlag = ($_GET['saved'] ?? '') === '1';
           </button>
         </div>
 
-        <!-- Campos dinámicos de participantes -->
+        <!-- Campos din&aacute;micos de participantes -->
         <div class="col-12 mt-2">
           <label class="form-label text-muted" style="font-size:.78rem;">Participantes</label>
           <div class="row g-2" id="nuevo_participantes_campos">
-            <!-- JS genera los inputs acá -->
+            <!-- JS genera los inputs ac&aacute; -->
           </div>
           <small class="text-secondary d-block mt-1" style="font-size:.72rem;">
             Ingrese el apellido y seleccione del listado sugerido del personal de la unidad.
@@ -527,7 +613,7 @@ $savedFlag = ($_GET['saved'] ?? '') === '1';
         </div>
       </form>
 
-      <!-- Form principal de edición -->
+      <!-- Form principal de edici&oacute;n -->
       <form id="cursosForm" action="save_s3_educacion.php" method="post" enctype="multipart/form-data">
         <?php if (function_exists('csrf_input')) { echo csrf_input(); } ?>
         <input type="hidden" name="section" value="cursos">
@@ -538,11 +624,11 @@ $savedFlag = ($_GET['saved'] ?? '') === '1';
               <tr>
                 <th class="col-sel-header" style="width:40px;">Sel</th>
                 <th style="width:80px;">Sigla</th>
-                <th>Denominación</th>
+                <th>Denominaci&oacute;n</th>
                 <th style="width:220px;">Participantes / PDF</th>
                 <th style="width:90px;">Desde</th>
                 <th style="width:90px;">Hasta</th>
-                <th style="width:120px;">Se cumplió</th>
+                <th style="width:120px;">Se cumpli&oacute;</th>
                 <th style="width:260px;">Evidencia</th>
               </tr>
             </thead>
@@ -556,7 +642,7 @@ $savedFlag = ($_GET['saved'] ?? '') === '1';
                   $cumplio = (string)$c['cumplio'];
                   $doc     = isset($c['documento']) ? (string)$c['documento'] : '';
 
-                  // Buscar TODA la evidencia del curso en el storage (múltiples archivos)
+                  // Buscar toda la evidencia del curso en el storage (m&uacute;ltiples archivos)
                   $evFiles = [];
                   if (is_dir($BASE_DIR . '/' . $DOC_SUBDIR)) {
                       $pattern = $BASE_DIR . '/' . $DOC_SUBDIR . '/curso_' . $id . '_doc_*';
@@ -569,7 +655,7 @@ $savedFlag = ($_GET['saved'] ?? '') === '1';
                   }
                 ?>
                 <tr>
-                  <!-- Selección para borrar -->
+                  <!-- Selecci&oacute;n para borrar -->
                   <td class="text-center col-sel-cell">
                     <input type="radio"
                            name="curso_sel"
@@ -584,7 +670,7 @@ $savedFlag = ($_GET['saved'] ?? '') === '1';
                            value="<?= e($c['sigla']) ?>">
                   </td>
 
-                  <!-- Denominación -->
+                  <!-- Denominaci&oacute;n -->
                   <td>
                     <input type="text"
                            name="cursos_denominacion[<?= $id ?>]"
@@ -621,7 +707,7 @@ $savedFlag = ($_GET['saved'] ?? '') === '1';
                            accept="application/pdf"
                            class="form-control form-control-sm">
                     <small class="text-secondary d-block mt-1" style="font-size:.72rem;">
-                      Listado de participantes (PDF). Podés subir versiones nuevas en guardados sucesivos.
+                      Listado de participantes (PDF). Pod&eacute;s subir versiones nuevas en guardados sucesivos.
                     </small>
                   </td>
 
@@ -641,18 +727,18 @@ $savedFlag = ($_GET['saved'] ?? '') === '1';
                            value="<?= e($c['hasta']) ?>">
                   </td>
 
-                  <!-- Se cumplió -->
+                  <!-- Se cumpli&oacute; -->
                   <td>
                     <select name="cursos_cumplio[<?= $id ?>]"
                             class="form-select form-select-sm">
-                      <option value="" <?= $cumplio===''?'selected':'' ?>>—</option>
-                      <option value="si" <?= $cumplio==='si'?'selected':'' ?>>Sí</option>
+<option value="" <?= $cumplio===''?'selected':'' ?>>&mdash;</option>
+<option value="si" <?= $cumplio==='si'?'selected':'' ?>>S&iacute;</option>
                       <option value="no" <?= $cumplio==='no'?'selected':'' ?>>No</option>
-                      <option value="en_ejecucion" <?= $cumplio==='en_ejecucion'?'selected':'' ?>>En ejecución</option>
+<option value="en_ejecucion" <?= $cumplio==='en_ejecucion'?'selected':'' ?>>En ejecuci&oacute;n</option>
                     </select>
                   </td>
 
-                  <!-- Evidencia (múltiples docs) -->
+                  <!-- Evidencia (m&uacute;ltiples docs) -->
                   <td>
                     <input type="hidden"
                            name="cursos_doc_actual[<?= $id ?>]"
@@ -664,7 +750,7 @@ $savedFlag = ($_GET['saved'] ?? '') === '1';
                           <?php foreach ($evFiles as $idx => $path): ?>
                             <?php $label = basename($path); ?>
                             <?php
-                              $delUrl = 's3_educacion_delete_doc.php?tipo=curso&id='
+                              $delUrl = 'operaciones_educacion_delete_doc.php?tipo=curso&id='
                                         . $id . '&file=' . urlencode(basename($path));
                             ?>
                             <div class="btn-group btn-group-sm mb-1" role="group">
@@ -692,7 +778,7 @@ $savedFlag = ($_GET['saved'] ?? '') === '1';
                            class="form-control form-control-sm ev-input"
                            data-row="curso-<?= $id ?>">
                     <small class="text-secondary d-block mt-1" style="font-size:.72rem;">
-                      Orden, plan de curso, certificados u otra evidencia. Podés subir más de un archivo en guardados sucesivos.
+                      Orden, plan de curso, certificados u otra evidencia. Pod&eacute;s subir m&aacute;s de un archivo en guardados sucesivos.
                     </small>
 
                     <div class="ev-selected small text-info mt-1" id="ev-selected-curso-<?= $id ?>"></div>
@@ -707,7 +793,7 @@ $savedFlag = ($_GET['saved'] ?? '') === '1';
 
         <div class="text-end mt-2">
           <button class="btn btn-success btn-sm" style="font-weight:700;">
-            💾 Guardar cambios
+            Guardar cambios
           </button>
         </div>
       </form>
@@ -723,7 +809,7 @@ $savedFlag = ($_GET['saved'] ?? '') === '1';
   <input type="hidden" name="curso_id" id="deleteCursoId" value="">
 </form>
 
-<!-- Modal tipo tarjeta para confirmar eliminación de curso -->
+<!-- Modal tipo tarjeta para confirmar eliminaci&oacute;n de curso -->
 <div class="modal fade" id="modalConfirmDelete" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content"
@@ -740,7 +826,7 @@ $savedFlag = ($_GET['saved'] ?? '') === '1';
       </div>
       <div class="modal-body">
         <p id="modalDeleteText" class="mb-0" style="font-size:.9rem; color:#bfdbfe;">
-          ¿Seguro que desea eliminar el curso seleccionado?
+          &iquest;Seguro que desea eliminar el curso seleccionado?
         </p>
       </div>
       <div class="modal-footer border-0">
@@ -778,7 +864,7 @@ $savedFlag = ($_GET['saved'] ?? '') === '1';
       </div>
       <div class="modal-body">
         <p class="mb-1" style="font-size:.9rem; color:#bfdbfe;">
-          ¿Seguro que desea eliminar el siguiente archivo?
+          &iquest;Seguro que desea eliminar el siguiente archivo?
         </p>
         <p id="deleteEvidFileName"
            class="fw-bold mb-0"
@@ -804,7 +890,7 @@ $savedFlag = ($_GET['saved'] ?? '') === '1';
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
-// Toast de "guardado correcto" cuando volvés de un POST normal
+// Toast de "guardado correcto" cuando volves de un POST normal
 (function(){
   const wasSaved = <?= $savedFlag ? 'true' : 'false' ?>;
   if (wasSaved && window.bootstrap) {
@@ -863,7 +949,7 @@ $savedFlag = ($_GET['saved'] ?? '') === '1';
       });
 })();
 
-// ===== Eliminar curso seleccionado (modo selección + modal) =====
+// ===== Eliminar curso seleccionado (modo seleccion + modal) =====
 document.addEventListener('DOMContentLoaded', function(){
   const btnDel   = document.getElementById('btnEliminarCurso');
   const formDel  = document.getElementById('deleteCursoForm');
@@ -883,7 +969,7 @@ document.addEventListener('DOMContentLoaded', function(){
 
   btnDel.addEventListener('click', function(){
     if (!deleteMode) {
-      // 1er click: activamos modo selección y mostramos la columna "Sel"
+      // 1er click: activamos modo selecciÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³n y mostramos la columna "Sel"
       deleteMode = true;
       table.classList.add('modo-eliminar');
       btnDel.classList.remove('btn-outline-danger');
@@ -908,14 +994,14 @@ document.addEventListener('DOMContentLoaded', function(){
     bsModal.show();
   });
 
-  // Confirmar eliminación desde el modal
+// Confirmar eliminacion desde el modal
   btnModal.addEventListener('click', function(){
     if (!inputId.value) return;
     formDel.submit();
   });
 });
 
-// === Mostrar nombres de archivos seleccionados (sin guardar aún) ===
+// === Mostrar nombres de archivos seleccionados (sin guardar aun) ===
 (function(){
   function escapeHtml(str){
     return String(str).replace(/[&<>"']/g, function(m){
@@ -945,7 +1031,7 @@ document.addEventListener('DOMContentLoaded', function(){
         html += '<li>' + escapeHtml(f.name) + '</li>';
       });
       html += '</ul>';
-      html += '<div class="text-muted mt-1" style="font-size:.75rem;">Recordá presionar "Guardar" para subirlos.</div>';
+html += '<div class="text-muted mt-1" style="font-size:.75rem;">Record&aacute; presionar "Guardar" para subirlos.</div>';
 
       box.innerHTML = html;
     });
@@ -982,7 +1068,7 @@ document.addEventListener('DOMContentLoaded', function () {
   });
 });
 
-// ===== Campos dinámicos de participantes (según cantidad) =====
+// ===== Campos dinamicos de participantes (segun cantidad) =====
 (function(){
   const inputCant = document.getElementById('nuevo_cant_participantes');
   const cont      = document.getElementById('nuevo_participantes_campos');
@@ -1016,7 +1102,7 @@ document.addEventListener('DOMContentLoaded', function () {
       cont.appendChild(col);
     }
 
-    // Restaurar lo que ya había escrito el usuario
+// Restaurar lo que ya habia escrito el usuario
     const newInputs = cont.querySelectorAll('input[name="participantes_nombres[]"]');
     newInputs.forEach(function(inp, idx){
       if (idx < oldVals.length) {

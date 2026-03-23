@@ -294,17 +294,6 @@ $kpis = [
     ['icon' => 'bi-heart-pulse', 'label' => 'Adiestramiento',    'hechas' => $hechasAdies,   'total' => $totalAdies,   'porc' => $porcAdies],
     ['icon' => 'bi-bullseye',    'label' => 'Tiro',              'hechas' => $hechasTiro,    'total' => $totalTiro,    'porc' => $porcTiro],
 ];
-$sharedBrowseRel = normalize_rel_path((string)($_GET['shared'] ?? ''));
-if ($sharedBrowseRel === null) $sharedBrowseRel = '';
-$sharedState = scan_shared_dir($OPERACIONES_ROOT_ABS, $sharedBrowseRel);
-$sharedSegments = [];
-if ($sharedState['ok'] && $sharedState['current'] !== '') {
-    $acc = [];
-    foreach (explode('/', (string)$sharedState['current']) as $seg) {
-        $acc[] = $seg;
-        $sharedSegments[] = ['name' => $seg, 'rel' => implode('/', $acc)];
-    }
-}
 ?>
 <!doctype html>
 <html lang="es">
@@ -613,43 +602,53 @@ body {
     border-radius: var(--radius-md);
     color:         var(--c-sub);
 }
-.shared-panel{
-    margin: 18px 0 20px;
-    background: rgba(15,23,42,.82);
-    border: 1px solid rgba(148,163,184,.28);
-    border-radius: 18px;
-    padding: 18px;
+.quick-access-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fit, minmax(210px, 1fr));
+    gap:12px;
+    margin:16px 0 18px;
 }
-.shared-toolbar{
-    display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;
-    margin-bottom:12px;
+.quick-access-card{
+    display:flex;
+    align-items:flex-start;
+    gap:12px;
+    padding:14px 16px;
+    border-radius:16px;
+    text-decoration:none;
+    background:rgba(15,23,42,.82);
+    border:1px solid rgba(148,163,184,.28);
+    color:var(--c-text);
+    transition:transform var(--transition), border-color var(--transition), box-shadow var(--transition);
 }
-.shared-path{
-    display:flex; flex-wrap:wrap; gap:6px; align-items:center; font-size:.86rem; color:#cbd5e1;
+.quick-access-card:hover{
+    transform:translateY(-2px);
+    border-color:rgba(34,197,94,.45);
+    box-shadow:0 14px 30px rgba(0,0,0,.32);
+    color:#f8fafc;
 }
-.shared-path a{ color:#7dd3fc; text-decoration:none; }
-.shared-table{
-    width:100%; border-collapse:collapse; overflow:hidden; border-radius:12px;
+.quick-access-icon{
+    width:48px;
+    height:48px;
+    flex:0 0 48px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    border-radius:14px;
+    background:rgba(34,197,94,.18);
+    color:#bbf7d0;
+    font-size:1.35rem;
 }
-.shared-table th, .shared-table td{
-    padding:10px 12px; border-bottom:1px solid rgba(148,163,184,.16); text-align:left; font-size:.84rem;
+.quick-access-title{
+    font-size:.92rem;
+    font-weight:900;
+    margin-bottom:2px;
 }
-.shared-table th{
-    color:#93c5fd; background:rgba(30,41,59,.92); font-weight:800;
+.quick-access-desc{
+    font-size:.8rem;
+    color:var(--c-sub);
+    line-height:1.45;
 }
-.shared-table td{ color:#e5e7eb; }
-.shared-table tr:hover td{ background:rgba(59,130,246,.08); }
-.shared-name{ display:flex; align-items:center; gap:10px; min-width:0; }
-.shared-icon{ width:28px; text-align:center; font-size:1rem; }
-.shared-link{
-    color:#e5e7eb; text-decoration:none; font-weight:700;
-    overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
-}
-.shared-link:hover{ color:#7dd3fc; }
-.shared-meta{ color:#94a3b8; font-size:.75rem; }
-.shared-empty{
-    padding:18px; border:1px dashed rgba(148,163,184,.24); border-radius:12px; color:#94a3b8;
-}
+.shared-panel{ display:none; }
 </style>
 </head>
 <body>
@@ -691,6 +690,16 @@ body {
       <div class="panel-sub">
         Seleccioná el eje de trabajo correspondiente. Este panel se alinea a la Sección III (S-3):
         organización, educación, operaciones, movimientos y doctrina (PON, SILEAP, reglamentos).
+      </div>
+
+      <div class="quick-access-grid">
+        <a class="quick-access-card" href="./operacionescarpetacompartida.php">
+          <div class="quick-access-icon"><i class="bi bi-folder2-open"></i></div>
+          <div>
+            <div class="quick-access-title">Carpeta compartida</div>
+            <div class="quick-access-desc">Abrí el explorador de archivos de Operaciones en una pantalla separada.</div>
+          </div>
+        </a>
       </div>
 
       <div class="shared-panel" id="shared-browser">

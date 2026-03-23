@@ -4,7 +4,8 @@ declare(strict_types=1);
 
 /**
  * db.php (modo PRO)
- * - Soporta variables de entorno: DB_HOST, DB_NAME, DB_USER, DB_PASS
+ * - Soporta variables de entorno: EA_DB_HOST/PORT/NAME/USER/PASS
+ * - Mantiene compatibilidad con DB_HOST, DB_NAME, DB_USER, DB_PASS
  * - Mantiene compatibilidad: expone $pdo global
  * - Evita repetir conexiones con static singleton
  *
@@ -18,17 +19,35 @@ function getDB(): PDO
     static $pdo = null;
     if ($pdo instanceof PDO) return $pdo;
 
-    // Defaults razonables
-    $host = getenv('DB_HOST') ?: '127.0.0.1';
-    $name = getenv('DB_NAME') ?: 'inspecciones';
-    $user = getenv('DB_USER') ?: 'root';
+    $envOr = static function (string $primary, ?string $legacy, string $default): string {
+        $value = getenv($primary);
+        if ($value === false && $legacy !== null) {
+            $value = getenv($legacy);
+        }
+        if ($value === false) {
+            return $default;
+        }
+        $value = trim((string)$value);
+        return $value === '' ? $default : $value;
+    };
+
+    // Defaults alineados con la configuracion principal del sistema.
+    $host = $envOr('EA_DB_HOST', 'DB_HOST', '127.0.0.1');
+    $port = (int)$envOr('EA_DB_PORT', null, '3306');
+    $name = $envOr('EA_DB_NAME', 'DB_NAME', 'unidad');
+    $user = $envOr('EA_DB_USER', 'DB_USER', 'root');
 
     // DB_PASS: si no existe la env var, queda '' (compatibilidad).
     // Recomendado: SETEAR DB_PASS en el servidor.
-    $pass = getenv('DB_PASS');
-    if ($pass === false) $pass = '';
+    $pass = getenv('EA_DB_PASS');
+    if ($pass === false) {
+        $pass = getenv('DB_PASS');
+    }
+    if ($pass === false) {
+        $pass = '';
+    }
 
-    $dsn = "mysql:host={$host};dbname={$name};charset=utf8mb4";
+    $dsn = "mysql:host={$host};port={$port};dbname={$name};charset=utf8mb4";
 
     $pdo = new PDO($dsn, $user, $pass, [
         PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,

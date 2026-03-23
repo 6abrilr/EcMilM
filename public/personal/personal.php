@@ -599,13 +599,7 @@ if ($sharedState['ok'] && $sharedState['current'] !== '') {
   .s-kpi-main{ font-size:1.05rem; font-weight:900; display:flex; align-items:center; gap:.45rem; }
   .s-kpi-sub{ font-size:.78rem; color:#cbd5f5; }
   .progress{ background:rgba(15,23,42,.9); }
-  .shared-panel{
-    margin: 22px 0 10px;
-    background: rgba(15,23,42,.82);
-    border: 1px solid rgba(148,163,184,.28);
-    border-radius: 18px;
-    padding: 18px;
-  }
+  .shared-panel{ display:none; }
   .shared-toolbar{
     display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;
     margin-bottom:12px;
@@ -631,6 +625,52 @@ if ($sharedState['ok'] && $sharedState['current'] !== '') {
   .shared-meta{ color:#94a3b8; font-size:.75rem; }
   .shared-empty{
     padding:18px; border:1px dashed rgba(148,163,184,.24); border-radius:12px; color:#94a3b8;
+  }
+  .quick-access-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fit, minmax(210px, 1fr));
+    gap:12px;
+    margin:16px 0 18px;
+  }
+  .quick-access-card{
+    display:flex;
+    align-items:flex-start;
+    gap:12px;
+    padding:14px 16px;
+    border-radius:16px;
+    text-decoration:none;
+    background:rgba(15,23,42,.82);
+    border:1px solid rgba(148,163,184,.28);
+    color:#e5e7eb;
+    transition:transform .18s ease, border-color .18s ease, box-shadow .18s ease;
+  }
+  .quick-access-card:hover{
+    transform:translateY(-2px);
+    border-color:rgba(34,197,94,.45);
+    box-shadow:0 14px 30px rgba(0,0,0,.32);
+    color:#f8fafc;
+  }
+  .quick-access-icon{
+    width:48px;
+    height:48px;
+    flex:0 0 48px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    border-radius:14px;
+    background:rgba(34,197,94,.18);
+    color:#bbf7d0;
+    font-size:1.35rem;
+  }
+  .quick-access-title{
+    font-size:.92rem;
+    font-weight:900;
+    margin-bottom:2px;
+  }
+  .quick-access-desc{
+    font-size:.8rem;
+    color:#cbd5f5;
+    line-height:1.45;
   }
 
   /* Donut */
@@ -726,6 +766,16 @@ if ($sharedState['ok'] && $sharedState['current'] !== '') {
       <div class="panel-sub">
         Seleccioná el módulo correspondiente. Este panel consolida información de personal y deja
         preparados accesos a funciones típicas de S-1 (documentación, mesa de entradas/salidas, disciplina).
+      </div>
+
+      <div class="quick-access-grid">
+        <a class="quick-access-card" href="./personalcarpetacompartida.php">
+          <div class="quick-access-icon"><i class="bi bi-folder2-open"></i></div>
+          <div>
+            <div class="quick-access-title">Carpeta compartida</div>
+            <div class="quick-access-desc">Entrá al explorador de archivos de Personal desde una vista separada.</div>
+          </div>
+        </a>
       </div>
 
       <div class="layout-s-row">

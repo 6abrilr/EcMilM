@@ -11,7 +11,7 @@ if (!$OFFLINE_MODE) {
     require_login();
 }
 require_once __DIR__ . '/../config/db.php';
-require_once __DIR__ . '/s3_educacion_tables_helper.php';
+require_once __DIR__ . '/operaciones_educacion_tables_helper.php';
 
 /** @var PDO $pdo */
 s3_ensure_tables($pdo);

@@ -379,6 +379,52 @@ try {
     padding:12px;
     color:#cbd5f5;
   }
+  .quick-access-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fit, minmax(210px, 1fr));
+    gap:12px;
+    margin:16px 0 18px;
+  }
+  .quick-access-card{
+    display:flex;
+    align-items:flex-start;
+    gap:12px;
+    padding:14px 16px;
+    border-radius:16px;
+    text-decoration:none;
+    background:rgba(15,23,42,.82);
+    border:1px solid rgba(148,163,184,.28);
+    color:#e5e7eb;
+    transition:transform .18s ease, border-color .18s ease, box-shadow .18s ease;
+  }
+  .quick-access-card:hover{
+    transform:translateY(-2px);
+    border-color:rgba(59,130,246,.45);
+    box-shadow:0 14px 30px rgba(0,0,0,.32);
+    color:#f8fafc;
+  }
+  .quick-access-icon{
+    width:48px;
+    height:48px;
+    flex:0 0 48px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    border-radius:14px;
+    background:rgba(59,130,246,.18);
+    color:#bfdbfe;
+    font-size:1.35rem;
+  }
+  .quick-access-title{
+    font-size:.92rem;
+    font-weight:900;
+    margin-bottom:2px;
+  }
+  .quick-access-desc{
+    font-size:.8rem;
+    color:#cbd5f5;
+    line-height:1.45;
+  }
   code{ color:#e5e7eb; }
 </style>
 </head>
@@ -417,6 +463,16 @@ try {
       <div class="panel-sub">
         Panel de Inteligencia orientado a: enemigo/oponente, terreno y meteorología, producción y distribución de inteligencia,
         y medidas de seguridad de contrainteligencia (CI) para la protección del elemento.
+      </div>
+
+      <div class="quick-access-grid">
+        <a class="quick-access-card" href="./inteligenciacarpetacompartida.php">
+          <div class="quick-access-icon"><i class="bi bi-folder2-open"></i></div>
+          <div>
+            <div class="quick-access-title">Carpeta compartida</div>
+            <div class="quick-access-desc">Abrí el explorador de archivos de Inteligencia desde una página separada.</div>
+          </div>
+        </a>
       </div>
 
       <div class="layout-s-row">

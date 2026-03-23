@@ -1,5 +1,5 @@
 <?php
-// public/s3_educacion_cuadros.php — Panel principal S-3 Educación
+// public/s3_educacion_cuadros.php Ã¢â‚¬â€ Panel principal S-3 EducaciÃƒÂ³n
 declare(strict_types=1);
 
 $OFFLINE_MODE = false;
@@ -7,20 +7,20 @@ $OFFLINE_MODE = false;
 require_once __DIR__ . '/../../auth/bootstrap.php';
 require_once __DIR__ . '/../config/db.php';
 require_once __DIR__ . '/../../includes/operaciones_helper.php';
-require_once __DIR__ . '/s3_educacion_tables_helper.php';
+require_once __DIR__ . '/operaciones_educacion_tables_helper.php';
 
 if (!$OFFLINE_MODE) {
     operaciones_require_login();
 }
 
-s3_ensure_tables($pdo);
+operaciones_educacion_ensure_tables($pdo);
 
 $esAdmin = operaciones_es_admin($pdo);
 $modoResumido = !$esAdmin;
 
 $ASSET_WEB = operaciones_assets_url();
 $IMG_BG    = operaciones_assets_url('img/fondo.png');
-$ESCUDO    = operaciones_assets_url('img/escudo_bcom602.png');
+$ESCUDO    = operaciones_assets_url('../../assets/img/ecmilm.png');
 
 function e($v){ return operaciones_e($v); }
 
@@ -35,7 +35,7 @@ function kpi(PDO $p, string $tbl): float {
         if ((int)$row['tot'] === 0) return 0.0;
         return round(((int)$row['ok'] * 100) / (int)$row['tot'], 1);
     } catch (Throwable $e) {
-        // Si la tabla no existe o hay cualquier error, no rompemos la página.
+        // Si la tabla no existe o hay cualquier error, no rompemos la pÃƒÂ¡gina.
         return 0.0;
     }
 }
@@ -51,11 +51,11 @@ $pctCursosCompl  = kpi($pdo, 's3_cursos_complementarios'); // NUEVO KPI
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<title>S-3 · Educación operacional de cuadros · B Com 602</title>
+<title>Educaci&oacute;n operacional de cuadros</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 <link rel="stylesheet" href="../assets/css/theme-602.css">
-<link rel="icon" href="../assets/img/bcom602.png">
+<link rel="icon" href="../../assets/img/ecmilm.png">
 <style>
   :root{
     --bg-dark: #020617;
@@ -160,7 +160,7 @@ $pctCursosCompl  = kpi($pdo, 's3_cursos_complementarios'); // NUEVO KPI
     color:white;
   }
 
-  /* ===== Título sección ===== */
+  /* ===== Titulo seccion ===== */
 
   .section-header{
     margin-bottom:22px;
@@ -358,15 +358,15 @@ $pctCursosCompl  = kpi($pdo, 's3_cursos_complementarios'); // NUEVO KPI
 <header class="brand-hero">
   <div class="hero-inner">
     <div class="brand-left">
-      <img src="<?= e($ESCUDO) ?>" class="brand-logo" alt="Escudo B Com 602">
+      <img src="<?= e($ESCUDO) ?>" class="brand-logo" alt="Escudo Ec Mil M">
       <div>
-        <div class="brand-title">Batallón de Comunicaciones 602</div>
-        <div class="brand-sub">“Hogar de las Comunicaciones Fijas del Ejército”</div>
+        <div class="brand-title">Escuela Militar de Monta&ntilde;a</div>
+        <div class="brand-sub">&ldquo;La monta&ntilde;a nos une&rdquo;</div>
       </div>
     </div>
     <div class="header-back">
       <a href="areas.php" class="btn btn-ghost">
-        ⬅ Volver a Áreas
+        &larr; Volver a &Aacute;reas
       </a>
     </div>
   </div>
@@ -377,12 +377,12 @@ $pctCursosCompl  = kpi($pdo, 's3_cursos_complementarios'); // NUEVO KPI
 
     <div class="section-header">
       <div class="section-kicker">
-        <span class="sk-text">S-3 · OPERACIONES</span>
+        <span class="sk-text">S-3 &middot; OPERACIONES</span>
       </div>
-      <div class="section-title">Educación operacional de cuadros</div>
+      <div class="section-title">Educaci&oacute;n operacional de cuadros</div>
       <p class="section-sub mb-0">
-        Visión rápida del avance en clases, trabajos de gabinete, alocuciones,
-        cursos regulares y cursos complementarios. Seleccione un módulo para
+        Visi&oacute;n r&aacute;pida del avance en clases, trabajos de gabinete, alocuciones,
+        cursos regulares y cursos complementarios. Seleccione un m&oacute;dulo para
         editar el detalle y adjuntar evidencias.
       </p>
     </div>
@@ -391,15 +391,15 @@ $pctCursosCompl  = kpi($pdo, 's3_cursos_complementarios'); // NUEVO KPI
 
       <!-- Clases -->
       <div>
-        <a href="s3_educacion_clases.php" class="card-link">
+        <a href="operaciones_educacion_clases.php" class="card-link">
           <article class="card-s3">
             <div class="card-topline">
               <div>
                 <div class="card-title">Clases (Programa anual)</div>
-                <div class="card-sub">Plan anual de educación de la unidad.</div>
+                <div class="card-sub">Plan anual de educaci&oacute;n de la unidad.</div>
               </div>
               <div class="d-flex flex-column align-items-end gap-1">
-                <div class="card-icon">📚</div>
+                <div class="card-icon">&#128218;</div>
                 <span class="card-pill">Programa</span>
               </div>
             </div>
@@ -419,15 +419,15 @@ $pctCursosCompl  = kpi($pdo, 's3_cursos_complementarios'); // NUEVO KPI
 
       <!-- Trabajos de gabinete -->
       <div>
-        <a href="s3_educacion_trabajos.php" class="card-link">
+        <a href="operaciones_educacion_trabajos.php" class="card-link">
           <article class="card-s3">
             <div class="card-topline">
               <div>
                 <div class="card-title">Trabajos de gabinete</div>
-                <div class="card-sub">Investigación y trabajos asignados a cuadros.</div>
+                <div class="card-sub">Investigaci&oacute;n y trabajos asignados a cuadros.</div>
               </div>
               <div class="d-flex flex-column align-items-end gap-1">
-                <div class="card-icon">🧠</div>
+                <div class="card-icon">&#129504;</div>
                 <span class="card-pill">Estudio</span>
               </div>
             </div>
@@ -447,15 +447,15 @@ $pctCursosCompl  = kpi($pdo, 's3_cursos_complementarios'); // NUEVO KPI
 
       <!-- Alocuciones -->
       <div>
-        <a href="s3_educacion_alocuciones.php" class="card-link">
+        <a href="operaciones_educacion_alocuciones.php" class="card-link">
           <article class="card-s3">
             <div class="card-topline">
               <div>
                 <div class="card-title">Alocuciones</div>
-                <div class="card-sub">Acontecimientos, efemérides y responsables.</div>
+                <div class="card-sub">Acontecimientos, efem&eacute;rides y responsables.</div>
               </div>
               <div class="d-flex flex-column align-items-end gap-1">
-                <div class="card-icon">🎙️</div>
+                <div class="card-icon">&#127897;</div>
                 <span class="card-pill">Formaciones</span>
               </div>
             </div>
@@ -475,7 +475,7 @@ $pctCursosCompl  = kpi($pdo, 's3_cursos_complementarios'); // NUEVO KPI
 
       <!-- Cursos regulares -->
       <div>
-        <a href="s3_educacion_cursos.php" class="card-link">
+        <a href="operaciones_educacion_cursos.php" class="card-link">
           <article class="card-s3">
             <div class="card-topline">
               <div>
@@ -483,7 +483,7 @@ $pctCursosCompl  = kpi($pdo, 's3_cursos_complementarios'); // NUEVO KPI
                 <div class="card-sub">CBPM, CAEMD y otros cursos de perfeccionamiento.</div>
               </div>
               <div class="d-flex flex-column align-items-end gap-1">
-                <div class="card-icon">🎓</div>
+                <div class="card-icon">&#127891;</div>
               </div>
             </div>
             <div class="card-footer">
@@ -502,15 +502,15 @@ $pctCursosCompl  = kpi($pdo, 's3_cursos_complementarios'); // NUEVO KPI
 
       <!-- Cursos complementarios -->
       <div>
-        <a href="s3_educacion_cursos_complementarios.php" class="card-link">
+        <a href="operaciones_educacion_cursos_complementarios.php" class="card-link">
           <article class="card-s3">
             <div class="card-topline">
               <div>
                 <div class="card-title">Cursos complementarios</div>
-                <div class="card-sub">Seminarios, cursos externos y capacitación adicional.</div>
+                <div class="card-sub">Seminarios, cursos externos y capacitaci&oacute;n adicional.</div>
               </div>
               <div class="d-flex flex-column align-items-end gap-1">
-                <div class="card-icon">🎓</div>
+                <div class="card-icon">&#127891;</div>
               </div>
             </div>
             <div class="card-footer">

@@ -366,6 +366,52 @@ $porcGlobal = $kpiTotalDemo > 0 ? $porcAbast : 0.0;
     font-size:.84rem;
   }
   .s4-doctrina li{ margin:6px 0; }
+  .quick-access-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fit, minmax(210px, 1fr));
+    gap:12px;
+    margin:16px 0 18px;
+  }
+  .quick-access-card{
+    display:flex;
+    align-items:flex-start;
+    gap:12px;
+    padding:14px 16px;
+    border-radius:16px;
+    text-decoration:none;
+    background:rgba(15,23,42,.82);
+    border:1px solid rgba(148,163,184,.28);
+    color:#e5e7eb;
+    transition:transform .18s ease, border-color .18s ease, box-shadow .18s ease;
+  }
+  .quick-access-card:hover{
+    transform:translateY(-2px);
+    border-color:rgba(59,130,246,.45);
+    box-shadow:0 14px 30px rgba(0,0,0,.32);
+    color:#f8fafc;
+  }
+  .quick-access-icon{
+    width:48px;
+    height:48px;
+    flex:0 0 48px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    border-radius:14px;
+    background:rgba(59,130,246,.18);
+    color:#bfdbfe;
+    font-size:1.35rem;
+  }
+  .quick-access-title{
+    font-size:.92rem;
+    font-weight:900;
+    margin-bottom:2px;
+  }
+  .quick-access-desc{
+    font-size:.8rem;
+    color:#cbd5f5;
+    line-height:1.45;
+  }
 </style>
 </head>
 <body>
@@ -403,6 +449,16 @@ $porcGlobal = $kpiTotalDemo > 0 ? $porcAbast : 0.0;
       <div class="panel-sub">
         Seleccioná el módulo correspondiente. Este panel consolida información del área de <strong>Material</strong> (S-4)
         y deja preparados accesos a funciones típicas: abastecimiento, mantenimiento, transporte y construcciones.
+      </div>
+
+      <div class="quick-access-grid">
+        <a class="quick-access-card" href="./materialescarpetacompartida.php">
+          <div class="quick-access-icon"><i class="bi bi-folder2-open"></i></div>
+          <div>
+            <div class="quick-access-title">Carpeta compartida</div>
+            <div class="quick-access-desc">Abrí el explorador de archivos del área Materiales en una vista separada.</div>
+          </div>
+        </a>
       </div>
 
       <div class="layout-s-row">
@@ -619,4 +675,3 @@ $porcGlobal = $kpiTotalDemo > 0 ? $porcAbast : 0.0;
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
-

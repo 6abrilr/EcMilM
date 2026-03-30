@@ -246,6 +246,14 @@ try {
 // módulos adicionales fijos
 $s1_modules = array_merge($s1_modules, [
     [
+        'id' => 'civil',
+        'icon' => 'bi-person-workspace',
+        'title' => 'Ingreso y egreso de personal civil',
+        'desc'  => 'Importar padrón civil y registros diarios o semanales para calcular horas trabajadas.',
+        'url'   => 'personal_civil_asistencia.php',
+        'enabled' => true,
+    ],
+    [
         'id' => 'orden',
         'icon' => 'bi-file-earmark-text',
         'title' => 'Orden del día',

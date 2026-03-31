@@ -7705,6 +7705,8 @@ CREATE TABLE `personal_unidad` (
   `parte_enfermo_hasta` date DEFAULT NULL,
   `cantidad_parte_enfermo` int DEFAULT NULL,
   `destino_interno` varchar(255) COLLATE utf8mb4_general_ci DEFAULT NULL,
+  `rol_combate` varchar(255) COLLATE utf8mb4_general_ci DEFAULT NULL,
+  `rol_administrativo` varchar(255) COLLATE utf8mb4_general_ci DEFAULT NULL,
   `rol` varchar(255) COLLATE utf8mb4_general_ci DEFAULT NULL,
   `anios_en_destino` decimal(5,2) DEFAULT NULL,
   `fracc` varchar(60) COLLATE utf8mb4_general_ci DEFAULT NULL,

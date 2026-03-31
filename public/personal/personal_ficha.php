@@ -34,6 +34,16 @@ function columns(PDO $pdo, string $t): array {
     $s=$pdo->prepare("SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME=:t");
     $s->execute([':t'=>$t]); $m=[]; foreach($s->fetchAll(PDO::FETCH_COLUMN) as $c) $m[$c]=true; return $m;
 }
+function ensure_personal_extra_columns(PDO $pdo): void {
+    if (!table_exists($pdo, 'personal_unidad')) return;
+    $cols = columns($pdo, 'personal_unidad');
+    if (!isset($cols['usuario_intranet'])) {
+        $pdo->exec("ALTER TABLE personal_unidad ADD COLUMN usuario_intranet VARCHAR(120) NULL AFTER alias_banco");
+    }
+    if (!isset($cols['usuario_gde'])) {
+        $pdo->exec("ALTER TABLE personal_unidad ADD COLUMN usuario_gde VARCHAR(120) NULL AFTER usuario_intranet");
+    }
+}
 function date_or_null(string $v): ?string {
     $v=trim($v); if($v==='') return null; $ts=strtotime($v); return $ts!==false?date('Y-m-d',$ts):null;
 }
@@ -49,6 +59,7 @@ function fmt_bytes(?int $b): string {
     $u=['B','KB','MB','GB']; $i=0; $v=(float)$b;
     while($v>=1024&&$i<3){$v/=1024;$i++;} return rtrim(rtrim(number_format($v,2,'.',''),'0'),'.') .' '.$u[$i];
 }
+ensure_personal_extra_columns($pdo);
 
 /** Nombre de archivo para foto: APELLIDO_NOMBRE_YYYYMMDD_id.ext */
 function foto_filename(string $apellidoNombre, int $pid, string $ext): string {
@@ -151,6 +162,7 @@ if (!is_file($SINFOTO_ABS)) {
 $id  = (int)($_GET['id']  ?? 0);
 $q   = trim((string)($_GET['q'] ?? ''));
 $tab = trim((string)($_GET['tab'] ?? 'ficha'));
+if (!in_array($tab, ['ficha','sanidad','docs'], true)) $tab = 'ficha';
 
 $mensajeOk = ''; $mensajeError = '';
 
@@ -175,14 +187,27 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
             $dom      = trim((string)($_POST['domicilio']   ??''));
             $ec       = trim((string)($_POST['estado_civil']??''));
             $hijos    = ($_POST['hijos']??'')===''?null:(int)$_POST['hijos'];
+            $peso     = ($_POST['peso']??'')===''?null:(float)$_POST['peso'];
+            $altura   = ($_POST['altura']??'')===''?null:(float)$_POST['altura'];
+            $nou      = trim((string)($_POST['nou']??''));
             $dest     = trim((string)($_POST['destino_interno']??''));
             $destId   = ($_POST['destino_id']??'')===''?null:(int)$_POST['destino_id'];
+            $rolComb  = trim((string)($_POST['rol_combate']??''));
+            $rolAdm   = trim((string)($_POST['rol_administrativo']??''));
+            $aniosDest= ($_POST['anios_en_destino']??'')===''?null:(float)$_POST['anios_en_destino'];
+            $fracc    = trim((string)($_POST['fracc']??''));
             $jerarq   = trim((string)($_POST['jerarquia']   ??''));
             $func     = trim((string)($_POST['funcion']     ??''));
             $tel      = trim((string)($_POST['telefono']    ??''));
             $cor      = trim((string)($_POST['correo']      ??''));
+            $usuarioIntranet = trim((string)($_POST['usuario_intranet'] ?? ''));
+            $usuarioGde = trim((string)($_POST['usuario_gde'] ?? ''));
+            $nroCta   = trim((string)($_POST['nro_cta']??''));
+            $cbu      = trim((string)($_POST['cbu']??''));
+            $aliasBanco = trim((string)($_POST['alias_banco']??''));
             $obs      = trim((string)($_POST['observaciones']??''));
             $fnacAlt  = date_or_null((string)($_POST['fecha_alta']??''));
+            $anexo27  = date_or_null((string)($_POST['fecha_ultimo_anexo27']??''));
 
             if($apnom==='') throw new RuntimeException('Apellido y Nombre es obligatorio.');
             if($dni==='')   throw new RuntimeException('DNI es obligatorio.');
@@ -190,20 +215,24 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
             $pdo->prepare("
                 UPDATE personal_unidad SET
                   grado=:grado, arma=:arma, apellido_nombre=:apnom, dni=:dni, cuil=:cuil,
-                  fecha_nac=:fnac, sexo=:sexo, domicilio=:dom, estado_civil=:ec, hijos=:hijos,
-                  destino_interno=:dest, destino_id=:destId, jerarquia=:jer,
-                  funcion=:fun, telefono=:tel, correo=:cor,
-                  fecha_alta=:falta, observaciones=:obs,
+                  fecha_nac=:fnac, peso=:peso, altura=:altura, sexo=:sexo, domicilio=:dom, estado_civil=:ec, hijos=:hijos,
+                  nou=:nou, destino_interno=:dest, destino_id=:destId, rol_combate=:rolComb, rol_administrativo=:rolAdm,
+                  anios_en_destino=:aniosDest, fracc=:fracc, jerarquia=:jer,
+                  funcion=:fun, telefono=:tel, correo=:cor, usuario_intranet=:usrIntra, usuario_gde=:usrGde,
+                  nro_cta=:nroCta, cbu=:cbu, alias_banco=:aliasBanco,
+                  fecha_alta=:falta, fecha_ultimo_anexo27=:anexo27, observaciones=:obs,
                   updated_at=NOW(), updated_by_id=:ubid
                 WHERE id=:id AND unidad_id=:uid LIMIT 1
             ")->execute([
                 ':grado'=>$grado?:null, ':arma'=>$arma?:null, ':apnom'=>$apnom,
-                ':dni'=>$dni, ':cuil'=>$cuil?:null, ':fnac'=>$fnac,
+                ':dni'=>$dni, ':cuil'=>$cuil?:null, ':fnac'=>$fnac, ':peso'=>$peso, ':altura'=>$altura,
                 ':sexo'=>$sexo?:null, ':dom'=>$dom?:null, ':ec'=>$ec?:null,
-                ':hijos'=>$hijos, ':dest'=>$dest?:null, ':destId'=>$destId,
+                ':hijos'=>$hijos, ':nou'=>$nou?:null, ':dest'=>$dest?:null, ':destId'=>$destId,
+                ':rolComb'=>$rolComb?:null, ':rolAdm'=>$rolAdm?:null, ':aniosDest'=>$aniosDest, ':fracc'=>$fracc?:null,
                 ':jer'=>$jerarq?:null, ':fun'=>$func?:null,
-                ':tel'=>$tel?:null, ':cor'=>$cor?:null,
-                ':falta'=>$fnacAlt, ':obs'=>$obs?:null,
+                ':tel'=>$tel?:null, ':cor'=>$cor?:null, ':usrIntra'=>$usuarioIntranet?:null, ':usrGde'=>$usuarioGde?:null,
+                ':nroCta'=>$nroCta?:null, ':cbu'=>$cbu?:null, ':aliasBanco'=>$aliasBanco?:null,
+                ':falta'=>$fnacAlt, ':anexo27'=>$anexo27, ':obs'=>$obs?:null,
                 ':ubid'=>$personalId?:null, ':id'=>$pid, ':uid'=>$unidadActiva,
             ]);
             $mensajeOk='Datos actualizados correctamente.'; $id=$pid; $tab='ficha';
@@ -287,9 +316,6 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
             $titulo = trim((string)($_POST['titulo']??''));
             $nota   = trim((string)($_POST['nota']  ??''));
             $fecha  = date_or_null((string)($_POST['fecha']??''));
-            $evId   = isset($colsPD['evento_id'])?(int)($_POST['evento_id']??0):0;
-            if($evId<=0) $evId=null;
-
             $carpRel = $DOCS_REL_DIR . '/' . $pid;
             $carpAbs = $ROOT . '/' . $carpRel;
             if(!is_dir($carpAbs)) @mkdir($carpAbs,0775,true);
@@ -310,7 +336,6 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
             $params=[':uid'=>$unidadActiva,':pid'=>$pid,':tipo'=>$tipo?:null,
                      ':tit'=>$titulo?:null,':path'=>$destRel,':nota'=>$nota?:null,
                      ':fecha'=>$fecha,':cbid'=>$personalId?:null];
-            if(isset($colsPD['evento_id'])){$fields[]='evento_id';$vals[]=':eid';$params[':eid']=$evId;}
             if(isset($colsPD['original_name'])){$fields[]='original_name';$vals[]=':on';$params[':on']=$origName;}
             if(isset($colsPD['mime'])){$fields[]='mime';$vals[]=':mm';$params[':mm']=$mime;}
             if(isset($colsPD['bytes'])){$fields[]='bytes';$vals[]=':by';$params[':by']=$bytes!==false?(int)$bytes:null;}
@@ -323,6 +348,25 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
         }
 
         /* ── Guardar sanidad ── */
+        if ($accion==='guardar_observacion_documento') {
+            $docId=(int)($_POST['doc_id']??0);
+            $pid=(int)($_POST['personal_id']??0);
+            if($docId<=0||$pid<=0) throw new RuntimeException('ParÃ¡metros invÃ¡lidos.');
+
+            $nota=trim((string)($_POST['nota']??''));
+            $pdo->prepare("UPDATE personal_documentos
+                           SET nota=:nota
+                           WHERE id=:id AND unidad_id=:u AND personal_id=:p LIMIT 1")
+                ->execute([
+                    ':nota'=>$nota!==''?$nota:null,
+                    ':id'=>$docId,
+                    ':u'=>$unidadActiva,
+                    ':p'=>$pid,
+                ]);
+
+            $mensajeOk='ObservaciÃ³n actualizada.'; $id=$pid; $tab='docs';
+        }
+
         if ($accion==='guardar_sanidad') {
             $pid=(int)($_POST['personal_id']??0);
             if($pid<=0) throw new RuntimeException('ID inválido.');
@@ -623,11 +667,18 @@ function _sync_sanidad(PDO $pdo, array $colsPD, array $colsSan, int $uid, int $p
 /* ═══════════════════════ CARGA DE DATOS ═════════════════════════════════ */
 $persona=null; $fotoUrl=''; $listado=[];
 $docs=[]; $sanidadUltimo=null; $sanidadHist=[]; $evidBySanidad=[]; $eventos=[];
-$destinosAll=[]; // Para el select de destino en ficha
+$destinosAll=[]; // Para sugerencias de destino interno en ficha
 
 try {
-    // Destinos de la unidad (para el selector)
-    $st=$pdo->prepare("SELECT id, codigo, nombre FROM destino WHERE unidad_id=:u AND activo=1 ORDER BY nombre ASC");
+    // Destinos internos ya usados en el personal de la unidad
+    $st=$pdo->prepare("
+        SELECT DISTINCT TRIM(destino_interno) AS nombre
+        FROM personal_unidad
+        WHERE unidad_id=:u
+          AND destino_interno IS NOT NULL
+          AND TRIM(destino_interno) <> ''
+        ORDER BY nombre ASC
+    ");
     $st->execute([':u'=>$unidadActiva]);
     $destinosAll=$st->fetchAll(PDO::FETCH_ASSOC)?:[];
 
@@ -916,7 +967,6 @@ function evento_badge(string $tipo): string {
     $parteIni    = $persona['parte_enfermo_desde']??null;
     $parteFin    = $persona['parte_enfermo_hasta']??null;
     $cantParte   = (int)($persona['cantidad_parte_enfermo']??0);
-    $destinoId   = (int)($persona['destino_id']??0);
 ?>
 
   <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-2">
@@ -934,9 +984,6 @@ function evento_badge(string $tipo): string {
     <a class="tab-pill <?= $tab==='ficha'?'active':'' ?>" href="?id=<?= $id ?>&tab=ficha"><i class="bi bi-person-vcard"></i> Datos</a>
     <a class="tab-pill <?= $tab==='sanidad'?'active':'' ?>" href="?id=<?= $id ?>&tab=sanidad"><i class="bi bi-heart-pulse"></i> Sanidad</a>
     <a class="tab-pill <?= $tab==='docs'?'active':'' ?>" href="?id=<?= $id ?>&tab=docs"><i class="bi bi-folder2"></i> Documentos</a>
-    <?php if(table_exists($pdo,'personal_eventos')): ?>
-    <a class="tab-pill <?= $tab==='eventos'?'active':'' ?>" href="?id=<?= $id ?>&tab=eventos"><i class="bi bi-calendar-event"></i> Eventos y Roles</a>
-    <?php endif; ?>
   </div>
 
   <!-- ┌─ FOTO ─────────────────────────────────────────────────────────────┐ -->
@@ -1024,26 +1071,50 @@ function evento_badge(string $tipo): string {
         <label class="form-label">Estado civil</label>
         <input class="form-control form-control-sm" name="estado_civil" value="<?= e($persona['estado_civil']??'') ?>">
       </div>
-
-      <!-- Destino / Función -->
-      <div class="col-md-3">
-        <label class="form-label">Área / Destino</label>
-        <select class="form-select form-select-sm" name="destino_id">
-          <option value="">— Sin asignar —</option>
-          <?php foreach($destinosAll as $dst): ?>
-            <option value="<?= (int)$dst['id'] ?>" <?= $destinoId===(int)$dst['id']?'selected':'' ?>>
-              <?= e($dst['codigo']??'') ?> · <?= e($dst['nombre']) ?>
-            </option>
-          <?php endforeach; ?>
-        </select>
+      <div class="col-md-2">
+        <label class="form-label">Peso</label>
+        <input type="number" step="0.01" class="form-control form-control-sm" name="peso" value="<?= e($persona['peso']??'') ?>">
       </div>
+      <div class="col-md-2">
+        <label class="form-label">Altura</label>
+        <input type="number" step="0.01" class="form-control form-control-sm" name="altura" value="<?= e($persona['altura']??'') ?>">
+      </div>
+      <div class="col-md-2">
+        <label class="form-label">NOU</label>
+        <input class="form-control form-control-sm" name="nou" value="<?= e($persona['nou']??'') ?>">
+      </div>
+
+      <!-- Destino / Funcion -->
       <div class="col-md-4">
-        <label class="form-label">Destino interno / Dependencia</label>
-        <input class="form-control form-control-sm" name="destino_interno" value="<?= e($persona['destino_interno']??'') ?>">
+        <label class="form-label">Area / Destino</label>
+        <input type="hidden" name="destino_id" value="">
+        <input class="form-control form-control-sm" name="destino_interno" list="destinos-internos"
+               value="<?= e($persona['destino_interno']??'') ?>" placeholder="Escribi o elegi un destino">
+        <datalist id="destinos-internos">
+          <?php foreach($destinosAll as $dst): ?>
+            <option value="<?= e($dst['nombre'] ?? '') ?>"></option>
+          <?php endforeach; ?>
+        </datalist>
       </div>
       <div class="col-md-5">
-        <label class="form-label">Función</label>
+        <label class="form-label">Funcion</label>
         <input class="form-control form-control-sm" name="funcion" value="<?= e($persona['funcion']??'') ?>">
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">Rol combate</label>
+        <input class="form-control form-control-sm" name="rol_combate" value="<?= e($persona['rol_combate']??'') ?>">
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">Rol administrativo</label>
+        <input class="form-control form-control-sm" name="rol_administrativo" value="<?= e($persona['rol_administrativo']??'') ?>">
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">Años en destino</label>
+        <input type="number" step="0.01" class="form-control form-control-sm" name="anios_en_destino" value="<?= e($persona['anios_en_destino']??'') ?>">
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">FRACC</label>
+        <input class="form-control form-control-sm" name="fracc" value="<?= e($persona['fracc']??'') ?>">
       </div>
 
       <!-- Domicilio / Hijos / Fecha alta -->
@@ -1059,6 +1130,10 @@ function evento_badge(string $tipo): string {
         <label class="form-label">Fecha de alta en la unidad</label>
         <input type="date" class="form-control form-control-sm" name="fecha_alta" value="<?= e($persona['fecha_alta']??'') ?>">
       </div>
+      <div class="col-md-4">
+        <label class="form-label">Último Anexo 27</label>
+        <input type="date" class="form-control form-control-sm" name="fecha_ultimo_anexo27" value="<?= e($persona['fecha_ultimo_anexo27']??'') ?>">
+      </div>
 
       <!-- Teléfono / Correo -->
       <div class="col-md-4">
@@ -1068,6 +1143,26 @@ function evento_badge(string $tipo): string {
       <div class="col-md-8">
         <label class="form-label">Correo electrónico</label>
         <input class="form-control form-control-sm" name="correo" value="<?= e($persona['correo']??'') ?>">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Usuario intranet</label>
+        <input class="form-control form-control-sm" name="usuario_intranet" value="<?= e($persona['usuario_intranet']??'') ?>">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Usuario GDE</label>
+        <input class="form-control form-control-sm" name="usuario_gde" value="<?= e($persona['usuario_gde']??'') ?>">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Nro. de cuenta</label>
+        <input class="form-control form-control-sm" name="nro_cta" value="<?= e($persona['nro_cta']??'') ?>">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">CBU</label>
+        <input class="form-control form-control-sm" name="cbu" value="<?= e($persona['cbu']??'') ?>">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Alias</label>
+        <input class="form-control form-control-sm" name="alias_banco" value="<?= e($persona['alias_banco']??'') ?>">
       </div>
 
       <!-- Observaciones -->
@@ -1101,6 +1196,31 @@ function evento_badge(string $tipo): string {
       <span class="help-small">Inicio: <b><?= e(fmt_date($parteIni)) ?></b></span>
       <span class="help-small">Fin: <b><?= e(fmt_date($parteFin)) ?></b></span>
       <span class="help-small">Total partes: <b><?= $cantParte ?></b></span>
+    </div>
+
+    <?php $docsAnexo27 = array_values(array_filter($docs, fn($d) => ($d['tipo'] ?? '') === 'anexo27')); ?>
+    <div class="card-sub" style="background:rgba(2,6,23,.35);margin-bottom:14px;">
+      <div class="section-title"><i class="bi bi-file-earmark-medical me-1 text-warning"></i> Anexo 27</div>
+      <div class="help-small mb-2">Fecha registrada en datos: <b><?= e(fmt_date($persona['fecha_ultimo_anexo27']??null)) ?></b></div>
+      <?php if(!$docsAnexo27): ?>
+        <div class="text-muted small">Sin archivos de Anexo 27 cargados.</div>
+      <?php else: ?>
+        <div class="table-responsive">
+          <table class="table table-sm table-dark tbl align-middle mb-0">
+            <thead><tr><th>T?tulo</th><th>Fecha</th><th>Observaci?n</th><th>Ver</th></tr></thead>
+            <tbody>
+            <?php foreach($docsAnexo27 as $d): $url=!empty($d['path'])?($BASE_APP_WEB.'/'.ltrim($d['path'],'/')):null; ?>
+              <tr>
+                <td><?= e($d['titulo']??'(s/t)') ?></td>
+                <td><?= e(fmt_date($d['fecha']??null)) ?></td>
+                <td><?= e($d['nota']??'') ?></td>
+                <td><?php if($url): ?><a class="btn btn-sm btn-outline-light py-0 px-2" href="<?= e($url) ?>" target="_blank">Ver</a><?php else: ?>?<?php endif; ?></td>
+              </tr>
+            <?php endforeach; ?>
+            </tbody>
+          </table>
+        </div>
+      <?php endif; ?>
     </div>
 
     <?php if($esAdmin): ?>
@@ -1241,22 +1361,9 @@ function evento_badge(string $tipo): string {
         <input type="date" class="form-control form-control-sm" name="fecha">
       </div>
       <div class="col-md-8">
-        <label class="form-label">Nota</label>
+        <label class="form-label">Observaciones</label>
         <input class="form-control form-control-sm" name="nota" placeholder="Observación breve...">
       </div>
-      <?php if(isset($colsPD['evento_id'])&&table_exists($pdo,'personal_eventos')&&$eventos): ?>
-      <div class="col-12">
-        <label class="form-label">Vincular a evento (opcional)</label>
-        <select class="form-select form-select-sm" name="evento_id">
-          <option value="0">(sin evento)</option>
-          <?php foreach($eventos as $ev): ?>
-            <option value="<?= (int)$ev['id'] ?>">
-              <?= e(($ev['tipo']??'').' · '.fmt_date($ev['desde']??null).' → '.fmt_date($ev['hasta']??null).' · '.($ev['titulo']??'')) ?>
-            </option>
-          <?php endforeach; ?>
-        </select>
-      </div>
-      <?php endif; ?>
       <div class="col-12">
         <label class="form-label">Archivo (PDF / Word / Imagen)</label>
         <input type="file" class="form-control form-control-sm" name="archivo" required accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx">
@@ -1270,10 +1377,10 @@ function evento_badge(string $tipo): string {
     <?php endif; ?>
     <div class="table-responsive">
       <table class="table table-sm table-dark tbl align-middle">
-        <thead><tr><th>Tipo</th><th>Título</th><th>Fecha</th><th>Tamaño</th><th>Ver</th><th class="text-end">Acción</th></tr></thead>
+        <thead><tr><th>Tipo</th><th>Título</th><th>Fecha</th><th>Tamaño</th><th>Ver</th><th>Observaciones</th><th class="text-end">Acción</th></tr></thead>
         <tbody>
         <?php if(!$docs): ?>
-          <tr><td colspan="6" class="text-center text-muted py-3">Sin documentos.</td></tr>
+          <tr><td colspan="7" class="text-center text-muted py-3">Sin documentos.</td></tr>
         <?php else: foreach($docs as $d):
           $url=!empty($d['path'])?($BASE_APP_WEB.'/'.ltrim($d['path'],'/')):null;
         ?>
@@ -1289,6 +1396,20 @@ function evento_badge(string $tipo): string {
             <td><?= e(fmt_date($d['fecha']??null)) ?></td>
             <td><?= e(fmt_bytes(isset($d['bytes'])?(int)$d['bytes']:null)) ?></td>
             <td><?php if($url): ?><a class="btn btn-sm btn-outline-light py-0 px-2" href="<?= e($url) ?>" target="_blank">Ver</a><?php else: ?>—<?php endif; ?></td>
+            <td style="min-width:240px;">
+              <?php if($esAdmin): ?>
+              <form method="post" class="d-flex gap-2 align-items-start">
+                <?php csrf_if_exists(); ?>
+                <input type="hidden" name="accion" value="guardar_observacion_documento">
+                <input type="hidden" name="personal_id" value="<?= $id ?>">
+                <input type="hidden" name="doc_id" value="<?= (int)($d['id']??0) ?>">
+                <textarea class="form-control form-control-sm" name="nota" rows="2" placeholder="Observaciones del archivo..."><?= e($d['nota']??'') ?></textarea>
+                <button type="submit" class="btn btn-sm btn-outline-info">Guardar</button>
+              </form>
+              <?php else: ?>
+                <div class="help-small"><?= e($d['nota']??'') ?></div>
+              <?php endif; ?>
+            </td>
             <td class="text-end">
               <?php if($esAdmin): ?>
               <form method="post" class="d-inline form-del-doc">

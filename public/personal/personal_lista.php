@@ -2,9 +2,9 @@
 /**
  * public/personal/personal_lista.php
  * Lista de personal con:
- *  - Orden por jerarquía y grado militar argentino
- *  - Filtros: búsqueda, jerarquía, destino, parte enfermo
- *  - Export PDF puro (HTML→print / tabla HTML sin librerías)
+ *  - Orden por jerarquÃƒÂ­a y grado militar argentino
+ *  - Filtros: bÃƒÂºsqueda, jerarquÃƒÂ­a, destino, parte enfermo
+ *  - Export PDF puro (HTMLÃ¢â€ â€™print / tabla HTML sin librerÃƒÂ­as)
  *  - Export XLSX con PhpSpreadsheet (si disponible) o CSV como fallback
  *  - UI mejorada dark
  */
@@ -16,18 +16,51 @@ require_login();
 require_once $ROOT . '/config/db.php';
 /** @var PDO $pdo */
 
-/* ════════════════════ HELPERS ════════════════════════════════════════════ */
+/* Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â HELPERS Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â */
 function e($v): string { return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'); }
 function norm_dni(string $d): string { return preg_replace('/\D+/', '', $d) ?? ''; }
 function fmt_date(?string $y): string {
-    if (!$y) return '—'; $ts = strtotime($y); return $ts !== false ? date('d/m/Y', $ts) : '—';
+    if (!$y) return '-'; $ts = strtotime($y); return $ts !== false ? date('d/m/Y', $ts) : '-';
 }
 function table_exists(PDO $pdo, string $t): bool {
     $s = $pdo->prepare("SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME=:t");
     $s->execute([':t' => $t]); return (int)$s->fetchColumn() > 0;
 }
+function column_exists(PDO $pdo, string $table, string $column): bool {
+    $s = $pdo->prepare("SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME=:t AND COLUMN_NAME=:c");
+    $s->execute([':t' => $table, ':c' => $column]); return (int)$s->fetchColumn() > 0;
+}
+function ensure_personal_role_columns(PDO $pdo): void {
+    if (!table_exists($pdo, 'personal_unidad')) return;
 
-/* ════════════════════ USUARIO / ROL ══════════════════════════════════════ */
+    $hasRol = column_exists($pdo, 'personal_unidad', 'rol');
+    if (!column_exists($pdo, 'personal_unidad', 'rol_combate')) {
+        $pdo->exec("ALTER TABLE personal_unidad ADD COLUMN rol_combate VARCHAR(255) NULL AFTER destino_interno");
+    }
+    if (!column_exists($pdo, 'personal_unidad', 'rol_administrativo')) {
+        $pdo->exec("ALTER TABLE personal_unidad ADD COLUMN rol_administrativo VARCHAR(255) NULL AFTER rol_combate");
+    }
+    if (!column_exists($pdo, 'personal_unidad', 'usuario_intranet')) {
+        $pdo->exec("ALTER TABLE personal_unidad ADD COLUMN usuario_intranet VARCHAR(120) NULL AFTER alias_banco");
+    }
+    if (!column_exists($pdo, 'personal_unidad', 'usuario_gde')) {
+        $pdo->exec("ALTER TABLE personal_unidad ADD COLUMN usuario_gde VARCHAR(120) NULL AFTER usuario_intranet");
+    }
+
+    if ($hasRol) {
+        $pdo->exec("
+            UPDATE personal_unidad
+               SET rol_administrativo = rol
+             WHERE (rol_administrativo IS NULL OR rol_administrativo = '')
+               AND rol IS NOT NULL
+               AND rol <> ''
+        ");
+    }
+}
+
+ensure_personal_role_columns($pdo);
+
+/* Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â USUARIO / ROL Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â */
 $user        = function_exists('current_user') ? current_user() : ($_SESSION['user'] ?? null);
 $dniUsuario  = norm_dni((string)($user['dni'] ?? $user['username'] ?? ''));
 $personalId  = 0; $unidadPropia = 1;
@@ -59,7 +92,7 @@ $esAdmin      = ($roleCodigo === 'ADMIN') || $esSuperAdmin;
 $unidadActiva = $unidadPropia;
 if ($esSuperAdmin) { $uSel = (int)($_SESSION['unidad_id'] ?? 0); if ($uSel > 0) $unidadActiva = $uSel; }
 
-/* ════════════════════ BRANDING ═══════════════════════════════════════════ */
+/* Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â BRANDING Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â */
 $NOMBRE = 'Unidad'; $LEYENDA = ''; $UNIDAD_SLUG = 'ecmilm';
 try {
     $st = $pdo->prepare("SELECT nombre_completo, subnombre, slug FROM unidades WHERE id=:id LIMIT 1");
@@ -79,9 +112,9 @@ $ASSETS_WEB     = $BASE_APP_WEB . '/assets';
 $IMG_BG         = $ASSETS_WEB . '/img/fondo.png';
 $ESCUDO         = $ASSETS_WEB . '/img/ecmilm.png';
 
-/* ════════════════════ ORDEN MILITAR ══════════════════════════════════════
- * Jerarquía: OFICIAL(1) → SUBOFICIAL(2) → SOLDADO(3) → AGENTE_CIVIL(4)
- * Grados: de mayor a menor rango dentro de cada jerarquía
+/* Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â ORDEN MILITAR Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â
+ * JerarquÃƒÂ­a: OFICIAL(1) Ã¢â€ â€™ SUBOFICIAL(2) Ã¢â€ â€™ SOLDADO(3) Ã¢â€ â€™ AGENTE_CIVIL(4)
+ * Grados: de mayor a menor rango dentro de cada jerarquÃƒÂ­a
  */
 $SQL_ORDEN_JERARQUIA = "CASE jerarquia
     WHEN 'OFICIAL'       THEN 1
@@ -122,16 +155,16 @@ $SQL_ORDEN_GRADO = "CASE grado
     ELSE 99
 END";
 
-/* ════════════════════ PARÁMETROS GET ═════════════════════════════════════ */
+/* Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â PARÃƒÂMETROS GET Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â */
 $q         = trim((string)($_GET['q']         ?? ''));
 $filtroJer = trim((string)($_GET['jerarquia'] ?? ''));
-$filtroDst = (int)($_GET['destino_id']        ?? 0);
+$filtroDst = trim((string)($_GET['destino']   ?? ($_GET['destino_id'] ?? '')));
 $filtroPte = trim((string)($_GET['parte']     ?? ''));
 $exportar  = trim((string)($_GET['export']    ?? ''));
 $cicloGet  = trim((string)($_GET['ciclo']     ?? ''));
 
 
-/* ════════════════════ AUTO-CREAR TABLA personal_ciclos ══════════════════ */
+/* Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â AUTO-CREAR TABLA personal_ciclos Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â */
 try {
     $pdo->exec("CREATE TABLE IF NOT EXISTS personal_ciclos (
       id int NOT NULL AUTO_INCREMENT,
@@ -148,7 +181,7 @@ try {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci");
 } catch (Throwable $e) {}
 
-/* ════════════════════ CICLO ACTIVO ═══════════════════════════════════════ */
+/* Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â CICLO ACTIVO Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â */
 $ciclosDisponibles = [];
 try {
     $st = $pdo->prepare("SELECT DISTINCT ciclo FROM personal_ciclos WHERE unidad_id=:u ORDER BY ciclo DESC");
@@ -162,10 +195,10 @@ if ($cicloGet === 'todos' || empty($ciclosDisponibles)) {
 } elseif ($cicloGet !== '' && is_numeric($cicloGet)) {
     $cicloFiltro = (int)$cicloGet;
 } elseif (!empty($ciclosDisponibles)) {
-    $cicloFiltro = (int)$ciclosDisponibles[0]; // año más reciente
+    $cicloFiltro = (int)$ciclosDisponibles[0]; // aÃƒÂ±o mÃƒÂ¡s reciente
 }
 
-/* ════════════════════ ACCIÓN POST: IMPORTAR EXCEL ════════════════════════ */
+/* Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â ACCIÃƒâ€œN POST: IMPORTAR EXCEL Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â */
 $mensajeImport = ''; $mensajeImportError = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_POST['accion_import'])) {
@@ -175,24 +208,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_POST['accion_import'])) {
     } else {
         try {
             $vendorAutoload = $ROOT . '/vendor/autoload.php';
-            if (!is_file($vendorAutoload)) throw new RuntimeException('Falta vendor/autoload.php. Ejecutá: composer require phpoffice/phpspreadsheet');
+            if (!is_file($vendorAutoload)) throw new RuntimeException('Falta vendor/autoload.php. EjecutÃƒÂ¡: composer require phpoffice/phpspreadsheet');
             require_once $vendorAutoload;
 
             if (!isset($_FILES['excel_archivo']) || $_FILES['excel_archivo']['error'] === UPLOAD_ERR_NO_FILE)
-                throw new RuntimeException('Seleccioná un archivo Excel.');
+                throw new RuntimeException('SeleccionÃƒÂ¡ un archivo Excel.');
             $file = $_FILES['excel_archivo'];
-            if ($file['error'] !== UPLOAD_ERR_OK) throw new RuntimeException('Error subida (cód '.(int)$file['error'].').');
+            if ($file['error'] !== UPLOAD_ERR_OK) throw new RuntimeException('Error subida (cÃƒÂ³d '.(int)$file['error'].').');
             $extXls = strtolower(pathinfo((string)$file['name'], PATHINFO_EXTENSION));
             if (!in_array($extXls, ['xls','xlsx'], true)) throw new RuntimeException('El archivo debe ser .xls o .xlsx.');
             if ($extXls === 'xlsx' && !class_exists('ZipArchive'))
-                throw new RuntimeException('Falta extensión PHP ZipArchive. En XAMPP: activá extension=zip en php.ini y reiniciá Apache.');
+                throw new RuntimeException('Falta extensiÃƒÂ³n PHP ZipArchive. En XAMPP: activÃƒÂ¡ extension=zip en php.ini y reiniciÃƒÂ¡ Apache.');
 
             $cicloImport = (int)($_POST['ciclo_import'] ?? date('Y'));
-            if ($cicloImport < 2020 || $cicloImport > 2040) throw new RuntimeException('Año inválido ('.$cicloImport.').');
+            if ($cicloImport < 2020 || $cicloImport > 2040) throw new RuntimeException('AÃƒÂ±o invÃƒÂ¡lido ('.$cicloImport.').');
 
             if ($accionImport === 'reemplazar_ciclo') {
                 if (($_POST['confirmacion_reemplazar'] ?? '') !== 'CONFIRMAR')
-                    throw new RuntimeException('Para reemplazar escribí CONFIRMAR en el campo de confirmación.');
+                    throw new RuntimeException('Para reemplazar escribÃƒÂ­ CONFIRMAR en el campo de confirmaciÃƒÂ³n.');
             }
 
             $spreadsheet = \PhpOffice\PhpSpreadsheet\IOFactory::load($file['tmp_name']);
@@ -221,7 +254,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_POST['accion_import'])) {
                 $apnom    = trim((string)$sheet->getCell("C{$row}")->getValue());
                 $dniRaw   = trim((string)$sheet->getCell("D{$row}")->getValue());
 
-                // Separador de jerarquía
+                // Separador de jerarquÃƒÂ­a
                 $gU = strtoupper($gradoRaw);
                 if (isset($jerMap[$gU]) && $arma === '' && $apnom === '' && $dniRaw === '') {
                     $currentJer = $jerMap[$gU]; continue;
@@ -235,9 +268,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_POST['accion_import'])) {
                 $sexo    = trim((string)$sheet->getCell("I{$row}")->getValue());
                 $domicilio = trim((string)$sheet->getCell("J{$row}")->getValue());
                 $destInt = trim((string)$sheet->getCell("V{$row}")->getValue());
-                $obs     = trim((string)$sheet->getCell("Z{$row}")->getValue());
+                $rolCombate = trim((string)$sheet->getCell("W{$row}")->getValue());
+                $rolAdministrativo = trim((string)$sheet->getCell("X{$row}")->getValue());
+                $obs     = trim((string)$sheet->getCell("AA{$row}")->getValue());
 
-                // Jerarquía
+                // JerarquÃƒÂ­a
                 $g2 = strtoupper(trim($gradoRaw));
                 if ($currentJer !== '') {
                     $jerEnum = $currentJer;
@@ -269,15 +304,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_POST['accion_import'])) {
 
                 $pdo->prepare("
                     INSERT INTO personal_unidad
-                      (unidad_id,dni,grado,arma,apellido_nombre,cuil,sexo,domicilio,destino_interno,observaciones,jerarquia,extra_json,updated_at,updated_by_id)
+                      (unidad_id,dni,grado,arma,apellido_nombre,cuil,sexo,domicilio,destino_interno,rol_combate,rol_administrativo,observaciones,jerarquia,extra_json,updated_at,updated_by_id)
                     VALUES
-                      (:uid,:dni,:grado,:arma,:apnom,:cuil,:sexo,:dom,:dest,:obs,:jer,:xj,NOW(),:ubid)
+                      (:uid,:dni,:grado,:arma,:apnom,:cuil,:sexo,:dom,:dest,:rol_combate,:rol_administrativo,:obs,:jer,:xj,NOW(),:ubid)
                     ON DUPLICATE KEY UPDATE
                       grado=VALUES(grado),arma=VALUES(arma),apellido_nombre=VALUES(apellido_nombre),
                       cuil=IF(VALUES(cuil) IS NOT NULL AND VALUES(cuil)!='',VALUES(cuil),cuil),
                       sexo=IF(VALUES(sexo) IS NOT NULL AND VALUES(sexo)!='',VALUES(sexo),sexo),
                       domicilio=IF(VALUES(domicilio) IS NOT NULL AND VALUES(domicilio)!='',VALUES(domicilio),domicilio),
                       destino_interno=IF(VALUES(destino_interno) IS NOT NULL AND VALUES(destino_interno)!='',VALUES(destino_interno),destino_interno),
+                      rol_combate=IF(VALUES(rol_combate) IS NOT NULL AND VALUES(rol_combate)!='',VALUES(rol_combate),rol_combate),
+                      rol_administrativo=IF(VALUES(rol_administrativo) IS NOT NULL AND VALUES(rol_administrativo)!='',VALUES(rol_administrativo),rol_administrativo),
                       observaciones=IF(VALUES(observaciones) IS NOT NULL AND VALUES(observaciones)!='',VALUES(observaciones),observaciones),
                       jerarquia=VALUES(jerarquia),
                       extra_json=IF(extra_json IS NULL,VALUES(extra_json),JSON_MERGE_PATCH(extra_json,VALUES(extra_json))),
@@ -286,7 +323,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_POST['accion_import'])) {
                     ':uid'=>$unidadActiva,':dni'=>$dni,
                     ':grado'=>$gradoRaw?:null,':arma'=>$arma?:null,':apnom'=>$apnom?:null,
                     ':cuil'=>$cuil?:null,':sexo'=>$sexo?:null,':dom'=>$domicilio?:null,
-                    ':dest'=>$destInt?:null,':obs'=>$obs?:null,
+                    ':dest'=>$destInt?:null,':rol_combate'=>$rolCombate?:null,':rol_administrativo'=>$rolAdministrativo?:null,':obs'=>$obs?:null,
                     ':jer'=>$jerEnum,':xj'=>$extraJson,':ubid'=>$personalId?:null,
                 ]);
 
@@ -305,8 +342,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_POST['accion_import'])) {
 
             $pdo->commit();
             $modoLabel = ['actualizar'=>'Actualizar/agregar','solo_nuevos'=>'Solo nuevos','reemplazar_ciclo'=>'Reemplazar ciclo'][$accionImport] ?? $accionImport;
-            $mensajeImport = "✓ Importación completada — Modo: {$modoLabel} · Ciclo: {$cicloImport} · Procesadas: {$procesadas}"
-                . (count($errores) ? ' · Avisos: '.implode('; ',array_slice($errores,0,5)) : '');
+            $mensajeImport = "Ã¢Å“â€œ ImportaciÃƒÂ³n completada Ã¢â‚¬â€ Modo: {$modoLabel} Ã‚Â· Ciclo: {$cicloImport} Ã‚Â· Procesadas: {$procesadas}"
+                . (count($errores) ? ' Ã‚Â· Avisos: '.implode('; ',array_slice($errores,0,5)) : '');
 
         } catch (Throwable $ex) {
             if ($pdo->inTransaction()) $pdo->rollBack();
@@ -315,15 +352,49 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_POST['accion_import'])) {
     }
 }
 
-/* ════════════════════ CARGA DESTINOS ═════════════════════════════════════ */
+/* Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â CARGA DESTINOS / ?REAS Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â */
 $destinos = [];
 try {
-    $st = $pdo->prepare("SELECT id, codigo, nombre FROM destino WHERE unidad_id=:u AND activo=1 ORDER BY nombre ASC");
+    $st = $pdo->prepare("
+        SELECT DISTINCT
+            CASE
+                WHEN UPPER(TRIM(destino_interno)) LIKE 'CA CDO SER%'
+                  OR UPPER(TRIM(destino_interno)) LIKE 'COMPAÑÍA COMANDO Y SERVICIOS%'
+                  OR UPPER(TRIM(destino_interno)) LIKE 'COMPANIA COMANDO Y SERVICIOS%'
+                THEN 'CA CDO SER'
+                WHEN UPPER(TRIM(destino_interno)) LIKE 'CA I M \"A\"%'
+                  OR UPPER(TRIM(destino_interno)) LIKE 'CA IM \"A\"%'
+                  OR UPPER(TRIM(destino_interno)) LIKE 'COMPAÑÍA DE INFANTERÍA DE MONTAÑA \"A\"%'
+                  OR UPPER(TRIM(destino_interno)) LIKE 'COMPANIA DE INFANTERIA DE MONTANA \"A\"%'
+                  OR UPPER(TRIM(destino_interno)) LIKE 'PELOTÓN COMANDO%'
+                  OR UPPER(TRIM(destino_interno)) LIKE 'PELOTON COMANDO%'
+                  OR UPPER(TRIM(destino_interno)) LIKE '1RA SECCIÓN DE TIRADORES%'
+                  OR UPPER(TRIM(destino_interno)) LIKE '1RA SECCION DE TIRADORES%'
+                  OR UPPER(TRIM(destino_interno)) LIKE '2DA SECCIÓN DE TIRADORES%'
+                  OR UPPER(TRIM(destino_interno)) LIKE '2DA SECCION DE TIRADORES%'
+                  OR UPPER(TRIM(destino_interno)) LIKE '1ER GRUPO DE TIRADORES%'
+                  OR UPPER(TRIM(destino_interno)) LIKE '2DO GRUPO DE TIRADORES%'
+                THEN 'CA I M \"A\"'
+                WHEN UPPER(TRIM(destino_interno)) LIKE 'CCIG \"BARILOCHE\"%'
+                  OR UPPER(TRIM(destino_interno)) LIKE 'CCIG BARILOCHE%'
+                  OR UPPER(TRIM(destino_interno)) LIKE 'ENC CCIG%'
+                  OR UPPER(TRIM(destino_interno)) LIKE 'AUX CCIG%'
+                  OR UPPER(TRIM(destino_interno)) LIKE 'OP ORG CI%'
+                  OR UPPER(TRIM(destino_interno)) LIKE 'RESIDENCIA QUINCHAHUALA%'
+                THEN 'CCIG \"BARILOCHE\"'
+                ELSE TRIM(destino_interno)
+            END AS nombre
+        FROM personal_unidad
+        WHERE unidad_id = :u
+          AND destino_interno IS NOT NULL
+          AND TRIM(destino_interno) <> ''
+        ORDER BY nombre ASC
+    ");
     $st->execute([':u' => $unidadActiva]);
     $destinos = $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
 } catch (Throwable $e) {}
 
-/* ════════════════════ QUERY PRINCIPAL ════════════════════════════════════ */
+/* Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â QUERY PRINCIPAL Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â */
 $where  = ["pu.unidad_id = :uid"];
 // Filtro por ciclo: si hay ciclo activo, filtrar por personal_ciclos
 $joinCiclo = '';
@@ -334,15 +405,45 @@ if ($cicloFiltro !== '') {
 }
 
 if ($q !== '') {
-    $where[] = "(pu.apellido_nombre LIKE :q OR pu.dni LIKE :q OR pu.grado LIKE :q)";
-    $params[':q'] = '%' . $q . '%';
+    $where[] = "(pu.apellido_nombre LIKE :q_nombre OR pu.dni LIKE :q_dni OR pu.grado LIKE :q_grado)";
+    $params[':q_nombre'] = '%' . $q . '%';
+    $params[':q_dni'] = '%' . $q . '%';
+    $params[':q_grado'] = '%' . $q . '%';
 }
 if ($filtroJer !== '') {
     $where[] = "pu.jerarquia = :jer";
     $params[':jer'] = $filtroJer;
 }
-if ($filtroDst > 0) {
-    $where[] = "pu.destino_id = :dst";
+if ($filtroDst !== '' && $filtroDst !== '0') {
+    $where[] = "
+        CASE
+            WHEN UPPER(TRIM(COALESCE(pu.destino_interno, ''))) LIKE 'CA CDO SER%'
+              OR UPPER(TRIM(COALESCE(pu.destino_interno, ''))) LIKE 'COMPAÑÍA COMANDO Y SERVICIOS%'
+              OR UPPER(TRIM(COALESCE(pu.destino_interno, ''))) LIKE 'COMPANIA COMANDO Y SERVICIOS%'
+            THEN 'CA CDO SER'
+            WHEN UPPER(TRIM(COALESCE(pu.destino_interno, ''))) LIKE 'CA I M \"A\"%'
+              OR UPPER(TRIM(COALESCE(pu.destino_interno, ''))) LIKE 'CA IM \"A\"%'
+              OR UPPER(TRIM(COALESCE(pu.destino_interno, ''))) LIKE 'COMPAÑÍA DE INFANTERÍA DE MONTAÑA \"A\"%'
+              OR UPPER(TRIM(COALESCE(pu.destino_interno, ''))) LIKE 'COMPANIA DE INFANTERIA DE MONTANA \"A\"%'
+              OR UPPER(TRIM(COALESCE(pu.destino_interno, ''))) LIKE 'PELOTÓN COMANDO%'
+              OR UPPER(TRIM(COALESCE(pu.destino_interno, ''))) LIKE 'PELOTON COMANDO%'
+              OR UPPER(TRIM(COALESCE(pu.destino_interno, ''))) LIKE '1RA SECCIÓN DE TIRADORES%'
+              OR UPPER(TRIM(COALESCE(pu.destino_interno, ''))) LIKE '1RA SECCION DE TIRADORES%'
+              OR UPPER(TRIM(COALESCE(pu.destino_interno, ''))) LIKE '2DA SECCIÓN DE TIRADORES%'
+              OR UPPER(TRIM(COALESCE(pu.destino_interno, ''))) LIKE '2DA SECCION DE TIRADORES%'
+              OR UPPER(TRIM(COALESCE(pu.destino_interno, ''))) LIKE '1ER GRUPO DE TIRADORES%'
+              OR UPPER(TRIM(COALESCE(pu.destino_interno, ''))) LIKE '2DO GRUPO DE TIRADORES%'
+            THEN 'CA I M \"A\"'
+            WHEN UPPER(TRIM(COALESCE(pu.destino_interno, ''))) LIKE 'CCIG \"BARILOCHE\"%'
+              OR UPPER(TRIM(COALESCE(pu.destino_interno, ''))) LIKE 'CCIG BARILOCHE%'
+              OR UPPER(TRIM(COALESCE(pu.destino_interno, ''))) LIKE 'ENC CCIG%'
+              OR UPPER(TRIM(COALESCE(pu.destino_interno, ''))) LIKE 'AUX CCIG%'
+              OR UPPER(TRIM(COALESCE(pu.destino_interno, ''))) LIKE 'OP ORG CI%'
+              OR UPPER(TRIM(COALESCE(pu.destino_interno, ''))) LIKE 'RESIDENCIA QUINCHAHUALA%'
+            THEN 'CCIG \"BARILOCHE\"'
+            ELSE TRIM(COALESCE(pu.destino_interno, ''))
+        END = :dst
+    ";
     $params[':dst'] = $filtroDst;
 }
 if ($filtroPte === '1') {
@@ -360,12 +461,13 @@ $sql = "
         pu.peso, pu.altura, pu.sexo, pu.domicilio,
         pu.estado_civil, pu.hijos, pu.nou,
         pu.nro_cta, pu.cbu, pu.alias_banco,
+        pu.usuario_intranet, pu.usuario_gde,
         pu.fecha_ultimo_anexo27,
         pu.tiene_parte_enfermo, pu.parte_enfermo_desde, pu.parte_enfermo_hasta,
         pu.cantidad_parte_enfermo,
         pu.destino_interno, pu.funcion,
         pu.telefono, pu.correo,
-        pu.rol, pu.anios_en_destino, pu.fracc, pu.observaciones,
+        pu.rol_combate, pu.rol_administrativo, pu.anios_en_destino, pu.fracc, pu.observaciones,
         pu.fecha_alta,
         d.codigo AS destino_codigo, d.nombre AS destino_nombre,
         pu.destino_id
@@ -389,7 +491,7 @@ try {
     $mensajeError = $ex->getMessage();
 }
 
-/* ════════════════════ TOTALES ════════════════════════════════════════════ */
+/* Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â TOTALES Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â */
 $totalOficial    = 0; $totalSuboficial = 0; $totalSoldado = 0; $totalCivil = 0; $totalParte = 0;
 foreach ($personal as $p) {
     switch ($p['jerarquia'] ?? '') {
@@ -402,11 +504,11 @@ foreach ($personal as $p) {
 }
 $totalGeneral = count($personal);
 
-/* ════════════════════ EXPORT XLSX ════════════════════════════════════════ */
+/* Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â EXPORT XLSX Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â */
 if ($exportar === 'xlsx') {
     $vendorAuto = $ROOT . '/vendor/autoload.php';
     if (!is_file($vendorAuto)) {
-        die('Falta vendor/autoload.php. Ejecutá: composer require phpoffice/phpspreadsheet');
+        die('Falta vendor/autoload.php. EjecutÃƒÂ¡: composer require phpoffice/phpspreadsheet');
     }
     require_once $vendorAuto;
 
@@ -418,9 +520,9 @@ if ($exportar === 'xlsx') {
     $headers = [
         'GRADO','ARMA/ESPEC','APELLIDO Y NOMBRE','DNI','CUIL','FECHA NAC',
         'PESO','ALTURA','SEXO','DOMICILIO','ESTADO CIVIL','HIJOS','NOU',
-        'NRO CTA BANCO','CBU BANCO','ALIAS BANCO','FECHA ULTIMO ANEXO 27',
+        'NRO CTA BANCO','CBU BANCO','ALIAS BANCO','USUARIO INTRANET','USUARIO GDE','FECHA ULTIMO ANEXO 27',
         'TIENE PARTE DE ENFERMO','DESDE','HASTA','CANTIDAD DE PARTE DE ENFERMO',
-        'DESTINO INTERNO','ROL','ANIOS EN DESTINO','FRACC','OBSERVACIONES'
+        'DESTINO INTERNO','ROL COMBATE','ROL ADMINISTRATIVO','ANIOS EN DESTINO','FRACC','OBSERVACIONES'
     ];
     foreach ($headers as $ci => $h) {
         $col = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($ci + 1);
@@ -431,8 +533,9 @@ if ($exportar === 'xlsx') {
               ->getStartColor()->setARGB('FF1a1a2e');
         $sheet->getStyle($col . '1')->getFont()->getColor()->setARGB('FFFFFFFF');
     }
+    $lastExportCol = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex(count($headers));
 
-    // Colores por jerarquía (ARGB)
+    // Colores por jerarquÃƒÂ­a (ARGB)
     $jerColors = [
         'OFICIAL'     => 'FFe8eaf6',
         'SUBOFICIAL'  => 'FFfff8e1',
@@ -445,14 +548,14 @@ if ($exportar === 'xlsx') {
     foreach ($personal as $i => $p) {
         $jer = $p['jerarquia'] ?? '';
 
-        // Fila separadora de jerarquía
+        // Fila separadora de jerarquÃƒÂ­a
         if ($jer !== $jerActualXlsx) {
             $jerActualXlsx = $jer;
             $jerLabelsXlsx = ['OFICIAL'=>'OFICIALES','SUBOFICIAL'=>'SUBOFICIALES','SOLDADO'=>'SOLDADOS','AGENTE_CIVIL'=>'AGENTES CIVILES'];
             $sheet->setCellValue('A' . $row, $jerLabelsXlsx[$jer] ?? strtoupper($jer));
-            $sheet->mergeCells('A' . $row . ':Z' . $row);
+            $sheet->mergeCells('A' . $row . ':' . $lastExportCol . $row);
             $sheet->getStyle('A' . $row)->getFont()->setBold(true)->setSize(10);
-            $sheet->getStyle('A' . $row . ':Z' . $row)->getFill()
+            $sheet->getStyle('A' . $row . ':' . $lastExportCol . $row)->getFill()
                   ->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)
                   ->getStartColor()->setARGB('FF2d3561');
             $sheet->getStyle('A' . $row)->getFont()->getColor()->setARGB('FFFFFFFF');
@@ -482,13 +585,16 @@ if ($exportar === 'xlsx') {
             $p['nro_cta'] ?? '',
             $p['cbu'] ?? '',
             $p['alias_banco'] ?? '',
+            $p['usuario_intranet'] ?? '',
+            $p['usuario_gde'] ?? '',
             $fechaAnexo27,
             $tieneParte ? 'SI' : 'NO',
             $parteDesde,
             $parteHasta,
             $p['cantidad_parte_enfermo'] ?? '',
             $p['destino_interno'] ?? '',
-            $p['rol'] ?? '',
+            $p['rol_combate'] ?? '',
+            $p['rol_administrativo'] ?? '',
             $p['anios_en_destino'] ?? '',
             $p['fracc'] ?? '',
             $p['observaciones'] ?? '',
@@ -499,9 +605,9 @@ if ($exportar === 'xlsx') {
             $sheet->setCellValue($col . $row, $val);
         }
 
-        // Color de fila según jerarquía o parte de enfermo
+        // Color de fila segÃƒÂºn jerarquÃƒÂ­a o parte de enfermo
         $bgColor = $tieneParte ? 'FFfff3cd' : ($jerColors[$jer] ?? 'FFFFFFFF');
-        $sheet->getStyle('A' . $row . ':Z' . $row)->getFill()
+        $sheet->getStyle('A' . $row . ':' . $lastExportCol . $row)->getFill()
               ->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)
               ->getStartColor()->setARGB($bgColor);
 
@@ -509,12 +615,12 @@ if ($exportar === 'xlsx') {
     }
 
     // Fila de totales al pie
-    $sheet->setCellValue('A' . $row, "Total: {$totalGeneral} efectivos — Oficiales: {$totalOficial} · Suboficiales: {$totalSuboficial} · Soldados: {$totalSoldado} · Ag. Civiles: {$totalCivil}");
-    $sheet->mergeCells('A' . $row . ':Z' . $row);
+    $sheet->setCellValue('A' . $row, "Total: {$totalGeneral} efectivos Ã¢â‚¬â€ Oficiales: {$totalOficial} Ã‚Â· Suboficiales: {$totalSuboficial} Ã‚Â· Soldados: {$totalSoldado} Ã‚Â· Ag. Civiles: {$totalCivil}");
+    $sheet->mergeCells('A' . $row . ':' . $lastExportCol . $row);
     $sheet->getStyle('A' . $row)->getFont()->setBold(true)->setItalic(true)->setSize(8);
 
     // Autosize columnas clave
-    foreach (range(1, 26) as $ci) {
+    foreach (range(1, 27) as $ci) {
         $col = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($ci);
         $sheet->getColumnDimension($col)->setAutoSize(true);
     }
@@ -529,10 +635,10 @@ if ($exportar === 'xlsx') {
     exit;
 }
 
-/* ════════════════════ EXPORT PDF — HTML puro enviado a browser ═══════════
- * No requiere librería externa: genera HTML con estilos print CSS
- * El navegador imprime/guarda como PDF con Ctrl+P → Guardar como PDF
- * Para PDF server-side automático se necesita dompdf (ver instrucciones al pie)
+/* Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â EXPORT PDF Ã¢â‚¬â€ HTML puro enviado a browser Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â
+ * No requiere librerÃƒÂ­a externa: genera HTML con estilos print CSS
+ * El navegador imprime/guarda como PDF con Ctrl+P Ã¢â€ â€™ Guardar como PDF
+ * Para PDF server-side automÃƒÂ¡tico se necesita dompdf (ver instrucciones al pie)
  */
 if ($exportar === 'pdf') {
     $fecha_doc = date('d/m/Y');
@@ -586,16 +692,16 @@ if ($exportar === 'pdf') {
 
 <div class="topline">
   <div class="topline-left">
-    <strong>Ejército Argentino</strong>
+    <strong>Ejercito Argentino</strong>
     <span><?= e($NOMBRE) ?></span>
   </div>
   <div class="topline-right">
-    "AÑO DE LA GRANDEZA ARGENTINA"
+    "ANO DE LA GRANDEZA ARGENTINA"
   </div>
 </div>
 
 <div class="title-wrap">
-  <h1>Nómina de personal</h1>
+  <h1>Nomina de personal</h1>
   <div class="sub"><?= e($LEYENDA !== '' ? $LEYENDA : $NOMBRE) ?></div>
 </div>
 
@@ -608,7 +714,7 @@ if ($exportar === 'pdf') {
       <th>Apellido y nombre</th>
       <th>DNI</th>
       <th>Destino</th>
-      <th>Función / destino interno</th>
+      <th>Funcion / destino interno</th>
       <th>Parte</th>
     </tr>
   </thead>
@@ -664,13 +770,13 @@ if ($exportar === 'pdf') {
     exit;
 }
 
-/* ════════════════════ HTML NORMAL ════════════════════════════════════════ */
+/* Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â HTML NORMAL Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â */
 ?>
 <!doctype html>
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<title>Personal · Lista</title>
+<title>Personal - Lista</title>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
@@ -708,7 +814,7 @@ if ($exportar === 'pdf') {
   .form-select option { background: #0f172a; color: #e5e7eb; }
   .form-label { font-size: .76rem; color: #94a3b8; margin-bottom: .25rem; }
 
-  /* Estadísticas */
+  /* Estadisticas */
   .stat-card {
     background: rgba(15,23,42,.85); border: 1px solid rgba(148,163,184,.28);
     border-radius: 10px; padding: 10px 14px; text-align: center;
@@ -731,8 +837,17 @@ if ($exportar === 'pdf') {
   }
   .tbl td { padding: .38rem .6rem; vertical-align: middle; border-color: rgba(148,163,184,.15) !important; }
   .tbl tbody tr:hover td { background: rgba(59,130,246,.08) !important; }
+  .tbl th:nth-child(1), .tbl td:nth-child(1) { width: 44px; text-align: center; }
+  .tbl th:nth-child(2), .tbl td:nth-child(2) { width: 110px; }
+  .tbl th:nth-child(3), .tbl td:nth-child(3) { width: 150px; }
+  .tbl th:nth-child(4), .tbl td:nth-child(4) { min-width: 290px; }
+  .tbl th:nth-child(5), .tbl td:nth-child(5) { width: 120px; }
+  .tbl th:nth-child(6), .tbl td:nth-child(6) { min-width: 340px; }
+  .tbl th:last-child, .tbl td:last-child { width: 110px; }
+  .tbl .dni-cell { font-size: .86rem; letter-spacing: .02em; }
+  .tbl .acciones-cell { white-space: nowrap; }
 
-  /* Jerarquía separador */
+  /* Jerarquia separador */
   .jer-row td {
     background: rgba(30,41,59,.98) !important;
     color: #7dd3fc; font-weight: 900; font-size: .78rem;
@@ -756,7 +871,7 @@ if ($exportar === 'pdf') {
     font-size: .65rem; font-weight: 800;
   }
 
-  /* Con parte — fila destacada */
+  /* Con parte - fila destacada */
   .fila-parte td { background: rgba(239,68,68,.06) !important; }
 
   /* Nombre clickable */
@@ -768,7 +883,7 @@ if ($exportar === 'pdf') {
   /* Observaciones truncadas */
   .obs-cell { max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: help; }
 
-  /* Botones de acción */
+  /* Botones de accion */
   .btn-accion {
     background: none; border: 1px solid rgba(148,163,184,.3); color: #94a3b8;
     border-radius: 6px; padding: .2rem .5rem; font-size: .72rem; cursor: pointer; transition: all .15s;
@@ -803,26 +918,26 @@ if ($exportar === 'pdf') {
   <div class="alert alert-success py-2"><?= e($mensajeImport) ?></div>
 <?php endif; ?>
 <?php if ($mensajeImportError !== ''): ?>
-  <div class="alert alert-danger py-2"><b>Error importación:</b> <?= e($mensajeImportError) ?></div>
+  <div class="alert alert-danger py-2"><b>Error de importacion:</b> <?= e($mensajeImportError) ?></div>
 <?php endif; ?>
 
-<!-- ENCABEZADO + ESTADÍSTICAS -->
+<!-- ENCABEZADO + ESTADISTICAS -->
 <div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-3">
   <div>
-    <div style="font-weight:900;font-size:1.1rem;"><i class="bi bi-people-fill me-2 text-info"></i>Nómina de personal</div>
+    <div style="font-weight:900;font-size:1.1rem;"><i class="bi bi-people-fill me-2 text-info"></i>Nomina de personal</div>
     <div class="help-small">
-      Ordenada por jerarquía y grado · <b><?= $totalGeneral ?></b> efectivos
+      Ordenada por jerarquia y grado - <b><?= $totalGeneral ?></b> efectivos
       <?php if ($cicloFiltro !== ''): ?>
-        · <span style="color:#7dd3fc;font-weight:700;">Ciclo <?= e($cicloFiltro) ?></span>
+        - <span style="color:#7dd3fc;font-weight:700;">Ciclo <?= e($cicloFiltro) ?></span>
       <?php elseif (!empty($ciclosDisponibles)): ?>
-        · <span style="color:#9ca3af;">Todos los ciclos</span>
+        - <span style="color:#9ca3af;">Todos los ciclos</span>
       <?php endif; ?>
     </div>
   </div>
   <!-- Selector de ciclo + botones -->
   <div class="d-flex flex-wrap gap-2 align-items-center">
 
-    <!-- Selector de año/ciclo -->
+    <!-- Selector de ano/ciclo -->
     <?php if (!empty($ciclosDisponibles)): ?>
     <div class="d-flex align-items-center gap-1" style="background:rgba(15,23,42,.8);border:1px solid rgba(148,163,184,.3);border-radius:8px;padding:.3rem .6rem;">
       <i class="bi bi-calendar2-week text-info" style="font-size:.85rem;"></i>
@@ -866,7 +981,7 @@ if ($exportar === 'pdf') {
   </div>
 </div>
 
-<!-- ESTADÍSTICAS -->
+<!-- ESTADISTICAS -->
 <div class="row g-2 mb-3">
   <div class="col-6 col-sm-3 col-lg">
     <div class="stat-card">
@@ -918,7 +1033,7 @@ if ($exportar === 'pdf') {
       <input class="form-control form-control-sm" name="q" value="<?= e($q) ?>" placeholder="Nombre, DNI, grado...">
     </div>
     <div class="col-md-3 col-lg-2">
-      <label class="form-label">Jerarquía</label>
+      <label class="form-label">Jerarquia</label>
       <select class="form-select form-select-sm" name="jerarquia">
         <option value="">Todas</option>
         <?php foreach (['OFICIAL','SUBOFICIAL','SOLDADO','AGENTE_CIVIL'] as $j): ?>
@@ -927,12 +1042,12 @@ if ($exportar === 'pdf') {
       </select>
     </div>
     <div class="col-md-3 col-lg-2">
-      <label class="form-label">Área / Destino</label>
-      <select class="form-select form-select-sm" name="destino_id">
-        <option value="0">Todos</option>
+      <label class="form-label">Area / Destino</label>
+      <select class="form-select form-select-sm" name="destino">
+        <option value="">Todos</option>
         <?php foreach ($destinos as $dst): ?>
-          <option value="<?= (int)$dst['id'] ?>" <?= $filtroDst === (int)$dst['id'] ? 'selected' : '' ?>>
-            <?= e($dst['codigo'] ?? '') ?> · <?= e($dst['nombre']) ?>
+          <option value="<?= e($dst['nombre'] ?? '') ?>" <?= $filtroDst === (string)($dst['nombre'] ?? '') ? 'selected' : '' ?>>
+            <?= e($dst['nombre'] ?? '') ?>
           </option>
         <?php endforeach; ?>
       </select>
@@ -973,11 +1088,8 @@ if ($exportar === 'pdf') {
         <th>Arma/Cuerpo</th>
         <th>Apellido y Nombre</th>
         <th>DNI</th>
-        <th>Área</th>
-        <th>Función / Destino interno</th>
-        <th>Teléfono</th>
-        <th>Fracción</th>
-        <?php if ($esAdmin): ?><th class="text-end">Acción</th><?php endif; ?>
+        <th>Funcion / Destino interno</th>
+        <?php if ($esAdmin): ?><th class="text-end">Accion</th><?php endif; ?>
       </tr>
     </thead>
     <tbody>
@@ -986,14 +1098,15 @@ if ($exportar === 'pdf') {
       $nro = 0;
       $jerBadgeMap = ['OFICIAL'=>'badge-of','SUBOFICIAL'=>'badge-sof','SOLDADO'=>'badge-sol','AGENTE_CIVIL'=>'badge-cv'];
       $jerLabels   = ['OFICIAL'=>'OFICIALES','SUBOFICIAL'=>'SUBOFICIALES','SOLDADO'=>'SOLDADOS','AGENTE_CIVIL'=>'AGENTES CIVILES'];
-      $cols = 9 + ($esAdmin ? 1 : 0);
+      $cols = 6 + ($esAdmin ? 1 : 0);
 
       foreach ($personal as $p):
           $jer       = $p['jerarquia'] ?? '';
           $tieneParte = (int)($p['tiene_parte_enfermo'] ?? 0) === 1;
-          $destLabel  = trim(($p['destino_codigo'] ?? '') !== '' ? ($p['destino_codigo'] . ' · ' . $p['destino_nombre']) : ($p['destino_nombre'] ?? ''));
-          if ($destLabel === '') $destLabel = '—';
-          $funcDest   = trim(($p['funcion'] ?? '') . (($p['destino_interno'] ?? '') !== '' ? ' / ' . $p['destino_interno'] : ''));
+          $funcDest = trim((string)($p['funcion'] ?? ''));
+          if (!empty($p['destino_interno'])) {
+              $funcDest = $funcDest !== '' ? $funcDest . ' / ' . $p['destino_interno'] : (string)$p['destino_interno'];
+          }
           $badgeClass = $jerBadgeMap[$jer] ?? 'badge-cv';
 
           if ($jer !== $jerActual):
@@ -1011,7 +1124,7 @@ if ($exportar === 'pdf') {
       <tr class="<?= $tieneParte ? 'fila-parte' : '' ?>">
         <td style="color:#6b7280;font-size:.72rem;text-align:center;"><?= $nro ?></td>
         <td>
-          <span class="badge-jer <?= $badgeClass ?>"><?= e($p['grado'] ?? '—') ?></span>
+          <span class="badge-jer <?= $badgeClass ?>"><?= e($p['grado'] ?? '-') ?></span>
         </td>
         <td style="color:#94a3b8;"><?= e($p['arma'] ?? '') ?></td>
         <td>
@@ -1019,34 +1132,16 @@ if ($exportar === 'pdf') {
             <?= e($p['apellido_nombre'] ?? '') ?>
           </a>
         </td>
-        <td style="font-family:monospace;font-size:.75rem;color:#94a3b8;"><?= e($p['dni'] ?? '') ?></td>
-        <td><?php if ($destLabel !== '—'): ?><span style="font-size:.75rem;"><?= e($destLabel) ?></span><?php else: ?><span class="text-muted">—</span><?php endif; ?></td>
+        <td class="dni-cell" style="font-family:monospace;color:#94a3b8;"><?= e($p['dni'] ?? '') ?></td>
         <td>
           <?php if ($funcDest !== '' && $funcDest !== '/'): ?>
             <span style="font-size:.76rem;color:#b7c3d6;"><?= e($funcDest) ?></span>
           <?php else: ?>
-            <span class="text-muted">—</span>
-          <?php endif; ?>
-        </td>
-        <td style="font-size:.75rem;">
-          <?php if (!empty($p['telefono'])): ?>
-            <a href="tel:<?= e($p['telefono']) ?>" style="color:#7dd3fc;text-decoration:none;">
-              <?= e($p['telefono']) ?>
-            </a>
-          <?php else: ?>—<?php endif; ?>
-        </td>
-        <td>
-          <?php if ($tieneParte): ?>
-            <span class="badge-parte">PARTE</span>
-            <?php if ($p['parte_enfermo_desde']): ?>
-              <div style="font-size:.65rem;color:#9ca3af;"><?= fmt_date($p['parte_enfermo_desde']) ?></div>
-            <?php endif; ?>
-          <?php else: ?>
-            <span style="color:#374151;font-size:.75rem;">—</span>
+            <span class="text-muted">-</span>
           <?php endif; ?>
         </td>
         <?php if ($esAdmin): ?>
-        <td class="text-end">
+        <td class="text-end acciones-cell">
           <a href="personal_ficha.php?id=<?= (int)$p['id'] ?>&tab=ficha" class="btn-accion" title="Ver ficha">
             <i class="bi bi-person-vcard"></i>
           </a>
@@ -1066,11 +1161,11 @@ if ($exportar === 'pdf') {
     <tfoot>
       <tr style="background:rgba(15,23,42,.98)!important;">
         <td colspan="<?= $cols - 2 ?>" style="color:#6b7280;font-size:.74rem;padding:.5rem .6rem;">
-          Oficiales: <b><?= $totalOficial ?></b> ·
+          Oficiales: <b><?= $totalOficial ?></b> -
           Suboficiales: <b><?= $totalSuboficial ?></b>
-          <?php if ($totalSoldado): ?> · Soldados: <b><?= $totalSoldado ?></b><?php endif; ?>
-          <?php if ($totalCivil): ?> · Ag. Civiles: <b><?= $totalCivil ?></b><?php endif; ?>
-          <?php if ($totalParte): ?> · <span style="color:#fca5a5;">Con parte: <b><?= $totalParte ?></b></span><?php endif; ?>
+          <?php if ($totalSoldado): ?> - Soldados: <b><?= $totalSoldado ?></b><?php endif; ?>
+          <?php if ($totalCivil): ?> - Ag. Civiles: <b><?= $totalCivil ?></b><?php endif; ?>
+          <?php if ($totalParte): ?> - <span style="color:#fca5a5;">Con parte: <b><?= $totalParte ?></b></span><?php endif; ?>
         </td>
         <td colspan="2" style="text-align:right;color:#4ade80;font-weight:900;font-size:.84rem;padding:.5rem .6rem;">
           Total: <?= $totalGeneral ?>
@@ -1086,7 +1181,7 @@ if ($exportar === 'pdf') {
 
 
 <?php if ($esAdmin): ?>
-<!-- ═══════════════════ MODAL IMPORTAR EXCEL ═══════════════════════════════ -->
+<!-- Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â MODAL IMPORTAR EXCEL Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â -->
 <div class="modal fade" id="modalImport" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-lg modal-dialog-scrollable">
     <div class="modal-content" style="background:rgba(15,23,42,.98);color:#e5e7eb;border:1px solid rgba(148,163,184,.5);border-radius:14px;">
@@ -1097,10 +1192,10 @@ if ($exportar === 'pdf') {
         </div>
         <div class="modal-body" style="overflow-y:auto;max-height:70vh;">
 
-          <!-- AÑO DEL CICLO -->
+          <!-- ANO DEL CICLO -->
           <div class="mb-3 p-3" style="background:rgba(59,130,246,.1);border:1px solid rgba(59,130,246,.3);border-radius:8px;">
             <label style="font-size:.8rem;font-weight:800;color:#93c5fd;display:block;margin-bottom:6px;">
-              <i class="bi bi-calendar2-week me-1"></i> Año del ciclo
+              <i class="bi bi-calendar2-week me-1"></i> Ano del ciclo
             </label>
             <div class="d-flex align-items-center gap-3 flex-wrap">
               <input type="number" name="ciclo_import" id="cicloImport"
@@ -1110,7 +1205,7 @@ if ($exportar === 'pdf') {
                 <div style="font-size:.75rem;color:#9ca3af;">Ciclos existentes para esta unidad:</div>
                 <div class="d-flex gap-1 flex-wrap mt-1">
                   <?php if (empty($ciclosDisponibles)): ?>
-                    <span style="font-size:.72rem;color:#6b7280;">Ninguno todavía</span>
+                    <span style="font-size:.72rem;color:#6b7280;">Ninguno todavia</span>
                   <?php else: foreach($ciclosDisponibles as $cy): ?>
                     <button type="button" onclick="document.getElementById('cicloImport').value='<?= (int)$cy ?>'"
                             style="background:rgba(59,130,246,.2);border:1px solid rgba(59,130,246,.4);color:#93c5fd;border-radius:4px;padding:.15rem .5rem;font-size:.72rem;font-weight:700;cursor:pointer;">
@@ -1122,10 +1217,10 @@ if ($exportar === 'pdf') {
             </div>
           </div>
 
-          <!-- MODO DE IMPORTACIÓN -->
+          <!-- MODO DE IMPORTACION -->
           <div class="mb-3">
             <label style="font-size:.8rem;font-weight:800;color:#e5e7eb;display:block;margin-bottom:8px;">
-              <i class="bi bi-gear me-1"></i> Modo de importación
+              <i class="bi bi-gear me-1"></i> Modo de importacion
             </label>
             <div class="d-flex flex-column gap-2">
 
@@ -1137,8 +1232,8 @@ if ($exportar === 'pdf') {
                   </div>
                   <div style="font-size:.74rem;color:#9ca3af;">
                     Crea nuevos y actualiza los existentes (por DNI).
-                    <b>No borra</b> a nadie que no esté en el Excel.
-                    Ideal para actualizaciones parciales durante el año.
+                    <b>No borra</b> a nadie que no este en el Excel.
+                    Ideal para actualizaciones parciales durante el ano.
                   </div>
                 </div>
               </label>
@@ -1150,7 +1245,7 @@ if ($exportar === 'pdf') {
                     <i class="bi bi-person-plus me-1"></i> Solo nuevos (soldados ingresantes, etc.)
                   </div>
                   <div style="font-size:.74rem;color:#9ca3af;">
-                    Inserta únicamente los DNI que <b>no existen</b> todavía. Los registros existentes no se modifican.
+                    Inserta unicamente los DNI que <b>no existen</b> todavia. Los registros existentes no se modifican.
                     Usalo para incorporar soldados nuevos en mitad del ciclo.
                   </div>
                 </div>
@@ -1163,14 +1258,14 @@ if ($exportar === 'pdf') {
                     <i class="bi bi-exclamation-triangle me-1"></i> Reemplazar ciclo completo
                   </div>
                   <div style="font-size:.74rem;color:#9ca3af;">
-                    Borra toda la relación del ciclo elegido y la recarga desde el Excel.
+                    Borra toda la relacion del ciclo elegido y la recarga desde el Excel.
                     Los datos en <code>personal_unidad</code> se actualizan pero <b>no se borran personas</b>.
-                    Usalo al inicio de un año nuevo (ej: 2027).
+                    Usalo al inicio de un ano nuevo (ej: 2027).
                   </div>
-                  <!-- Campo de confirmación — oculto hasta seleccionar -->
+                  <!-- Campo de confirmacion - oculto hasta seleccionar -->
                   <div class="confirm-zone mt-2" style="display:none;">
                     <div style="font-size:.74rem;color:#f87171;margin-bottom:4px;">
-                      ⚠️ Escribí <b>CONFIRMAR</b> para continuar:
+                      Atencion: Escribi <b>CONFIRMAR</b> para continuar:
                     </div>
                     <input type="text" name="confirmacion_reemplazar" id="confirmInput"
                            class="form-control form-control-sm" placeholder="CONFIRMAR"
@@ -1190,12 +1285,12 @@ if ($exportar === 'pdf') {
             <input type="file" name="excel_archivo" class="form-control form-control-sm"
                    accept=".xls,.xlsx" required>
             <div style="font-size:.73rem;color:#9ca3af;margin-top:4px;">
-              El Excel debe venir con 26 columnas, de la A a la Z, y acepta filas separadoras de jerarquía
+              El Excel debe venir con 26 columnas, de la A a la Z, y acepta filas separadoras de jerarquia
               (OFICIALES / SUBOFICIALES / SOLDADOS / AGENTES CIVILES).
             </div>
             <div class="mt-2 small" style="color:#cbd5e1;">
               <div><b>Columnas esperadas:</b></div>
-              <div><b>A:</b> Grado (o separador jerarquía)</div>
+              <div><b>A:</b> Grado (o separador de jerarquia)</div>
               <div><b>B:</b> Arma / Especialidad</div>
               <div><b>C:</b> Apellido y Nombre</div>
               <div><b>D:</b> DNI</div>
@@ -1211,15 +1306,15 @@ if ($exportar === 'pdf') {
               <div><b>N:</b> Nro Cta Banco</div>
               <div><b>O:</b> CBU Banco</div>
               <div><b>P:</b> Alias Banco</div>
-              <div><b>Q:</b> Fecha último Anexo 27</div>
+              <div><b>Q:</b> Fecha ultimo Anexo 27</div>
               <div><b>R:</b> Tiene parte de enfermo (SI/NO/1/0)</div>
               <div><b>S:</b> Desde</div>
               <div><b>T:</b> Hasta</div>
               <div><b>U:</b> Cantidad de parte de enfermo</div>
               <div><b>V:</b> Destino interno</div>
               <div><b>W:</b> Rol</div>
-              <div><b>X:</b> Años en destino</div>
-              <div><b>Y:</b> Fracción</div>
+              <div><b>X:</b> Anos en destino</div>
+              <div><b>Y:</b> Fraccion</div>
               <div><b>Z:</b> Observaciones</div>
             </div>
           </div>
@@ -1227,7 +1322,7 @@ if ($exportar === 'pdf') {
           <!-- RESUMEN ciclo seleccionado -->
           <div id="cicloInfo" style="font-size:.74rem;color:#9ca3af;padding:.4rem .7rem;background:rgba(15,23,42,.6);border-radius:6px;border:1px solid rgba(148,163,184,.15);">
             <i class="bi bi-info-circle me-1"></i>
-            Seleccioná el año arriba para ver si ya existe ese ciclo.
+            Selecciona el ano arriba para ver si ya existe ese ciclo.
           </div>
 
         </div>
@@ -1243,16 +1338,16 @@ if ($exportar === 'pdf') {
 </div>
 
 <script>
-// Datos de ciclos existentes para el info dinámico
+// Datos de ciclos existentes para el info dinamico
 const ciclosExistentes = <?= json_encode(array_map('intval', $ciclosDisponibles)) ?>;
-const cicloConteos    = {}; // podría llenarse con AJAX, por ahora info básica
+const cicloConteos    = {}; // podria llenarse con AJAX, por ahora info basica
 
 document.addEventListener('DOMContentLoaded', () => {
   const cicloInput   = document.getElementById('cicloImport');
   const cicloInfoBox = document.getElementById('cicloInfo');
   const confirmInput = document.getElementById('confirmInput');
 
-  // Mostrar/ocultar campo de confirmación según radio seleccionado
+  // Mostrar/ocultar campo de confirmacion segun radio seleccionado
   document.querySelectorAll('input[name="accion_import"]').forEach(radio => {
     radio.addEventListener('change', () => {
       document.querySelectorAll('.confirm-zone').forEach(z => z.style.display = 'none');
@@ -1262,7 +1357,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
-  // Info dinámica del ciclo
+  // Info dinamica del ciclo
   function updateCicloInfo() {
     const ciclo = parseInt(cicloInput?.value || 0);
     if (!cicloInfoBox) return;
@@ -1276,7 +1371,7 @@ document.addEventListener('DOMContentLoaded', () => {
       cicloInfoBox.style.background  = 'rgba(251,191,36,.06)';
     } else {
       cicloInfoBox.innerHTML = `<i class="bi bi-plus-circle text-success me-1"></i>
-        El ciclo <b>${ciclo}</b> es nuevo — se creará al importar.`;
+        El ciclo <b>${ciclo}</b> es nuevo - se creara al importar.`;
       cicloInfoBox.style.borderColor = 'rgba(34,197,94,.3)';
       cicloInfoBox.style.background  = 'rgba(34,197,94,.05)';
     }
@@ -1286,15 +1381,15 @@ document.addEventListener('DOMContentLoaded', () => {
     updateCicloInfo();
   }
 
-  // Validar confirmación antes de enviar
+  // Validar confirmacion antes de enviar
   document.getElementById('formImport')?.addEventListener('submit', (e) => {
     const modo = document.querySelector('input[name="accion_import"]:checked')?.value;
     if (modo === 'reemplazar_ciclo') {
       if (confirmInput?.value.trim() !== 'CONFIRMAR') {
         e.preventDefault();
         Swal.fire({
-          title: '⚠️ Confirmación requerida',
-          text: 'Escribí CONFIRMAR en el campo de texto para reemplazar el ciclo.',
+          title: 'Atencion: Confirmacion requerida',
+          text: 'Escribi CONFIRMAR en el campo de texto para reemplazar el ciclo.',
           icon: 'warning', background: '#0f172a', color: '#e5e7eb'
         });
         return;
@@ -1302,13 +1397,13 @@ document.addEventListener('DOMContentLoaded', () => {
       const ciclo = parseInt(cicloInput?.value || 0);
       e.preventDefault();
       Swal.fire({
-        title: '¿Reemplazar ciclo ' + ciclo + '?',
-        html: `Se borrarán <b>todas las relaciones</b> del ciclo ${ciclo} y se recargarán desde el Excel.<br><br>
-               Los datos en la tabla de personal <b>no se borran</b>, solo la relación con el ciclo.<br><br>
-               <span style="color:#fca5a5;font-weight:bold;">Esta acción no se puede deshacer.</span>`,
+        title: 'Reemplazar ciclo ' + ciclo + '?',
+        html: `Se borraran <b>todas las relaciones</b> del ciclo ${ciclo} y se recargaran desde el Excel.<br><br>
+               Los datos en la tabla de personal <b>no se borran</b>, solo la relacion con el ciclo.<br><br>
+               <span style="color:#fca5a5;font-weight:bold;">Esta accion no se puede deshacer.</span>`,
         icon: 'warning',
         showCancelButton: true,
-        confirmButtonText: 'Sí, reemplazar',
+        confirmButtonText: 'Si, reemplazar',
         cancelButtonText: 'Cancelar',
         confirmButtonColor: '#dc3545',
         background: '#0f172a', color: '#e5e7eb'
@@ -1325,7 +1420,7 @@ document.addEventListener('DOMContentLoaded', () => {
 document.querySelectorAll('.obs-cell').forEach(el => {
     el.title = el.textContent.trim();
 });
-// Highlight búsqueda en la tabla
+// Highlight busqueda en la tabla
 const q = <?= json_encode($q) ?>;
 if (q.trim() !== '') {
     const re = new RegExp('(' + q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')', 'gi');

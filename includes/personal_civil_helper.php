@@ -259,6 +259,50 @@ function personal_civil_destino_map(PDO $pdo, int $unidadId): array
     return $map;
 }
 
+function personal_civil_attlog_rows(string $path): array
+{
+    if (!is_file($path)) {
+        throw new RuntimeException('No se encontró el archivo .dat a importar.');
+    }
+
+    $lines = @file($path, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+    if ($lines === false) {
+        throw new RuntimeException('No se pudo leer el archivo .dat del lector.');
+    }
+
+    $rows = [];
+    foreach ($lines as $line) {
+        $raw = trim((string)$line);
+        if ($raw === '') {
+            continue;
+        }
+
+        $parts = preg_split('/\t+/', $raw) ?: [];
+        if (count($parts) < 2) {
+            continue;
+        }
+
+        $dni = personal_civil_normalize_dni((string)($parts[0] ?? ''));
+        $fechaHora = trim((string)($parts[1] ?? ''));
+        if ($dni === '' || $fechaHora === '') {
+            continue;
+        }
+
+        $rows[] = [
+            'A' => $dni,
+            'B' => '',
+            'C' => '',
+            'F' => (string)($parts[2] ?? ''),
+            'G' => (string)($parts[3] ?? ''),
+            'H' => (string)($parts[4] ?? ''),
+            'I' => (string)($parts[5] ?? ''),
+            'J' => $fechaHora,
+        ];
+    }
+
+    return $rows;
+}
+
 function personal_civil_import_padron(PDO $pdo, int $unidadId, int $updatedById, string $path, string $sourceName = ''): array
 {
     personal_civil_ensure_tables($pdo);
@@ -400,14 +444,23 @@ function personal_civil_import_padron(PDO $pdo, int $unidadId, int $updatedById,
 function personal_civil_import_registros(PDO $pdo, int $unidadId, int $updatedById, string $path, string $sourceName = ''): array
 {
     personal_civil_ensure_tables($pdo);
-    $sheets = personal_civil_xlsx_rows($path);
-    if ($sheets === []) {
-        throw new RuntimeException('El Excel de registros no contiene hojas legibles.');
-    }
+    $ext = strtolower((string)pathinfo($sourceName !== '' ? $sourceName : $path, PATHINFO_EXTENSION));
+    if ($ext === 'dat') {
+        $rows = personal_civil_attlog_rows($path);
+        if ($rows === []) {
+            throw new RuntimeException('El archivo .dat no contiene marcas legibles.');
+        }
+    } else {
+        $sheets = personal_civil_xlsx_rows($path);
+        if ($sheets === []) {
+            throw new RuntimeException('El Excel de registros no contiene hojas legibles.');
+        }
 
-    $rows = $sheets[0]['rows'] ?? [];
-    if (count($rows) < 2) {
-        throw new RuntimeException('El Excel de registros no tiene filas de datos.');
+        $rows = $sheets[0]['rows'] ?? [];
+        if (count($rows) < 2) {
+            throw new RuntimeException('El Excel de registros no tiene filas de datos.');
+        }
+        $rows = array_slice($rows, 1);
     }
 
     $getPersonalId = $pdo->prepare("SELECT id FROM personal_unidad WHERE unidad_id = :u AND dni = :dni LIMIT 1");
@@ -430,7 +483,7 @@ function personal_civil_import_registros(PDO $pdo, int $unidadId, int $updatedBy
     $count = 0;
     $pdo->beginTransaction();
     try {
-        foreach (array_slice($rows, 1) as $row) {
+        foreach ($rows as $row) {
             $dni = personal_civil_normalize_dni((string)($row['A'] ?? ''));
             if ($dni === '') {
                 continue;

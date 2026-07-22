@@ -17,8 +17,16 @@ require_once __DIR__ . '/../auth/bootstrap.php';
  */
 function operaciones_app_base_web(): string {
     $self = (string)($_SERVER['SCRIPT_NAME'] ?? $_SERVER['PHP_SELF'] ?? '');
-    $public = rtrim(str_replace('\\','/', dirname($self)), '/'); // /ea/public/...
-    return rtrim(str_replace('\\','/', dirname($public)), '/'); // /ea
+    $self = str_replace('\\', '/', $self);
+    $pos = stripos($self, '/public/');
+    if ($pos !== false) {
+        return rtrim(substr($self, 0, $pos), '/');
+    }
+    if (preg_match('#/public$#i', $self)) {
+        return rtrim(substr($self, 0, -7), '/');
+    }
+    $dir = rtrim(str_replace('\\', '/', dirname($self)), '/');
+    return rtrim(str_replace('\\', '/', dirname($dir)), '/');
 }
 
 /**
@@ -27,7 +35,15 @@ function operaciones_app_base_web(): string {
  */
 function operaciones_app_public_web(): string {
     $self = (string)($_SERVER['SCRIPT_NAME'] ?? $_SERVER['PHP_SELF'] ?? '');
-    return rtrim(str_replace('\\','/', dirname($self)), '/');
+    $self = str_replace('\\', '/', $self);
+    $pos = stripos($self, '/public/');
+    if ($pos !== false) {
+        return rtrim(substr($self, 0, $pos + 7), '/');
+    }
+    if (preg_match('#/public$#i', $self)) {
+        return rtrim($self, '/');
+    }
+    return rtrim(operaciones_app_base_web(), '/') . '/public';
 }
 
 /**
@@ -239,13 +255,15 @@ function operaciones_render_chat_widget(PDO $pdo): void {
     echo "\n";
     ?>
 
+<link rel="stylesheet" href="<?= operaciones_url('public/chat.css') ?>">
+
 <!-- Chat widget -->
-<div id="chatLauncher" class="chat-launcher chat-hidden">
+<div id="chatLauncher" class="chat-launcher show">
   <div class="chat-launcher-title">Chat interno</div>
   <span id="chatLauncherBadge" class="chat-total-badge">0</span>
 </div>
 
-<div id="chatDock" class="chat-dock">
+<div id="chatDock" class="chat-dock chat-hidden">
   <div class="chat-dock-head">
     <div class="chat-dock-title-wrap">
       <div class="chat-dock-title">Chat interno</div>

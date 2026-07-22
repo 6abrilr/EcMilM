@@ -6,17 +6,26 @@ declare(strict_types=1);
 $OFFLINE_MODE = false;
 // ===================================
 
-require_once __DIR__ . '/../auth/bootstrap.php';
+require_once __DIR__ . '/../../auth/bootstrap.php';
 if (!$OFFLINE_MODE) {
     require_login();
 }
-require_once __DIR__ . '/../config/db.php';
+require_once __DIR__ . '/../../config/db.php';
 require_once __DIR__ . '/operaciones_educacion_tables_helper.php';
 
 /** @var PDO $pdo */
 s3_ensure_tables($pdo);
 
 function e($v){ return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'); }
+function s3_column_exists(PDO $pdo, string $table, string $column): bool {
+    try {
+        $st = $pdo->prepare("SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = :t AND COLUMN_NAME = :c");
+        $st->execute([':t' => $table, ':c' => $column]);
+        return (int)$st->fetchColumn() > 0;
+    } catch (Throwable $e) {
+        return false;
+    }
+}
 
 /* ===== Usuario ===== */
 if (!function_exists('user_display_name')) {
@@ -108,7 +117,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             ]);
         }
 
-        header('Location: s3_educacion_cursos.php?saved=1');
+        header('Location: operaciones_educacion_cursos.php?saved=1');
         exit;
     }
 
@@ -128,17 +137,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
             }
         }
-        header('Location: s3_educacion_cursos.php?saved=1');
+        header('Location: operaciones_educacion_cursos.php?saved=1');
         exit;
     }
 }
 
 /* ===== Assets ===== */
-$PUBLIC_URL = rtrim(str_replace('\\','/', dirname($_SERVER['SCRIPT_NAME'] ?? $_SERVER['PHP_SELF'])), '/');
-$APP_URL    = rtrim(str_replace('\\','/', dirname($PUBLIC_URL)), '/');
-$ASSETS_URL = ($APP_URL === '' ? '' : $APP_URL) . '/assets';
+$SELF_URL        = (string)($_SERVER['SCRIPT_NAME'] ?? $_SERVER['PHP_SELF'] ?? '');
+$OPERACIONES_URL = rtrim(str_replace('\\','/', dirname($SELF_URL)), '/');
+$PUBLIC_URL      = rtrim(str_replace('\\','/', dirname($OPERACIONES_URL)), '/');
+$APP_URL         = rtrim(str_replace('\\','/', dirname($PUBLIC_URL)), '/');
+$ASSETS_URL      = ($APP_URL === '' ? '' : $APP_URL) . '/assets';
 $IMG_BG     = $ASSETS_URL . '/img/fondo.png';
-$ESCUDO     = $ASSETS_URL . '/img/escudo_bcom602.png';
+$ESCUDO     = $ASSETS_URL . '/img/ecmilm.png';
+$FAVICON    = $ESCUDO;
+$UNIDAD_NOMBRE = 'Escuela Militar de Monta&ntilde;a';
+$UNIDAD_LEMA   = '&ldquo;La monta&ntilde;a nos une&rdquo;';
 
 /* ===== Filtros por Sigla / Denominación / Participantes (GET) ===== */
 $filtroSigla        = trim((string)($_GET['sigla'] ?? ''));
@@ -186,10 +200,14 @@ $porcCursos       = $totalCursos > 0 ? round($cursosCumplidos * 100.0 / $totalCu
 /* ===== Listado de personal para autocomplete (igual que en s3_educacion_clases.php) ===== */
 $personalUnidad = [];
 try {
+    $armaCol = s3_column_exists($pdo, 'personal_unidad', 'arma_espec')
+        ? 'arma_espec'
+        : (s3_column_exists($pdo, 'personal_unidad', 'arma') ? 'arma' : '');
+    $armaExpr = $armaCol !== '' ? $armaCol : "''";
     $personalUnidad = $pdo->query("
         SELECT
           grado,
-          arma_espec      AS arma,
+          {$armaExpr} AS arma,
           apellido_nombre AS nombre_apellido
         FROM personal_unidad
         WHERE apellido_nombre IS NOT NULL AND apellido_nombre <> ''
@@ -208,8 +226,8 @@ $savedFlag = ($_GET['saved'] ?? '') === '1';
 <title>Cursos regulares · Educación operacional · S-3 · B Com 602</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-<link rel="stylesheet" href="../assets/css/theme-602.css">
-<link rel="icon" type="image/png" href="../assets/img/bcom602.png">
+<link rel="stylesheet" href="<?= e($ASSETS_URL) ?>/css/theme-602.css">
+<link rel="icon" type="image/png" href="<?= e($FAVICON) ?>">
 <style>
   body{
     background: url("<?= e($IMG_BG) ?>") no-repeat center center fixed;
@@ -271,6 +289,22 @@ $savedFlag = ($_GET['saved'] ?? '') === '1';
   .brand-sub{
     font-size:.8rem;
     color:#9ca3af;
+  }
+  .brand-title:not(.brand-title-fixed),
+  .brand-sub:not(.brand-sub-fixed){
+    display:none;
+  }
+  .header-back a{
+    font-size:0 !important;
+  }
+  .header-back a::before{
+    font-size:.875rem;
+  }
+  .header-back a:first-child::before{
+    content:"Volver a Educaci\00f3n de cuadros";
+  }
+  .header-back a:last-child::before{
+    content:"Volver a Operaciones";
   }
 
   .top-actions{
@@ -380,17 +414,20 @@ $savedFlag = ($_GET['saved'] ?? '') === '1';
 <header class="brand-hero">
   <div class="hero-inner container-main d-flex justify-content-between align-items-center">
     <div class="d-flex align-items-center gap-3">
-      <img class="brand-logo" src="<?= e($ESCUDO) ?>" alt="Escudo 602" style="height:52px; width:auto;">
+      <img class="brand-logo" src="<?= e($ESCUDO) ?>" alt="Escudo ECMILM" style="height:52px; width:auto;"
+           onerror="this.onerror=null;this.src='<?= e($ASSETS_URL) ?>/img/EA.png';">
       <div>
+        <div class="brand-title brand-title-fixed"><?= $UNIDAD_NOMBRE ?></div>
+        <div class="brand-sub brand-sub-fixed"><?= $UNIDAD_LEMA ?></div>
         <div class="brand-title">Batallón de Comunicaciones 602</div>
         <div class="brand-sub">“Hogar de las Comunicaciones Fijas del Ejército”</div>
       </div>
     </div>
     <div class="header-back">
-      <a href="s3_educacion_cuadros.php" class="btn btn-success btn-sm" style="font-weight:700; padding:.35rem .9rem;">
+      <a href="operaciones_educacion_cuadros.php" class="btn btn-success btn-sm" style="font-weight:700; padding:.35rem .9rem;">
         ⬅ Volver a Educación de cuadros
       </a>
-      <a href="areas.php" class="btn btn-success btn-sm" style="font-weight:700; padding:.35rem .9rem;">
+      <a href="operaciones.php" class="btn btn-success btn-sm" style="font-weight:700; padding:.35rem .9rem;">
         Volver a Áreas
       </a>
     </div>
@@ -477,7 +514,7 @@ $savedFlag = ($_GET['saved'] ?? '') === '1';
                       style="font-weight:700;">
                 Buscar
               </button>
-              <a href="s3_educacion_cursos.php"
+              <a href="operaciones_educacion_cursos.php"
                  class="btn btn-outline-success"
                  style="font-weight:600;">
                 Limpiar
@@ -692,7 +729,7 @@ $savedFlag = ($_GET['saved'] ?? '') === '1';
                           <?php foreach ($evFiles as $idx => $path): ?>
                             <?php $label = basename($path); ?>
                             <?php
-                              $delUrl = 's3_educacion_delete_doc.php?tipo=curso&id='
+                              $delUrl = 'operaciones_educacion_delete_doc.php?tipo=curso&id='
                                         . $id . '&file=' . urlencode(basename($path));
                             ?>
                             <div class="btn-group btn-group-sm mb-1" role="group">

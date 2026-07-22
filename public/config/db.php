@@ -1,6 +1,14 @@
 <?php
-// config/db.php
 declare(strict_types=1);
+
+if (realpath($_SERVER['SCRIPT_FILENAME'] ?? '') === __FILE__) {
+    require_once __DIR__ . '/../../auth/bootstrap.php';
+    require_login();
+    http_response_code(204);
+    exit;
+}
+
+// config/db.php
 
 /**
  * db.php (modo PRO)
@@ -10,8 +18,8 @@ declare(strict_types=1);
  * - Evita repetir conexiones con static singleton
  *
  * IMPORTANTE:
- * - NO hardcodees la contraseña en el repo público.
- * - Seteá DB_PASS en el servidor (recomendado).
+ * - NO hardcodees la contraseÃƒÆ’Ã‚Â±a en el repo pÃƒÆ’Ã‚Âºblico.
+ * - SeteÃƒÆ’Ã‚Â¡ DB_PASS en el servidor (recomendado).
  */
 
 function getDB(): PDO
@@ -59,5 +67,13 @@ function getDB(): PDO
     return $pdo;
 }
 
-// Compatibilidad con tu código actual (usa $pdo directamente)
+// Compatibilidad con tu cÃƒÆ’Ã‚Â³digo actual (usa $pdo directamente)
 $pdo = getDB();
+
+$unidadContextPath = __DIR__ . '/../../includes/unidad_context.php';
+if (is_file($unidadContextPath)) {
+    require_once $unidadContextPath;
+    if (function_exists('unidad_register_branding_output_filter')) {
+        unidad_register_branding_output_filter($pdo);
+    }
+}

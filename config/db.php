@@ -22,3 +22,11 @@ $pdo = new PDO($dsn, $cfg['user'], $cfg['pass'], [
   PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
   PDO::ATTR_EMULATE_PREPARES => false,
 ]);
+
+$unidadContextPath = dirname(__DIR__) . '/includes/unidad_context.php';
+if (is_file($unidadContextPath)) {
+  require_once $unidadContextPath;
+  if (function_exists('unidad_register_branding_output_filter')) {
+    unidad_register_branding_output_filter($pdo);
+  }
+}

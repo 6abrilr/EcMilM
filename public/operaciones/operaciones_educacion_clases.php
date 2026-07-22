@@ -17,6 +17,15 @@ require_once __DIR__ . '/operaciones_educacion_tables_helper.php';
 s3_ensure_tables($pdo);
 
 function e($v){ return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'); }
+function s3_column_exists(PDO $pdo, string $table, string $column): bool {
+    try {
+        $st = $pdo->prepare("SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = :t AND COLUMN_NAME = :c");
+        $st->execute([':t' => $table, ':c' => $column]);
+        return (int)$st->fetchColumn() > 0;
+    } catch (Throwable $e) {
+        return false;
+    }
+}
 
 /* ===== Usuario ===== */
 if (!function_exists('user_display_name')) {
@@ -191,10 +200,14 @@ $porcCursos       = $totalCursos > 0 ? round($cursosCumplidos * 100.0 / $totalCu
 /* ===== Listado de personal para autocomplete ===== */
 $personalUnidad = [];
 try {
+    $armaCol = s3_column_exists($pdo, 'personal_unidad', 'arma_espec')
+        ? 'arma_espec'
+        : (s3_column_exists($pdo, 'personal_unidad', 'arma') ? 'arma' : '');
+    $armaExpr = $armaCol !== '' ? $armaCol : "''";
     $personalUnidad = $pdo->query("
         SELECT
           grado,
-          arma_espec      AS arma,
+          {$armaExpr} AS arma,
           apellido_nombre AS nombre_apellido
         FROM personal_unidad
         WHERE apellido_nombre IS NOT NULL AND apellido_nombre <> ''
@@ -213,8 +226,8 @@ $savedFlag = ($_GET['saved'] ?? '') === '1';
 <title>Cursos regulares - Educacion operacional - <?= e($NOMBRE) ?></title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-<link rel="stylesheet" href="../assets/css/theme-602.css">
-<link rel="icon" type="image/png" href="../../assets/img/ecmilm.png">
+<link rel="stylesheet" href="<?= e($ASSETS_URL) ?>/css/theme-602.css">
+<link rel="icon" type="image/png" href="<?= e($ESCUDO) ?>">
 <style>
   :root{
     --bg-dark: #020617;
@@ -438,7 +451,7 @@ $savedFlag = ($_GET['saved'] ?? '') === '1';
     </div>
     <div class="header-back">
       <a href="operaciones_educacion_cuadros.php" class="btn-ghost">Volver a Educaci&oacute;n de cuadros</a>
-      <a href="areas.php" class="btn-ghost">Volver a &Aacute;reas</a>
+      <a href="operaciones.php" class="btn-ghost">Volver a Operaciones</a>
     </div>
   </div>
 </header>

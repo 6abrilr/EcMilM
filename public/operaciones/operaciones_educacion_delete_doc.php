@@ -1,8 +1,12 @@
 <?php
-// public/s3_educacion_delete_doc.php
 declare(strict_types=1);
 
-// Solo borramos archivo físico de evidencias de S3 Educación
+require_once __DIR__ . '/../../auth/bootstrap.php';
+require_login();
+
+// public/s3_educacion_delete_doc.php
+
+// Solo borramos archivo fÃƒÂ­sico de evidencias de S3 EducaciÃƒÂ³n
 // (clases_docs / trabajos_docs). No tocamos nada de checklist.
 
 $tipo = $_GET['tipo'] ?? '';
@@ -11,18 +15,18 @@ $file = $_GET['file'] ?? '';
 
 if ($id <= 0 || $file === '' || ($tipo !== 'clase' && $tipo !== 'trabajo')) {
     http_response_code(400);
-    echo "Parámetros inválidos";
+    echo "ParÃƒÂ¡metros invÃƒÂ¡lidos";
     exit;
 }
 
-// Normalizamos sólo al nombre de archivo, por seguridad
+// Normalizamos sÃƒÂ³lo al nombre de archivo, por seguridad
 $basename = basename($file);
 
 // Rutas base (ajustadas a tu estructura):
 //   /var/www/html/inspeccion
 //   /var/www/html/inspeccion/public
 //   /var/www/html/inspeccion/storage/s3_educacion/...
-$projectBase = realpath(__DIR__ . '/..'); // subimos de /public a raíz del proyecto
+$projectBase = realpath(__DIR__ . '/..'); // subimos de /public a raÃƒÂ­z del proyecto
 if ($projectBase === false) {
     http_response_code(500);
     echo "No se pudo resolver la ruta base del proyecto";
@@ -49,13 +53,13 @@ if ($baseDir === false) {
 // Ruta absoluta al archivo que queremos borrar
 $target = $baseDir . DIRECTORY_SEPARATOR . $basename;
 
-// Protección: nos aseguramos que la ruta final siga dentro de $baseDir
+// ProtecciÃƒÂ³n: nos aseguramos que la ruta final siga dentro de $baseDir
 $targetReal = realpath($target);
 if ($targetReal !== false && strpos($targetReal, $baseDir) === 0 && is_file($targetReal)) {
     @unlink($targetReal);
 }
 
-// Redirección de vuelta a la pantalla correspondiente
+// RedirecciÃƒÂ³n de vuelta a la pantalla correspondiente
 $redirect = ($tipo === 'clase')
     ? 's3_educacion_clases.php?saved=1'
     : 's3_educacion_trabajos.php?saved=1';

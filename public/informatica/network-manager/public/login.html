@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NetMonitor — Acceso</title>
+  <link rel="stylesheet" href="css/styles.css">
+  <style>
+    body {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      background: var(--bg-primary);
+    }
+
+    .login-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-lg);
+      padding: 40px 36px;
+      width: 100%;
+      max-width: 360px;
+      box-shadow: 0 8px 40px rgba(0,0,0,.4);
+    }
+
+    .login-logo {
+      text-align: center;
+      margin-bottom: 28px;
+    }
+
+    .login-logo h1 {
+      font-size: 1.3rem;
+      font-weight: 700;
+      color: var(--accent-cyan);
+      letter-spacing: .5px;
+    }
+
+    .login-logo p {
+      font-size: .78rem;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+
+    .login-card label {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      font-size: .82rem;
+      color: var(--text-secondary);
+      margin-bottom: 14px;
+    }
+
+    .login-card input {
+      padding: 9px 12px;
+      background: var(--bg-secondary);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius-md);
+      color: var(--text-primary);
+      font-size: .9rem;
+      transition: border-color .15s;
+    }
+
+    .login-card input:focus {
+      outline: none;
+      border-color: var(--accent-cyan);
+    }
+
+    .login-btn {
+      width: 100%;
+      padding: 10px;
+      margin-top: 6px;
+      background: var(--accent-cyan);
+      color: #0f172a;
+      border: none;
+      border-radius: var(--radius-md);
+      font-size: .9rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: opacity .15s;
+    }
+    .login-btn:hover { opacity: .85; }
+
+    .login-error {
+      background: rgba(239,68,68,.12);
+      border: 1px solid var(--accent-red);
+      border-radius: var(--radius-md);
+      color: var(--accent-red);
+      font-size: .8rem;
+      padding: 8px 12px;
+      margin-bottom: 14px;
+      display: none;
+    }
+    .login-error.visible { display: block; }
+  </style>
+</head>
+<body>
+  <div class="login-card">
+    <div class="login-logo">
+      <h1>🖧 NetMonitor</h1>
+      <p>Stealth Mode — Acceso requerido</p>
+    </div>
+
+    <div class="login-error" id="loginError">
+      Usuario o contraseña incorrectos
+    </div>
+
+    <form method="POST" action="/auth/login">
+      <label>
+        Usuario
+        <input type="text" name="username" autocomplete="username" required autofocus>
+      </label>
+      <label>
+        Contraseña
+        <input type="password" name="password" autocomplete="current-password" required>
+      </label>
+      <button type="submit" class="login-btn">Ingresar</button>
+    </form>
+  </div>
+
+  <script>
+    if (new URLSearchParams(location.search).get('error')) {
+      document.getElementById('loginError').classList.add('visible');
+    }
+  </script>
+</body>
+</html>

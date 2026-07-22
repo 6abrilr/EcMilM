@@ -221,7 +221,7 @@ $ejesS3 = [
         'icon'  => 'bi-diagram-2',
         'label' => 'Organización (CO / estados)',
         'desc'  => 'CO actualizado, ajustes, prioridades; estados de personal/armas/vehículos.',
-        'href'  => null,
+        'href'  => './organizacion.php',
     ],
     [
         'id'    => 's3-cuadros',

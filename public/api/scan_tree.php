@@ -1,4 +1,7 @@
 <?php
+require_once __DIR__ . '/../../auth/bootstrap.php';
+require_login();
+
 @ini_set('max_execution_time', '0');
 @ini_set('memory_limit', '1024M');
 @set_time_limit(0);
@@ -99,8 +102,8 @@ foreach($iter as $areaDir){
   [$code,$name] = parse_area_from_dir($areaDir->getFilename());
   $selAreaByCode->execute([$code]);
   $areaId = (int)$selAreaByCode->fetchColumn();
-  if($areaId<=0){ $maxOrd++; $insArea->execute([$code,$name,$maxOrd]); $areaId=(int)$pdo->lastInsertId(); logv("Área creada: $code - $name"); }
-  else { logv("Área: $code - $name"); }
+  if($areaId<=0){ $maxOrd++; $insArea->execute([$code,$name,$maxOrd]); $areaId=(int)$pdo->lastInsertId(); logv("Ãrea creada: $code - $name"); }
+  else { logv("Ãrea: $code - $name"); }
   $areas++;
 
   $it = new RecursiveIteratorIterator(
@@ -133,7 +136,7 @@ foreach($iter as $areaDir){
       $selDocByNameA->execute([$areaId, $docName]);
       $docId = (int)$selDocByNameA->fetchColumn();
       if($docId<=0){
-        $rutaRel = 'storage/pdf_ok/'.$code.'/'.$docName; // puede no existir todavía
+        $rutaRel = 'storage/pdf_ok/'.$code.'/'.$docName; // puede no existir todavÃ­a
         $hash    = sha1($areaId.'|'.$docName.'|'.$rutaRel.'|'.microtime(true));
         $insDoc->execute([$areaId,$docName,$rutaRel,$hash,'ok']);
         $docId=(int)$pdo->lastInsertId();
@@ -144,13 +147,13 @@ foreach($iter as $areaDir){
       else {
         $rows = read_xlsx_rows($path);
         if(is_array($rows) && isset($rows[0])){
-          if($rows[0]==='__NO_LIB__'){ $xlsx_skip_no++; logv("XLSX omitido (sin librería/zip): ".$file->getFilename()); continue; }
+          if($rows[0]==='__NO_LIB__'){ $xlsx_skip_no++; logv("XLSX omitido (sin librerÃ­a/zip): ".$file->getFilename()); continue; }
           if($rows[0]==='__READ_ERR__'){ $xlsx_read_err++; logv("XLSX error: ".$file->getFilename()." - ".$rows[1]); continue; }
         }
         $src='XLSX';
       }
 
-      if(!$rows){ $csv_err++; logv("Vacío: ".$file->getFilename()); continue; }
+      if(!$rows){ $csv_err++; logv("VacÃ­o: ".$file->getFilename()); continue; }
 
       $auto=1;
       foreach($rows as $r){
@@ -170,19 +173,19 @@ foreach($iter as $areaDir){
         $auto++;
       }
 
-      if($src==='CSV'){ $csv_ok++; logv("Ítems importados (CSV): ".$file->getFilename()); }
-      else { $xlsx_ok++; logv("Ítems importados (XLSX): ".$file->getFilename()); }
+      if($src==='CSV'){ $csv_ok++; logv("Ãtems importados (CSV): ".$file->getFilename()); }
+      else { $xlsx_ok++; logv("Ãtems importados (XLSX): ".$file->getFilename()); }
     }
   }
 }
 
-echo "Áreas procesadas: $areas\n";
+echo "Ãreas procesadas: $areas\n";
 echo "PDFs encontrados: $pdf_found\n";
 echo "PDFs importados:  $pdf_moved\n";
 echo "PDFs duplicados:  $pdf_dup\n";
 echo "PDFs con error:   $pdf_err\n";
 echo "CSV OK:           $csv_ok\n";
-echo "CSV vacíos:       $csv_err\n";
+echo "CSV vacÃ­os:       $csv_err\n";
 echo "XLSX OK:          $xlsx_ok\n";
-echo "XLSX sin librería:$xlsx_skip_no\n";
+echo "XLSX sin librerÃ­a:$xlsx_skip_no\n";
 echo "XLSX error read.: $xlsx_read_err\n";

@@ -5,7 +5,7 @@ declare(strict_types=1);
 $OFFLINE_MODE = false;
 
 require_once __DIR__ . '/../../auth/bootstrap.php';
-require_once __DIR__ . '/../config/db.php';
+require_once __DIR__ . '/../../config/db.php';
 require_once __DIR__ . '/../../includes/operaciones_helper.php';
 require_once __DIR__ . '/operaciones_educacion_tables_helper.php';
 
@@ -20,7 +20,7 @@ $modoResumido = !$esAdmin;
 
 $ASSET_WEB = operaciones_assets_url();
 $IMG_BG    = operaciones_assets_url('img/fondo.png');
-$ESCUDO    = operaciones_assets_url('../../assets/img/ecmilm.png');
+$ESCUDO    = operaciones_assets_url('img/ecmilm.png');
 
 function e($v){ return operaciones_e($v); }
 
@@ -54,8 +54,8 @@ $pctCursosCompl  = kpi($pdo, 's3_cursos_complementarios'); // NUEVO KPI
 <title>Educaci&oacute;n operacional de cuadros</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-<link rel="stylesheet" href="../assets/css/theme-602.css">
-<link rel="icon" href="../../assets/img/ecmilm.png">
+<link rel="stylesheet" href="<?= e($ASSET_WEB) ?>/css/theme-602.css">
+<link rel="icon" href="<?= e($ESCUDO) ?>">
 <style>
   :root{
     --bg-dark: #020617;
@@ -365,8 +365,8 @@ $pctCursosCompl  = kpi($pdo, 's3_cursos_complementarios'); // NUEVO KPI
       </div>
     </div>
     <div class="header-back">
-      <a href="areas.php" class="btn btn-ghost">
-        &larr; Volver a &Aacute;reas
+      <a href="operaciones.php" class="btn btn-ghost">
+        &larr; Volver a Operaciones
       </a>
     </div>
   </div>

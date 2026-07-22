@@ -255,6 +255,10 @@ try {
     }
 } catch (Throwable $e) {}
 
+if (function_exists('unidad_context')) {
+    $unidadInfo = array_merge($unidadInfo, unidad_context($pdo, (int)$unidadActiva));
+}
+
 $SELF_WEB = (string)($_SERVER['SCRIPT_NAME'] ?? $_SERVER['PHP_SELF'] ?? '');
 $BASE_PUBLIC_WEB = rtrim(str_replace('\\', '/', dirname($SELF_WEB)), '/');
 $BASE_APP_WEB = rtrim(str_replace('\\', '/', dirname($BASE_PUBLIC_WEB)), '/');
@@ -262,6 +266,12 @@ $ASSET_WEB = $BASE_APP_WEB . '/assets';
 $IMG_BG = $ASSET_WEB . '/img/fondo.png';
 $ESCUDO = $ASSET_WEB . '/img/ecmilm.png';
 $FAVICON = $ESCUDO;
+if (function_exists('unidad_context')) {
+    $UNIDAD_CTX = unidad_context($pdo, (int)$unidadActiva);
+    $IMG_BG = (string)$UNIDAD_CTX['bg_url'];
+    $ESCUDO = (string)$UNIDAD_CTX['escudo_url'];
+    $FAVICON = (string)$UNIDAD_CTX['icon_url'];
+}
 $ROOT_FS = realpath(__DIR__ . '/..');
 $unidadSlug = trim((string)($unidadInfo['slug'] ?? 'ecmilm'));
 if ($unidadSlug === '') $unidadSlug = 'ecmilm';

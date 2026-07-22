@@ -112,9 +112,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($accion === 'guardar_manual') {
             if (!$esAdmin) throw new RuntimeException('Acceso restringido. Solo ADMIN o SUPERADMIN puede editar horarios.');
             $dni = norm_dni_local((string)($_POST['dni'] ?? ''));
-            $fecha = trim((string)($_POST['fecha'] ?? ''));
-            $bloqueado = (string)($_POST['permite_manual'] ?? '') !== '1';
-            if ($bloqueado) throw new RuntimeException(html_entity_decode('Solo se puede editar cuando falta ingreso/egreso o los horarios est&aacute;n repetidos.', ENT_QUOTES, 'UTF-8'));
+            $fecha = trim((string)($_POST['fecha_fila'] ?? $_POST['fecha'] ?? ''));
             if ($dni === '' || $fecha === '') throw new RuntimeException('Faltan datos para guardar el ajuste manual.');
             $ingresoManual = time_to_datetime($fecha, (string)($_POST['ingreso_manual'] ?? ''));
             $egresoManual = time_to_datetime($fecha, (string)($_POST['egreso_manual'] ?? ''));
@@ -401,7 +399,7 @@ if (isset($_GET['export']) && $_GET['export'] === 'xls') {
     <div class="section-header">
       <div class="section-kicker"><span class="sk-text">S-1 &middot; PERSONAL</span></div>
       <div class="section-title">Ingreso y egreso de personal civil</div>
-      <p class="section-sub mb-0">Por defecto se muestra la fecha actual del equipo dentro del a&ntilde;o seleccionado. Pod&eacute;s cambiar a otro d&iacute;a o trabajar por rango. Solo se habilita edici&oacute;n manual cuando falta ingreso/egreso o cuando ambos horarios quedaron iguales.</p>
+      <p class="section-sub mb-0">Por defecto se muestra la fecha actual del equipo dentro del a&ntilde;o seleccionado. Pod&eacute;s cambiar a otro d&iacute;a o trabajar por rango. ADMIN y SUPERADMIN pueden corregir manualmente ingreso y egreso cuando una marca haya quedado mal.</p>
     </div>
 
     <?php if ($flashOk !== ''): ?>
@@ -542,36 +540,31 @@ if (isset($_GET['export']) && $_GET['export'] === 'xls') {
                       <td><strong><?= e(fmt_hours(isset($row['segundos_trabajados']) ? (int)$row['segundos_trabajados'] : null)) ?></strong></td>
                       <?php if ($esAdmin): ?>
                         <td style="min-width:310px;">
-                          <?php if ((int)$row['permite_manual'] === 1): ?>
-                            <form method="post" class="inline-form d-flex flex-wrap gap-2 align-items-end">
-                              <input type="hidden" name="accion_excel" value="guardar_manual">
-                              <input type="hidden" name="year" value="<?= e((string)$selectedYear) ?>">
-                              <input type="hidden" name="fecha" value="<?= e($selectedDate) ?>">
-                              <input type="hidden" name="desde" value="<?= e($dateFrom) ?>">
-                              <input type="hidden" name="hasta" value="<?= e($dateTo) ?>">
-                              <input type="hidden" name="q" value="<?= e($q) ?>">
-                              <input type="hidden" name="dni" value="<?= e((string)$row['dni']) ?>">
-                              <input type="hidden" name="permite_manual" value="1">
-                              <input type="hidden" name="fecha_fila" value="<?= e((string)$row['fecha']) ?>">
-                              <div>
-                                <label class="small-muted d-block">Ingreso</label>
-                                <input type="time" name="ingreso_manual" value="<?= e(fmt_time((string)$row['ingreso'])) ?>" class="form-control form-control-sm">
-                              </div>
-                              <div>
-                                <label class="small-muted d-block">Egreso</label>
-                                <input type="time" name="egreso_manual" value="<?= e(fmt_time((string)$row['egreso'])) ?>" class="form-control form-control-sm">
-                              </div>
-                              <div class="flex-grow-1">
-                                <label class="small-muted d-block">Obs.</label>
-                                <input type="text" name="observacion_manual" value="<?= e((string)($row['observacion_manual'] ?? '')) ?>" class="form-control form-control-sm" placeholder="Opcional">
-                              </div>
-                              <div>
-                                <button type="submit" class="btn btn-sm btn-success">Guardar</button>
-                              </div>
-                            </form>
-                          <?php else: ?>
-                            <span class="small-muted">Bloqueado: ya tiene ingreso y egreso v&aacute;lidos.</span>
-                          <?php endif; ?>
+                          <form method="post" class="inline-form d-flex flex-wrap gap-2 align-items-end">
+                            <input type="hidden" name="accion_excel" value="guardar_manual">
+                            <input type="hidden" name="year" value="<?= e((string)$selectedYear) ?>">
+                            <input type="hidden" name="fecha" value="<?= e($selectedDate) ?>">
+                            <input type="hidden" name="desde" value="<?= e($dateFrom) ?>">
+                            <input type="hidden" name="hasta" value="<?= e($dateTo) ?>">
+                            <input type="hidden" name="q" value="<?= e($q) ?>">
+                            <input type="hidden" name="dni" value="<?= e((string)$row['dni']) ?>">
+                            <input type="hidden" name="fecha_fila" value="<?= e((string)$row['fecha']) ?>">
+                            <div>
+                              <label class="small-muted d-block">Ingreso</label>
+                              <input type="time" name="ingreso_manual" value="<?= e(fmt_time((string)$row['ingreso'])) ?>" class="form-control form-control-sm">
+                            </div>
+                            <div>
+                              <label class="small-muted d-block">Egreso</label>
+                              <input type="time" name="egreso_manual" value="<?= e(fmt_time((string)$row['egreso'])) ?>" class="form-control form-control-sm">
+                            </div>
+                            <div class="flex-grow-1">
+                              <label class="small-muted d-block">Obs.</label>
+                              <input type="text" name="observacion_manual" value="<?= e((string)($row['observacion_manual'] ?? '')) ?>" class="form-control form-control-sm" placeholder="Opcional">
+                            </div>
+                            <div>
+                              <button type="submit" class="btn btn-sm btn-success">Guardar</button>
+                            </div>
+                          </form>
                         </td>
                       <?php endif; ?>
                     </tr>

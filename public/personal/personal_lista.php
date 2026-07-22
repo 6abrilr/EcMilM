@@ -2,9 +2,9 @@
 /**
  * public/personal/personal_lista.php
  * Lista de personal con:
- *  - Orden por jerarquÃƒÂ­a y grado militar argentino
- *  - Filtros: bÃƒÂºsqueda, jerarquÃƒÂ­a, destino, parte enfermo
- *  - Export PDF puro (HTMLÃ¢â€ â€™print / tabla HTML sin librerÃƒÂ­as)
+ *  - Orden por jerarquía y grado militar argentino
+ *  - Filtros: búsqueda, jerarquía, destino, parte enfermo
+ *  - Export PDF puro (HTML→print / tabla HTML sin librerías)
  *  - Export XLSX con PhpSpreadsheet (si disponible) o CSV como fallback
  *  - UI mejorada dark
  */
@@ -16,7 +16,7 @@ require_login();
 require_once $ROOT . '/config/db.php';
 /** @var PDO $pdo */
 
-/* Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â HELPERS Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â */
+/* ════════════════════════════════════════ HELPERS ════════════════════════════════════════ */
 function e($v): string { return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'); }
 function norm_dni(string $d): string { return preg_replace('/\D+/', '', $d) ?? ''; }
 function fmt_date(?string $y): string {
@@ -29,6 +29,23 @@ function table_exists(PDO $pdo, string $t): bool {
 function column_exists(PDO $pdo, string $table, string $column): bool {
     $s = $pdo->prepare("SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME=:t AND COLUMN_NAME=:c");
     $s->execute([':t' => $table, ':c' => $column]); return (int)$s->fetchColumn() > 0;
+}
+function normalizar_destino_interno_personal(string $nombre): string {
+    $nombre = trim(preg_replace('/\s+/', ' ', $nombre) ?? $nombre);
+    $key = mb_strtoupper(str_replace('.', '', $nombre), 'UTF-8');
+    $key = preg_replace('/\s+/', ' ', $key) ?? $key;
+    return in_array($key, ['BDA MIL', 'BDA MILITAR', 'BANDA MIL', 'BANDA MILITAR'], true) ? 'BANDA MILITAR' : $nombre;
+}
+function resolver_destino_interno_personal(PDO $pdo, string $nombre): ?int {
+    $nombre = normalizar_destino_interno_personal($nombre);
+    if ($nombre === '') return null;
+    $st = $pdo->prepare("SELECT id FROM destino_interno WHERE UPPER(nombre)=UPPER(:nom) AND COALESCE(estado,'ACTIVO')='ACTIVO' LIMIT 1");
+    $st->execute([':nom' => $nombre]);
+    $id = $st->fetchColumn();
+    if ($id !== false) return (int)$id;
+    $st = $pdo->prepare("INSERT INTO destino_interno (nombre, estado) VALUES (:nom, 'ACTIVO')");
+    $st->execute([':nom' => $nombre]);
+    return (int)$pdo->lastInsertId();
 }
 function ensure_personal_role_columns(PDO $pdo): void {
     if (!table_exists($pdo, 'personal_unidad')) return;
@@ -60,7 +77,7 @@ function ensure_personal_role_columns(PDO $pdo): void {
 
 ensure_personal_role_columns($pdo);
 
-/* Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â USUARIO / ROL Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â */
+/* ════════════════════════════════════ USUARIO / ROL ════════════════════════════════════ */
 $user        = function_exists('current_user') ? current_user() : ($_SESSION['user'] ?? null);
 $dniUsuario  = norm_dni((string)($user['dni'] ?? $user['username'] ?? ''));
 $personalId  = 0; $unidadPropia = 1;
@@ -92,7 +109,7 @@ $esAdmin      = ($roleCodigo === 'ADMIN') || $esSuperAdmin;
 $unidadActiva = $unidadPropia;
 if ($esSuperAdmin) { $uSel = (int)($_SESSION['unidad_id'] ?? 0); if ($uSel > 0) $unidadActiva = $uSel; }
 
-/* Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â BRANDING Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â */
+/* ════════════════════════════════════ BRANDING ════════════════════════════════════ */
 $NOMBRE = 'Unidad'; $LEYENDA = ''; $UNIDAD_SLUG = 'ecmilm';
 try {
     $st = $pdo->prepare("SELECT nombre_completo, subnombre, slug FROM unidades WHERE id=:id LIMIT 1");
@@ -112,9 +129,9 @@ $ASSETS_WEB     = $BASE_APP_WEB . '/assets';
 $IMG_BG         = $ASSETS_WEB . '/img/fondo.png';
 $ESCUDO         = $ASSETS_WEB . '/img/ecmilm.png';
 
-/* Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â ORDEN MILITAR Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â
- * JerarquÃƒÂ­a: OFICIAL(1) Ã¢â€ â€™ SUBOFICIAL(2) Ã¢â€ â€™ SOLDADO(3) Ã¢â€ â€™ AGENTE_CIVIL(4)
- * Grados: de mayor a menor rango dentro de cada jerarquÃƒÂ­a
+/* ════════════════════════════════════ ORDEN MILITAR ════════════════════════════════════
+ * Jerarquía: OFICIAL(1) → SUBOFICIAL(2) → SOLDADO(3) → AGENTE_CIVIL(4)
+ * Grados: de mayor a menor rango dentro de cada jerarquía
  */
 $SQL_ORDEN_JERARQUIA = "CASE jerarquia
     WHEN 'OFICIAL'       THEN 1
@@ -155,7 +172,7 @@ $SQL_ORDEN_GRADO = "CASE grado
     ELSE 99
 END";
 
-/* Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â PARÃƒÂMETROS GET Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â */
+/* ════════════════════════════════════ PARÁMETROS GET ════════════════════════════════════ */
 $q         = trim((string)($_GET['q']         ?? ''));
 $filtroJer = trim((string)($_GET['jerarquia'] ?? ''));
 $filtroDst = trim((string)($_GET['destino']   ?? ($_GET['destino_id'] ?? '')));
@@ -164,7 +181,7 @@ $exportar  = trim((string)($_GET['export']    ?? ''));
 $cicloGet  = trim((string)($_GET['ciclo']     ?? ''));
 
 
-/* Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â AUTO-CREAR TABLA personal_ciclos Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â */
+/* ════════════════════════════════════ AUTO-CREAR TABLA personal_ciclos ════════════════════════════════════ */
 try {
     $pdo->exec("CREATE TABLE IF NOT EXISTS personal_ciclos (
       id int NOT NULL AUTO_INCREMENT,
@@ -181,7 +198,7 @@ try {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci");
 } catch (Throwable $e) {}
 
-/* Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â CICLO ACTIVO Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â */
+/* ════════════════════════════════════ CICLO ACTIVO ════════════════════════════════════ */
 $ciclosDisponibles = [];
 try {
     $st = $pdo->prepare("SELECT DISTINCT ciclo FROM personal_ciclos WHERE unidad_id=:u ORDER BY ciclo DESC");
@@ -195,12 +212,76 @@ if ($cicloGet === 'todos' || empty($ciclosDisponibles)) {
 } elseif ($cicloGet !== '' && is_numeric($cicloGet)) {
     $cicloFiltro = (int)$cicloGet;
 } elseif (!empty($ciclosDisponibles)) {
-    $cicloFiltro = (int)$ciclosDisponibles[0]; // aÃƒÂ±o mÃƒÂ¡s reciente
+    $cicloFiltro = (int)$ciclosDisponibles[0]; // año más reciente
 }
 
-/* Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â ACCIÃƒâ€œN POST: IMPORTAR EXCEL Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â */
+/* ════════════════════════════════════ ACCIÓN POST: GUARDAR DESTINOS INTERNOS CON CLAVE FORÁNEA ════════════════════════════════════ */
 $mensajeImport = ''; $mensajeImportError = '';
+$mensajeDestino = ''; $mensajeDestinoError = '';
 
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['guardar_destinos'])) {
+    if (!$esAdmin) {
+        $mensajeDestinoError = 'Acceso restringido. Solo ADMIN/SUPERADMIN.';
+    } else {
+        try {
+            $ids = $_POST['ids'] ?? [];
+            $destinosSel = $_POST['destino_interno_id'] ?? [];
+            $destinosNuevos = $_POST['destino_interno_nuevo'] ?? [];
+            
+            if (!is_array($ids)) $ids = [];
+            if (!is_array($destinosSel)) $destinosSel = [];
+            if (!is_array($destinosNuevos)) $destinosNuevos = [];
+
+            $pdo->beginTransaction();
+            $actualizados = 0;
+            
+            foreach ($ids as $idRaw) {
+                $pid = (int)$idRaw;
+                if ($pid <= 0) continue;
+                
+                $finalDestinoId = null;
+
+                // Si eligió dar de alta un destino nuevo inline desde la interfaz web
+                if (isset($destinosSel[$pid]) && $destinosSel[$pid] === 'NUEVO' && !empty($destinosNuevos[$pid])) {
+                    $nuevoNombre = trim((string)$destinosNuevos[$pid]);
+                    
+                    $finalDestinoId = resolver_destino_interno_personal($pdo, $nuevoNombre);
+                } elseif (!empty($destinosSel[$pid]) && $destinosSel[$pid] !== 'NUEVO') {
+                    // Si seleccionó uno ya existente, usamos su ID numérico directamente
+                    $finalDestinoId = (int)$destinosSel[$pid];
+                }
+
+                // Guardar la ID numérica del destino en la columna vinculada por la Clave Foránea
+                $paramsUpd = [
+                    ':id' => $pid,
+                    ':uid' => $unidadActiva,
+                    ':destino_interno' => $finalDestinoId // Pasa el ID numérico o null
+                ];
+                
+                $sqlUpd = "UPDATE personal_unidad SET destino_interno = :destino_interno";
+                if (column_exists($pdo, 'personal_unidad', 'updated_at')) {
+                    $sqlUpd .= ", updated_at = NOW()";
+                }
+                if (column_exists($pdo, 'personal_unidad', 'updated_by_id')) {
+                    $sqlUpd .= ", updated_by_id = :updated_by_id";
+                    $paramsUpd[':updated_by_id'] = $personalId;
+                }
+                $sqlUpd .= " WHERE id = :id AND unidad_id = :uid LIMIT 1";
+                
+                $stUpd = $pdo->prepare($sqlUpd);
+                $stUpd->execute($paramsUpd);
+                $actualizados += $stUpd->rowCount();
+            }
+            $pdo->commit();
+            $mensajeDestino = "Destinos internos guardados de forma segura. Efectivos actualizados: {$actualizados}.";
+        } catch (Throwable $ex) {
+            if ($pdo->inTransaction()) $pdo->rollBack();
+            $mensajeDestinoError = $ex->getMessage();
+        }
+    }
+}
+
+/* ════════════════════════════════════ ACCIÓN POST: IMPORTAR EXCEL ════════════════════════════════════ */
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_POST['accion_import'])) {
     $accionImport = (string)$_POST['accion_import'];
     if (!$esAdmin) {
@@ -208,24 +289,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_POST['accion_import'])) {
     } else {
         try {
             $vendorAutoload = $ROOT . '/vendor/autoload.php';
-            if (!is_file($vendorAutoload)) throw new RuntimeException('Falta vendor/autoload.php. EjecutÃƒÂ¡: composer require phpoffice/phpspreadsheet');
+            if (!is_file($vendorAutoload)) throw new RuntimeException('Falta vendor/autoload.php. Ejecutá: composer require phpoffice/phpspreadsheet');
             require_once $vendorAutoload;
 
             if (!isset($_FILES['excel_archivo']) || $_FILES['excel_archivo']['error'] === UPLOAD_ERR_NO_FILE)
-                throw new RuntimeException('SeleccionÃƒÂ¡ un archivo Excel.');
+                throw new RuntimeException('Seleccioná un archivo Excel.');
             $file = $_FILES['excel_archivo'];
-            if ($file['error'] !== UPLOAD_ERR_OK) throw new RuntimeException('Error subida (cÃƒÂ³d '.(int)$file['error'].').');
+            if ($file['error'] !== UPLOAD_ERR_OK) throw new RuntimeException('Error subida (cód '.(int)$file['error'].').');
             $extXls = strtolower(pathinfo((string)$file['name'], PATHINFO_EXTENSION));
             if (!in_array($extXls, ['xls','xlsx'], true)) throw new RuntimeException('El archivo debe ser .xls o .xlsx.');
             if ($extXls === 'xlsx' && !class_exists('ZipArchive'))
-                throw new RuntimeException('Falta extensiÃƒÂ³n PHP ZipArchive. En XAMPP: activÃƒÂ¡ extension=zip en php.ini y reiniciÃƒÂ¡ Apache.');
+                throw new RuntimeException('Falta extensión PHP ZipArchive. En XAMPP: activá extension=zip en php.ini y reiniciá Apache.');
 
             $cicloImport = (int)($_POST['ciclo_import'] ?? date('Y'));
-            if ($cicloImport < 2020 || $cicloImport > 2040) throw new RuntimeException('AÃƒÂ±o invÃƒÂ¡lido ('.$cicloImport.').');
+            if ($cicloImport < 2020 || $cicloImport > 2040) throw new RuntimeException('Año inválido ('.$cicloImport.').');
 
             if ($accionImport === 'reemplazar_ciclo') {
                 if (($_POST['confirmacion_reemplazar'] ?? '') !== 'CONFIRMAR')
-                    throw new RuntimeException('Para reemplazar escribÃƒÂ­ CONFIRMAR en el campo de confirmaciÃƒÂ³n.');
+                    throw new RuntimeException('Para reemplazar escribí CONFIRMAR en el campo de confirmación.');
             }
 
             $spreadsheet = \PhpOffice\PhpSpreadsheet\IOFactory::load($file['tmp_name']);
@@ -254,7 +335,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_POST['accion_import'])) {
                 $apnom    = trim((string)$sheet->getCell("C{$row}")->getValue());
                 $dniRaw   = trim((string)$sheet->getCell("D{$row}")->getValue());
 
-                // Separador de jerarquÃƒÂ­a
+                // Separador de jerarquía
                 $gU = strtoupper($gradoRaw);
                 if (isset($jerMap[$gU]) && $arma === '' && $apnom === '' && $dniRaw === '') {
                     $currentJer = $jerMap[$gU]; continue;
@@ -272,7 +353,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_POST['accion_import'])) {
                 $rolAdministrativo = trim((string)$sheet->getCell("X{$row}")->getValue());
                 $obs     = trim((string)$sheet->getCell("AA{$row}")->getValue());
 
-                // JerarquÃƒÂ­a
+                // Jerarquía
                 $g2 = strtoupper(trim($gradoRaw));
                 if ($currentJer !== '') {
                     $jerEnum = $currentJer;
@@ -287,6 +368,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_POST['accion_import'])) {
                 }
 
                 $extraJson = json_encode(['jerarquia'=>$jerEnum,'jerarquia_label'=>match($jerEnum){'OFICIAL'=>'OFICIALES','SUBOFICIAL'=>'SUBOFICIALES','SOLDADO'=>'SOLDADOS',default=>'AGENTES CIVILES'}]);
+
+                // Interceptar texto de Excel para transformarlo en ID numérico válido para la FK
+                $finalExcelDestId = null;
+                if ($destInt !== '') {
+                    $finalExcelDestId = resolver_destino_interno_personal($pdo, $destInt);
+                }
 
                 // Para 'solo_nuevos': no actualizar si ya existe
                 if ($accionImport === 'solo_nuevos') {
@@ -312,7 +399,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_POST['accion_import'])) {
                       cuil=IF(VALUES(cuil) IS NOT NULL AND VALUES(cuil)!='',VALUES(cuil),cuil),
                       sexo=IF(VALUES(sexo) IS NOT NULL AND VALUES(sexo)!='',VALUES(sexo),sexo),
                       domicilio=IF(VALUES(domicilio) IS NOT NULL AND VALUES(domicilio)!='',VALUES(domicilio),domicilio),
-                      destino_interno=IF(VALUES(destino_interno) IS NOT NULL AND VALUES(destino_interno)!='',VALUES(destino_interno),destino_interno),
+                      destino_interno=VALUES(destino_interno),
                       rol_combate=IF(VALUES(rol_combate) IS NOT NULL AND VALUES(rol_combate)!='',VALUES(rol_combate),rol_combate),
                       rol_administrativo=IF(VALUES(rol_administrativo) IS NOT NULL AND VALUES(rol_administrativo)!='',VALUES(rol_administrativo),rol_administrativo),
                       observaciones=IF(VALUES(observaciones) IS NOT NULL AND VALUES(observaciones)!='',VALUES(observaciones),observaciones),
@@ -323,7 +410,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_POST['accion_import'])) {
                     ':uid'=>$unidadActiva,':dni'=>$dni,
                     ':grado'=>$gradoRaw?:null,':arma'=>$arma?:null,':apnom'=>$apnom?:null,
                     ':cuil'=>$cuil?:null,':sexo'=>$sexo?:null,':dom'=>$domicilio?:null,
-                    ':dest'=>$destInt?:null,':rol_combate'=>$rolCombate?:null,':rol_administrativo'=>$rolAdministrativo?:null,':obs'=>$obs?:null,
+                    ':dest'=>$finalExcelDestId,':rol_combate'=>$rolCombate?:null,':rol_administrativo'=>$rolAdministrativo?:null,':obs'=>$obs?:null,
                     ':jer'=>$jerEnum,':xj'=>$extraJson,':ubid'=>$personalId?:null,
                 ]);
 
@@ -342,8 +429,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_POST['accion_import'])) {
 
             $pdo->commit();
             $modoLabel = ['actualizar'=>'Actualizar/agregar','solo_nuevos'=>'Solo nuevos','reemplazar_ciclo'=>'Reemplazar ciclo'][$accionImport] ?? $accionImport;
-            $mensajeImport = "Ã¢Å“â€œ ImportaciÃƒÂ³n completada Ã¢â‚¬â€ Modo: {$modoLabel} Ã‚Â· Ciclo: {$cicloImport} Ã‚Â· Procesadas: {$procesadas}"
-                . (count($errores) ? ' Ã‚Â· Avisos: '.implode('; ',array_slice($errores,0,5)) : '');
+            $mensajeImport = "✓ Importación completada — Modo: {$modoLabel} · Ciclo: {$cicloImport} · Procesadas: {$procesadas}"
+                . (count($errores) ? ' · Avisos: '.implode('; ',array_slice($errores,0,5)) : '');
 
         } catch (Throwable $ex) {
             if ($pdo->inTransaction()) $pdo->rollBack();
@@ -352,53 +439,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_POST['accion_import'])) {
     }
 }
 
-/* Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â CARGA DESTINOS / ?REAS Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â */
+/* ════════════════════════════════════ CARGA CATÁLOGO COMPLETO PARA LOS SELECTORES ════════════════════════════════════ */
+$todosLosDestinosInternos = [];
+try {
+    $stDst = $pdo->query("SELECT id, nombre FROM destino_interno WHERE COALESCE(estado,'ACTIVO')='ACTIVO' ORDER BY nombre ASC");
+    $todosLosDestinosInternos = $stDst->fetchAll(PDO::FETCH_ASSOC) ?: [];
+} catch (Throwable $e) {}
+
 $destinos = [];
 try {
     $st = $pdo->prepare("
-        SELECT DISTINCT
-            CASE
-                WHEN UPPER(TRIM(destino_interno)) LIKE 'CA CDO SER%'
-                  OR UPPER(TRIM(destino_interno)) LIKE 'COMPAÑÍA COMANDO Y SERVICIOS%'
-                  OR UPPER(TRIM(destino_interno)) LIKE 'COMPANIA COMANDO Y SERVICIOS%'
-                THEN 'CA CDO SER'
-                WHEN UPPER(TRIM(destino_interno)) LIKE 'CA I M \"A\"%'
-                  OR UPPER(TRIM(destino_interno)) LIKE 'CA IM \"A\"%'
-                  OR UPPER(TRIM(destino_interno)) LIKE 'COMPAÑÍA DE INFANTERÍA DE MONTAÑA \"A\"%'
-                  OR UPPER(TRIM(destino_interno)) LIKE 'COMPANIA DE INFANTERIA DE MONTANA \"A\"%'
-                  OR UPPER(TRIM(destino_interno)) LIKE 'PELOTÓN COMANDO%'
-                  OR UPPER(TRIM(destino_interno)) LIKE 'PELOTON COMANDO%'
-                  OR UPPER(TRIM(destino_interno)) LIKE '1RA SECCIÓN DE TIRADORES%'
-                  OR UPPER(TRIM(destino_interno)) LIKE '1RA SECCION DE TIRADORES%'
-                  OR UPPER(TRIM(destino_interno)) LIKE '2DA SECCIÓN DE TIRADORES%'
-                  OR UPPER(TRIM(destino_interno)) LIKE '2DA SECCION DE TIRADORES%'
-                  OR UPPER(TRIM(destino_interno)) LIKE '1ER GRUPO DE TIRADORES%'
-                  OR UPPER(TRIM(destino_interno)) LIKE '2DO GRUPO DE TIRADORES%'
-                THEN 'CA I M \"A\"'
-                WHEN UPPER(TRIM(destino_interno)) LIKE 'CCIG \"BARILOCHE\"%'
-                  OR UPPER(TRIM(destino_interno)) LIKE 'CCIG BARILOCHE%'
-                  OR UPPER(TRIM(destino_interno)) LIKE 'ENC CCIG%'
-                  OR UPPER(TRIM(destino_interno)) LIKE 'AUX CCIG%'
-                  OR UPPER(TRIM(destino_interno)) LIKE 'OP ORG CI%'
-                  OR UPPER(TRIM(destino_interno)) LIKE 'RESIDENCIA QUINCHAHUALA%'
-                THEN 'CCIG \"BARILOCHE\"'
-                ELSE TRIM(destino_interno)
-            END AS nombre
-        FROM personal_unidad
-        WHERE unidad_id = :u
-          AND destino_interno IS NOT NULL
-          AND TRIM(destino_interno) <> ''
-        ORDER BY nombre ASC
+        SELECT DISTINCT di.nombre
+        FROM personal_unidad pu
+        INNER JOIN destino_interno di ON di.id = pu.destino_interno
+        WHERE pu.unidad_id = :u
+        ORDER BY di.nombre ASC
     ");
     $st->execute([':u' => $unidadActiva]);
     $destinos = $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
 } catch (Throwable $e) {}
 
-/* Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â QUERY PRINCIPAL Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â */
+/* ════════════════════════════════════ QUERY PRINCIPAL AJUSTADA A LA LLAVE FORÁNEA ════════════════════════════════════ */
 $where  = ["pu.unidad_id = :uid"];
-// Filtro por ciclo: si hay ciclo activo, filtrar por personal_ciclos
 $joinCiclo = '';
-$params = [':uid' => $unidadActiva]; // inicializar ANTES de agregar :ciclo
+$params = [':uid' => $unidadActiva]; 
 if ($cicloFiltro !== '') {
     $joinCiclo = "INNER JOIN personal_ciclos pc ON pc.personal_id = pu.id AND pc.unidad_id = pu.unidad_id AND pc.ciclo = :ciclo";
     $params[':ciclo'] = $cicloFiltro;
@@ -415,35 +479,7 @@ if ($filtroJer !== '') {
     $params[':jer'] = $filtroJer;
 }
 if ($filtroDst !== '' && $filtroDst !== '0') {
-    $where[] = "
-        CASE
-            WHEN UPPER(TRIM(COALESCE(pu.destino_interno, ''))) LIKE 'CA CDO SER%'
-              OR UPPER(TRIM(COALESCE(pu.destino_interno, ''))) LIKE 'COMPAÑÍA COMANDO Y SERVICIOS%'
-              OR UPPER(TRIM(COALESCE(pu.destino_interno, ''))) LIKE 'COMPANIA COMANDO Y SERVICIOS%'
-            THEN 'CA CDO SER'
-            WHEN UPPER(TRIM(COALESCE(pu.destino_interno, ''))) LIKE 'CA I M \"A\"%'
-              OR UPPER(TRIM(COALESCE(pu.destino_interno, ''))) LIKE 'CA IM \"A\"%'
-              OR UPPER(TRIM(COALESCE(pu.destino_interno, ''))) LIKE 'COMPAÑÍA DE INFANTERÍA DE MONTAÑA \"A\"%'
-              OR UPPER(TRIM(COALESCE(pu.destino_interno, ''))) LIKE 'COMPANIA DE INFANTERIA DE MONTANA \"A\"%'
-              OR UPPER(TRIM(COALESCE(pu.destino_interno, ''))) LIKE 'PELOTÓN COMANDO%'
-              OR UPPER(TRIM(COALESCE(pu.destino_interno, ''))) LIKE 'PELOTON COMANDO%'
-              OR UPPER(TRIM(COALESCE(pu.destino_interno, ''))) LIKE '1RA SECCIÓN DE TIRADORES%'
-              OR UPPER(TRIM(COALESCE(pu.destino_interno, ''))) LIKE '1RA SECCION DE TIRADORES%'
-              OR UPPER(TRIM(COALESCE(pu.destino_interno, ''))) LIKE '2DA SECCIÓN DE TIRADORES%'
-              OR UPPER(TRIM(COALESCE(pu.destino_interno, ''))) LIKE '2DA SECCION DE TIRADORES%'
-              OR UPPER(TRIM(COALESCE(pu.destino_interno, ''))) LIKE '1ER GRUPO DE TIRADORES%'
-              OR UPPER(TRIM(COALESCE(pu.destino_interno, ''))) LIKE '2DO GRUPO DE TIRADORES%'
-            THEN 'CA I M \"A\"'
-            WHEN UPPER(TRIM(COALESCE(pu.destino_interno, ''))) LIKE 'CCIG \"BARILOCHE\"%'
-              OR UPPER(TRIM(COALESCE(pu.destino_interno, ''))) LIKE 'CCIG BARILOCHE%'
-              OR UPPER(TRIM(COALESCE(pu.destino_interno, ''))) LIKE 'ENC CCIG%'
-              OR UPPER(TRIM(COALESCE(pu.destino_interno, ''))) LIKE 'AUX CCIG%'
-              OR UPPER(TRIM(COALESCE(pu.destino_interno, ''))) LIKE 'OP ORG CI%'
-              OR UPPER(TRIM(COALESCE(pu.destino_interno, ''))) LIKE 'RESIDENCIA QUINCHAHUALA%'
-            THEN 'CCIG \"BARILOCHE\"'
-            ELSE TRIM(COALESCE(pu.destino_interno, ''))
-        END = :dst
-    ";
+    $where[] = "di.nombre = :dst";
     $params[':dst'] = $filtroDst;
 }
 if ($filtroPte === '1') {
@@ -465,7 +501,8 @@ $sql = "
         pu.fecha_ultimo_anexo27,
         pu.tiene_parte_enfermo, pu.parte_enfermo_desde, pu.parte_enfermo_hasta,
         pu.cantidad_parte_enfermo,
-        pu.destino_interno, pu.funcion,
+        pu.destino_interno AS destino_interno_id, pu.funcion,
+        di.nombre AS destino_interno_nombre_rel,
         pu.telefono, pu.correo,
         pu.rol_combate, pu.rol_administrativo, pu.anios_en_destino, pu.fracc, pu.observaciones,
         pu.fecha_alta,
@@ -473,6 +510,7 @@ $sql = "
         pu.destino_id
     FROM personal_unidad pu
     LEFT JOIN destino d ON d.id = pu.destino_id
+    LEFT JOIN destino_interno di ON di.id = pu.destino_interno
     $joinCiclo
     WHERE $whereSQL
     ORDER BY
@@ -491,7 +529,7 @@ try {
     $mensajeError = $ex->getMessage();
 }
 
-/* Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â TOTALES Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â */
+/* ════════════════════════════════════ TOTALES ════════════════════════════════════ */
 $totalOficial    = 0; $totalSuboficial = 0; $totalSoldado = 0; $totalCivil = 0; $totalParte = 0;
 foreach ($personal as $p) {
     switch ($p['jerarquia'] ?? '') {
@@ -504,11 +542,11 @@ foreach ($personal as $p) {
 }
 $totalGeneral = count($personal);
 
-/* Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â EXPORT XLSX Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â */
+/* ════════════════════════════════════ EXPORT XLSX ════════════════════════════════════ */
 if ($exportar === 'xlsx') {
     $vendorAuto = $ROOT . '/vendor/autoload.php';
     if (!is_file($vendorAuto)) {
-        die('Falta vendor/autoload.php. EjecutÃƒÂ¡: composer require phpoffice/phpspreadsheet');
+        die('Falta vendor/autoload.php. Ejecutá: composer require phpoffice/phpspreadsheet');
     }
     require_once $vendorAuto;
 
@@ -535,7 +573,6 @@ if ($exportar === 'xlsx') {
     }
     $lastExportCol = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex(count($headers));
 
-    // Colores por jerarquÃƒÂ­a (ARGB)
     $jerColors = [
         'OFICIAL'     => 'FFe8eaf6',
         'SUBOFICIAL'  => 'FFfff8e1',
@@ -548,7 +585,6 @@ if ($exportar === 'xlsx') {
     foreach ($personal as $i => $p) {
         $jer = $p['jerarquia'] ?? '';
 
-        // Fila separadora de jerarquÃƒÂ­a
         if ($jer !== $jerActualXlsx) {
             $jerActualXlsx = $jer;
             $jerLabelsXlsx = ['OFICIAL'=>'OFICIALES','SUBOFICIAL'=>'SUBOFICIALES','SOLDADO'=>'SOLDADOS','AGENTE_CIVIL'=>'AGENTES CIVILES'];
@@ -592,7 +628,7 @@ if ($exportar === 'xlsx') {
             $parteDesde,
             $parteHasta,
             $p['cantidad_parte_enfermo'] ?? '',
-            $p['destino_interno'] ?? '',
+            $p['destino_interno_nombre_rel'] ?? '',
             $p['rol_combate'] ?? '',
             $p['rol_administrativo'] ?? '',
             $p['anios_en_destino'] ?? '',
@@ -605,7 +641,6 @@ if ($exportar === 'xlsx') {
             $sheet->setCellValue($col . $row, $val);
         }
 
-        // Color de fila segÃƒÂºn jerarquÃƒÂ­a o parte de enfermo
         $bgColor = $tieneParte ? 'FFfff3cd' : ($jerColors[$jer] ?? 'FFFFFFFF');
         $sheet->getStyle('A' . $row . ':' . $lastExportCol . $row)->getFill()
               ->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)
@@ -614,19 +649,16 @@ if ($exportar === 'xlsx') {
         $row++;
     }
 
-    // Fila de totales al pie
-    $sheet->setCellValue('A' . $row, "Total: {$totalGeneral} efectivos Ã¢â‚¬â€ Oficiales: {$totalOficial} Ã‚Â· Suboficiales: {$totalSuboficial} Ã‚Â· Soldados: {$totalSoldado} Ã‚Â· Ag. Civiles: {$totalCivil}");
+    $sheet->setCellValue('A' . $row, "Total: {$totalGeneral} efectivos — Oficiales: {$totalOficial} · Suboficiales: {$totalSuboficial} · Soldados: {$totalSoldado} · Ag. Civiles: {$totalCivil}");
     $sheet->mergeCells('A' . $row . ':' . $lastExportCol . $row);
     $sheet->getStyle('A' . $row)->getFont()->setBold(true)->setItalic(true)->setSize(8);
 
-    // Autosize columnas clave
     foreach (range(1, 27) as $ci) {
         $col = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($ci);
         $sheet->getColumnDimension($col)->setAutoSize(true);
     }
 
-    $cicloLabel = $cicloFiltro !== '' ? "_{$cicloFiltro}" : '';
-    $filename = 'personal' . $cicloLabel . '_' . date('Ymd_His') . '.xlsx';
+    $filename = 'personal_' . date('Ymd_His') . '.xlsx';
     header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     header('Content-Disposition: attachment; filename="' . $filename . '"');
     header('Cache-Control: max-age=0');
@@ -635,11 +667,7 @@ if ($exportar === 'xlsx') {
     exit;
 }
 
-/* Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â EXPORT PDF Ã¢â‚¬â€ HTML puro enviado a browser Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â
- * No requiere librerÃƒÂ­a externa: genera HTML con estilos print CSS
- * El navegador imprime/guarda como PDF con Ctrl+P Ã¢â€ â€™ Guardar como PDF
- * Para PDF server-side automÃƒÂ¡tico se necesita dompdf (ver instrucciones al pie)
- */
+/* ════════════════════════════════════ EXPORT PDF ════════════════════════════════════ */
 if ($exportar === 'pdf') {
     $fecha_doc = date('d/m/Y');
     $hora_doc  = date('H:i');
@@ -724,10 +752,13 @@ if ($exportar === 'pdf') {
     foreach ($personal as $p):
         $tieneParte = (int)($p['tiene_parte_enfermo'] ?? 0) === 1;
         $destLabel = trim(($p['destino_codigo'] ?? '') . ' ' . ($p['destino_nombre'] ?? ''));
-        if ($destLabel === '') $destLabel = (string)($p['destino_interno'] ?? '-');
+        
+        $lblDestInt = !empty($p['destino_interno_nombre_rel']) ? $p['destino_interno_nombre_rel'] : '';
+        if ($destLabel === '') $destLabel = (string)($lblDestInt !== '' ? $lblDestInt : '-');
+        
         $funcionDestino = trim((string)($p['funcion'] ?? ''));
-        if (!empty($p['destino_interno'])) {
-            $funcionDestino = $funcionDestino !== '' ? $funcionDestino . ' / ' . $p['destino_interno'] : (string)$p['destino_interno'];
+        if ($lblDestInt !== '') {
+            $funcionDestino = $funcionDestino !== '' ? $funcionDestino . ' / ' . $lblDestInt : (string)$lblDestInt;
         }
   ?>
     <tr>
@@ -762,15 +793,13 @@ if ($exportar === 'pdf') {
   <?= e($lugarFirma) ?>, <?= e($fecha_doc) ?>.
 </div>
 
-<script>
-</script>
 </body>
 </html>
 <?php
     exit;
 }
 
-/* Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â HTML NORMAL Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â */
+/* ════════════════════════════════════ HTML NORMAL ════════════════════════════════════ */
 ?>
 <!doctype html>
 <html lang="es">
@@ -846,6 +875,21 @@ if ($exportar === 'pdf') {
   .tbl th:last-child, .tbl td:last-child { width: 110px; }
   .tbl .dni-cell { font-size: .86rem; letter-spacing: .02em; }
   .tbl .acciones-cell { white-space: nowrap; }
+  .destino-edit-select {
+    min-width: 240px;
+    font-size: .78rem;
+    font-weight: 700;
+    background-color: rgba(30, 41, 59, 0.95);
+    color: #fff;
+  }
+  .destino-nuevo-inline {
+    display: none;
+    margin-top: 5px;
+    font-size: .75rem;
+    background: rgba(15, 23, 42, 0.95);
+    border: 1px solid #f87171 !important;
+    color: #fff;
+  }
 
   /* Jerarquia separador */
   .jer-row td {
@@ -919,6 +963,12 @@ if ($exportar === 'pdf') {
 <?php endif; ?>
 <?php if ($mensajeImportError !== ''): ?>
   <div class="alert alert-danger py-2"><b>Error de importacion:</b> <?= e($mensajeImportError) ?></div>
+<?php endif; ?>
+<?php if ($mensajeDestino !== ''): ?>
+  <div class="alert alert-success py-2"><?= e($mensajeDestino) ?></div>
+<?php endif; ?>
+<?php if ($mensajeDestinoError !== ''): ?>
+  <div class="alert alert-danger py-2"><b>Error al guardar destinos:</b> <?= e($mensajeDestinoError) ?></div>
 <?php endif; ?>
 
 <!-- ENCABEZADO + ESTADISTICAS -->
@@ -1079,6 +1129,15 @@ if ($exportar === 'pdf') {
   </div>
 <?php else: ?>
 
+<?php if ($esAdmin): ?>
+<form method="post">
+  <div class="d-flex justify-content-end mb-2">
+    <button type="submit" name="guardar_destinos" class="btn btn-sm btn-success fw-bold">
+      <i class="bi bi-save me-1"></i> Guardar destinos internos
+    </button>
+  </div>
+<?php endif; ?>
+
 <div class="tbl-wrap">
   <table class="table table-sm tbl mb-0">
     <thead>
@@ -1088,7 +1147,8 @@ if ($exportar === 'pdf') {
         <th>Arma/Cuerpo</th>
         <th>Apellido y Nombre</th>
         <th>DNI</th>
-        <th>Funcion / Destino interno</th>
+        <th>Destino interno</th>
+        <th>Funcion</th>
         <?php if ($esAdmin): ?><th class="text-end">Accion</th><?php endif; ?>
       </tr>
     </thead>
@@ -1098,15 +1158,13 @@ if ($exportar === 'pdf') {
       $nro = 0;
       $jerBadgeMap = ['OFICIAL'=>'badge-of','SUBOFICIAL'=>'badge-sof','SOLDADO'=>'badge-sol','AGENTE_CIVIL'=>'badge-cv'];
       $jerLabels   = ['OFICIAL'=>'OFICIALES','SUBOFICIAL'=>'SUBOFICIALES','SOLDADO'=>'SOLDADOS','AGENTE_CIVIL'=>'AGENTES CIVILES'];
-      $cols = 6 + ($esAdmin ? 1 : 0);
+      $cols = 7 + ($esAdmin ? 1 : 0);
 
       foreach ($personal as $p):
           $jer       = $p['jerarquia'] ?? '';
           $tieneParte = (int)($p['tiene_parte_enfermo'] ?? 0) === 1;
           $funcDest = trim((string)($p['funcion'] ?? ''));
-          if (!empty($p['destino_interno'])) {
-              $funcDest = $funcDest !== '' ? $funcDest . ' / ' . $p['destino_interno'] : (string)$p['destino_interno'];
-          }
+          $destinoInternoId = $p['destino_interno_id'];
           $badgeClass = $jerBadgeMap[$jer] ?? 'badge-cv';
 
           if ($jer !== $jerActual):
@@ -1133,8 +1191,30 @@ if ($exportar === 'pdf') {
           </a>
         </td>
         <td class="dni-cell" style="font-family:monospace;color:#94a3b8;"><?= e($p['dni'] ?? '') ?></td>
+        
+        <!-- SELECTOR DINÁMICO DE CATALOGO ASOCIADO POR ID A LA CLAVE FORÁNEA -->
         <td>
-          <?php if ($funcDest !== '' && $funcDest !== '/'): ?>
+          <?php if ($esAdmin): ?>
+            <input type="hidden" name="ids[]" value="<?= (int)$p['id'] ?>">
+            <select name="destino_interno_id[<?= (int)$p['id'] ?>]" class="form-select form-select-sm destino-edit-select" onchange="toggleNuevoDestinoInline(this, <?= (int)$p['id'] ?>)">
+              <option value="">-- Sin Destino Asignado --</option>
+              <?php foreach ($todosLosDestinosInternos as $di): ?>
+                <option value="<?= (int)$di['id'] ?>" <?= ((int)$destinoInternoId === (int)$di['id']) ? 'selected' : '' ?>>
+                  <?= e($di['nombre']) ?>
+                </option>
+              <?php endforeach; ?>
+              <option value="NUEVO" style="color:#f87171; font-weight:bold;">+ -- Agregar nuevo destino --</option>
+            </select>
+            <input type="text" id="input_nuevo_dst_<?= (int)$p['id'] ?>" name="destino_interno_nuevo[<?= (int)$p['id'] ?>]" class="form-control form-control-sm destino-nuevo-inline" placeholder="Nombre del nuevo destino militar...">
+          <?php else: ?>
+            <span style="font-size:.76rem;color:#b7c3d6;">
+              <?= e($p['destino_interno_nombre_rel'] ?? '-') ?>
+            </span>
+          <?php endif; ?>
+        </td>
+        
+        <td>
+          <?php if ($funcDest !== ''): ?>
             <span style="font-size:.76rem;color:#b7c3d6;"><?= e($funcDest) ?></span>
           <?php else: ?>
             <span class="text-muted">-</span>
@@ -1174,6 +1254,9 @@ if ($exportar === 'pdf') {
     </tfoot>
   </table>
 </div>
+<?php if ($esAdmin): ?>
+</form>
+<?php endif; ?>
 
 <?php endif; ?>
 
@@ -1181,7 +1264,7 @@ if ($exportar === 'pdf') {
 
 
 <?php if ($esAdmin): ?>
-<!-- Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â MODAL IMPORTAR EXCEL Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â -->
+<!-- ════════════════════════════════════ MODAL IMPORTAR EXCEL ════════════════════════════════════ -->
 <div class="modal fade" id="modalImport" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-lg modal-dialog-scrollable">
     <div class="modal-content" style="background:rgba(15,23,42,.98);color:#e5e7eb;border:1px solid rgba(148,163,184,.5);border-radius:14px;">
@@ -1426,9 +1509,27 @@ if (q.trim() !== '') {
     const re = new RegExp('(' + q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')', 'gi');
     document.querySelectorAll('.tbl tbody td').forEach(td => {
         if (td.classList.contains('text-end')) return;
-        if (td.querySelector('a,span.badge-jer,span.badge-parte')) return; // skip action cells
+        if (td.querySelector('a,span.badge-jer,span.badge-parte,select')) return; // skip action cells
         td.innerHTML = td.innerHTML.replace(re, '<mark style="background:rgba(251,191,36,.35);color:#fef3c7;border-radius:2px;padding:0 2px;">$1</mark>');
     });
+}
+
+/**
+ * Control visual para desplegar u ocultar la caja de texto inline de nuevo destino
+ */
+function toggleNuevoDestinoInline(selectElement, id) {
+    const inputNuevo = document.getElementById('input_nuevo_dst_' + id);
+    if (inputNuevo) {
+        if (selectElement.value === 'NUEVO') {
+            inputNuevo.style.display = 'block';
+            inputNuevo.required = true;
+            inputNuevo.focus();
+        } else {
+            inputNuevo.style.display = 'none';
+            inputNuevo.required = false;
+            inputNuevo.value = '';
+        }
+    }
 }
 </script>
 </body>

@@ -11,6 +11,16 @@ function norm_dni(string $dni): string { return preg_replace('/\D+/', '', $dni);
 
 $user = function_exists('current_user') ? current_user() : ($_SESSION['user'] ?? null);
 $dniNorm = norm_dni((string)($user['dni'] ?? $user['username'] ?? ''));
+$sessionRole = strtoupper(trim((string)($user['rol_app'] ?? $user['role_app'] ?? '')));
+if ($sessionRole === 'SUPERADMINISTRADOR') $sessionRole = 'SUPERADMIN';
+if ($sessionRole === 'ADMINISTRADOR') $sessionRole = 'ADMIN';
+
+// Respaldo operativo: el login marca a este usuario como superadmin hardcoded.
+// Esta pantalla no debe degradarlo a USUARIO si falla la lectura desde personal_unidad.
+$isHardcodedSuperAdmin = (
+  $dniNorm === '41742406'
+  || strtolower(trim((string)($user['username'] ?? ''))) === 'nesrojas'
+);
 
 /* ===== Assets ===== */
 $PUBLIC_URL = rtrim(str_replace('\\','/', dirname($_SERVER['SCRIPT_NAME'] ?? $_SERVER['PHP_SELF'])), '/');
@@ -62,9 +72,13 @@ try {
     ");
     $st->execute([':pid' => $personalId]);
     $c = $st->fetchColumn();
-    if (is_string($c) && $c !== '') $roleCodigo = $c;
+    if (is_string($c) && $c !== '') $roleCodigo = strtoupper(trim($c));
   }
 } catch (Throwable $e) {}
+
+if ($roleCodigo === 'USUARIO' && in_array($sessionRole, ['ADMIN', 'SUPERADMIN'], true)) {
+  $roleCodigo = $sessionRole;
+}
 
 if ($roleCodigo === 'USUARIO') {
   try {
@@ -82,9 +96,13 @@ if ($roleCodigo === 'USUARIO') {
       ");
       $st->execute([':pid' => $personalId, ':uid' => $unidadPropia]);
       $c = $st->fetchColumn();
-      if (is_string($c) && $c !== '') $roleCodigo = $c;
+      if (is_string($c) && $c !== '') $roleCodigo = strtoupper(trim($c));
     }
   } catch (Throwable $e) {}
+}
+
+if ($isHardcodedSuperAdmin) {
+  $roleCodigo = 'SUPERADMIN';
 }
 
 $esSuperAdmin = ($roleCodigo === 'SUPERADMIN');
@@ -322,6 +340,17 @@ try {
         <p class="qdesc">Gestión del storage y documentos asociados al sistema.</p>
         <div class="qactions">
           <a class="btn btn-primary btn-cta" href="./administrar_archivos.php">Entrar</a>
+        </div>
+      </div>
+
+      <div class="qcard">
+        <div class="qhead">
+          <div class="qtitle">Permisos carpetas</div>
+          <span class="pill">carpetas compartidas</span>
+        </div>
+        <p class="qdesc">Autorizar jefes, encargados y auxiliares para las carpetas compartidas de cada area.</p>
+        <div class="qactions">
+          <a class="btn btn-primary btn-cta" href="./administrar_carpetas_compartidas.php">Entrar</a>
         </div>
       </div>
 

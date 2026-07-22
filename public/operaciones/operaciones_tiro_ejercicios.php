@@ -3,9 +3,9 @@
 declare(strict_types=1);
 
 $OFFLINE_MODE = false;
-require_once __DIR__ . '/../auth/bootstrap.php';
+require_once __DIR__ . '/../../auth/bootstrap.php';
 if(!$OFFLINE_MODE) require_login();
-require_once __DIR__ . '/../config/db.php';
+require_once __DIR__ . '/../../config/db.php';
 require_once __DIR__ . '/s3_tiro_tables_helper.php';
 
 s3_tiro_ensure_tables($pdo);
@@ -42,7 +42,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         ]);
     }
 
-    header('Location: s3_tiro_ejercicios.php');
+    header('Location: operaciones_tiro_ejercicios.php');
     exit;
 }
 
@@ -51,11 +51,15 @@ $ej = $pdo->query("SELECT * FROM s3_tiro_ejercicios ORDER BY fecha DESC, codigo"
           ->fetchAll(PDO::FETCH_ASSOC);
 
 /* Assets */
-$PUBLIC_URL = rtrim(str_replace("\\","/", dirname($_SERVER["SCRIPT_NAME"] ?? "")), "/");
-$APP_URL    = rtrim(dirname($PUBLIC_URL), "/");
-$ASSETS     = ($APP_URL==="" ? "" : $APP_URL)."/assets";
+$SELF_URL        = (string)($_SERVER['SCRIPT_NAME'] ?? $_SERVER['PHP_SELF'] ?? '');
+$OPERACIONES_URL = rtrim(str_replace('\\','/', dirname($SELF_URL)), '/');
+$PUBLIC_URL      = rtrim(str_replace('\\','/', dirname($OPERACIONES_URL)), '/');
+$APP_URL         = rtrim(str_replace('\\','/', dirname($PUBLIC_URL)), '/');
+$ASSETS          = ($APP_URL === '' ? '' : $APP_URL)."/assets";
 $IMG_BG     = $ASSETS."/img/fondo.png";
-$ESCUDO     = $ASSETS."/img/escudo_bcom602.png";
+$ESCUDO     = $ASSETS."/img/ecmilm.png";
+$UNIDAD_NOMBRE = 'Escuela Militar de Monta&ntilde;a';
+$UNIDAD_LEMA   = '&ldquo;La monta&ntilde;a nos une&rdquo;';
 ?>
 <!doctype html>
 <html lang="es">
@@ -63,7 +67,7 @@ $ESCUDO     = $ASSETS."/img/escudo_bcom602.png";
 <meta charset="utf-8">
 <title>Ejercicios de tiro · S-3 Tiro</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<link rel="stylesheet" href="../assets/css/theme-602.css">
+<link rel="stylesheet" href="<?= e($ASSETS) ?>/css/theme-602.css">
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 <style>
 body{
@@ -82,6 +86,8 @@ body{
 .badge-ok{ background:#16a34a; }
 .badge-no{ background:#dc2626; }
 .table-sm th,.table-sm td{ font-size:.82rem; }
+.brand-title:not(.brand-title-fixed),
+.brand-sub:not(.brand-sub-fixed){ display:none; }
 </style>
 </head>
 <body>
@@ -89,13 +95,16 @@ body{
 <header class="brand-hero">
   <div class="container-main d-flex justify-content-between py-2">
     <div class="d-flex gap-3 align-items-center">
-      <img src="<?= e($ESCUDO) ?>" style="height:55px;">
+      <img src="<?= e($ESCUDO) ?>" alt="Escudo ECMILM" style="height:55px;"
+           onerror="this.onerror=null;this.src='<?= e($ASSETS) ?>/img/EA.png';">
       <div>
-        <div class="brand-title">Batallón de Comunicaciones 602</div>
+        <div class="brand-title brand-title-fixed"><?= $UNIDAD_NOMBRE ?></div>
+        <div class="brand-sub brand-sub-fixed"><?= $UNIDAD_LEMA ?></div>
+        <div class="brand-title"><?= $UNIDAD_NOMBRE ?></div>
         <div class="brand-sub">S-3 · Tiro · Ejercicios</div>
       </div>
     </div>
-    <a href="s3_tiro.php" class="btn btn-secondary btn-sm fw-bold">Volver</a>
+    <a href="operaciones_tiro.php" class="btn btn-secondary btn-sm fw-bold">Volver a Tiro</a>
   </div>
 </header>
 

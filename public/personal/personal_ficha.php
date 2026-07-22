@@ -59,6 +59,35 @@ function fmt_bytes(?int $b): string {
     $u=['B','KB','MB','GB']; $i=0; $v=(float)$b;
     while($v>=1024&&$i<3){$v/=1024;$i++;} return rtrim(rtrim(number_format($v,2,'.',''),'0'),'.') .' '.$u[$i];
 }
+function normalizar_destino_interno_ficha(string $nombre): string {
+    $nombre = trim(preg_replace('/\s+/', ' ', $nombre) ?? $nombre);
+    $key = mb_strtoupper(str_replace('.', '', $nombre), 'UTF-8');
+    $key = preg_replace('/\s+/', ' ', $key) ?? $key;
+    return in_array($key, ['BDA MIL', 'BDA MILITAR', 'BANDA MIL', 'BANDA MILITAR'], true) ? 'BANDA MILITAR' : $nombre;
+}
+function resolver_destino_interno_id(PDO $pdo, string $seleccion, string $nuevo): ?int {
+    $seleccion = trim($seleccion);
+    $nuevo = normalizar_destino_interno_ficha($nuevo);
+
+    if ($seleccion === 'NUEVO') {
+        if ($nuevo === '') {
+            throw new RuntimeException('Ingresá el nombre del nuevo destino interno.');
+        }
+        $st = $pdo->prepare("SELECT id FROM destino_interno WHERE UPPER(nombre)=UPPER(:nombre) AND COALESCE(estado,'ACTIVO')='ACTIVO' LIMIT 1");
+        $st->execute([':nombre' => $nuevo]);
+        $id = $st->fetchColumn();
+        if ($id !== false) return (int)$id;
+        $pdo->prepare("INSERT INTO destino_interno (nombre, estado) VALUES (:nombre, 'ACTIVO')")
+            ->execute([':nombre' => $nuevo]);
+        return (int)$pdo->lastInsertId();
+    }
+
+    if ($seleccion !== '' && ctype_digit($seleccion)) {
+        return (int)$seleccion;
+    }
+
+    return null;
+}
 ensure_personal_extra_columns($pdo);
 
 /** Nombre de archivo para foto: APELLIDO_NOMBRE_YYYYMMDD_id.ext */
@@ -110,6 +139,33 @@ $esSuperAdmin = ($roleCodigo==='SUPERADMIN');
 $esAdmin      = ($roleCodigo==='ADMIN')||$esSuperAdmin;
 $unidadActiva = $unidadPropia;
 if ($esSuperAdmin) { $uSel=(int)($_SESSION['unidad_id']??0); if($uSel>0) $unidadActiva=$uSel; }
+
+$esUsuarioSanidad = false;
+try {
+    if ($personalId > 0) {
+        $st = $pdo->prepare("
+            SELECT d.codigo AS destino_codigo, d.nombre AS destino_nombre, di.nombre AS destino_interno_nombre
+            FROM personal_unidad pu
+            LEFT JOIN destino d ON d.id = pu.destino_id
+            LEFT JOIN destino_interno di ON di.id = pu.destino_interno
+            WHERE pu.id = :pid
+            LIMIT 1
+        ");
+        $st->execute([':pid' => $personalId]);
+        if ($r = $st->fetch(PDO::FETCH_ASSOC)) {
+            $haystack = strtoupper(trim(
+                (string)($r['destino_codigo'] ?? '') . ' ' .
+                (string)($r['destino_nombre'] ?? '') . ' ' .
+                (string)($r['destino_interno_nombre'] ?? '')
+            ));
+            $esUsuarioSanidad = (bool)preg_match('/\bSAN\b|SANIDAD/u', $haystack);
+        }
+    }
+} catch (Throwable $e) {}
+
+$modoSanidadSolo = $esUsuarioSanidad && !$esSuperAdmin;
+$puedeEditarSanidad = $esAdmin || $esUsuarioSanidad;
+$puedeEditarPersonal = $esAdmin && !$modoSanidadSolo;
 
 /* Branding */
 $NOMBRE='Unidad'; $LEYENDA='';
@@ -163,6 +219,7 @@ $id  = (int)($_GET['id']  ?? 0);
 $q   = trim((string)($_GET['q'] ?? ''));
 $tab = trim((string)($_GET['tab'] ?? 'ficha'));
 if (!in_array($tab, ['ficha','sanidad','docs'], true)) $tab = 'ficha';
+if ($modoSanidadSolo && $tab === 'docs') $tab = 'ficha';
 
 $mensajeOk = ''; $mensajeError = '';
 
@@ -170,7 +227,14 @@ $mensajeOk = ''; $mensajeError = '';
 if ($_SERVER['REQUEST_METHOD']==='POST') {
     $accion=(string)($_POST['accion']??'');
     try {
-        if (!$esAdmin) throw new RuntimeException('Acceso restringido. Solo ADMIN/SUPERADMIN.');
+        $accionesSanidad = ['guardar_sanidad'];
+        $accionesPersonal = ['guardar_personal','subir_foto','subir_documento','guardar_observacion_documento','crear_evento','eliminar_evento','eliminar_documento'];
+        if (in_array($accion, $accionesSanidad, true) && !$puedeEditarSanidad) {
+            throw new RuntimeException('Acceso restringido. Sin permisos para modificar Sanidad.');
+        }
+        if (in_array($accion, $accionesPersonal, true) && !$puedeEditarPersonal) {
+            throw new RuntimeException('Acceso restringido. Sanidad solo puede modificar la pestaña Sanidad.');
+        }
 
         /* ── Guardar datos personales ── */
         if ($accion==='guardar_personal') {
@@ -190,7 +254,11 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
             $peso     = ($_POST['peso']??'')===''?null:(float)$_POST['peso'];
             $altura   = ($_POST['altura']??'')===''?null:(float)$_POST['altura'];
             $nou      = trim((string)($_POST['nou']??''));
-            $dest     = trim((string)($_POST['destino_interno']??''));
+            $destinoInternoId = resolver_destino_interno_id(
+                $pdo,
+                (string)($_POST['destino_interno_id'] ?? ''),
+                (string)($_POST['destino_interno_nuevo'] ?? '')
+            );
             $destId   = ($_POST['destino_id']??'')===''?null:(int)$_POST['destino_id'];
             $rolComb  = trim((string)($_POST['rol_combate']??''));
             $rolAdm   = trim((string)($_POST['rol_administrativo']??''));
@@ -216,7 +284,7 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
                 UPDATE personal_unidad SET
                   grado=:grado, arma=:arma, apellido_nombre=:apnom, dni=:dni, cuil=:cuil,
                   fecha_nac=:fnac, peso=:peso, altura=:altura, sexo=:sexo, domicilio=:dom, estado_civil=:ec, hijos=:hijos,
-                  nou=:nou, destino_interno=:dest, destino_id=:destId, rol_combate=:rolComb, rol_administrativo=:rolAdm,
+                  nou=:nou, destino_interno=:destinoInternoId, destino_id=:destId, rol_combate=:rolComb, rol_administrativo=:rolAdm,
                   anios_en_destino=:aniosDest, fracc=:fracc, jerarquia=:jer,
                   funcion=:fun, telefono=:tel, correo=:cor, usuario_intranet=:usrIntra, usuario_gde=:usrGde,
                   nro_cta=:nroCta, cbu=:cbu, alias_banco=:aliasBanco,
@@ -227,7 +295,7 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
                 ':grado'=>$grado?:null, ':arma'=>$arma?:null, ':apnom'=>$apnom,
                 ':dni'=>$dni, ':cuil'=>$cuil?:null, ':fnac'=>$fnac, ':peso'=>$peso, ':altura'=>$altura,
                 ':sexo'=>$sexo?:null, ':dom'=>$dom?:null, ':ec'=>$ec?:null,
-                ':hijos'=>$hijos, ':nou'=>$nou?:null, ':dest'=>$dest?:null, ':destId'=>$destId,
+                ':hijos'=>$hijos, ':nou'=>$nou?:null, ':destinoInternoId'=>$destinoInternoId, ':destId'=>$destId,
                 ':rolComb'=>$rolComb?:null, ':rolAdm'=>$rolAdm?:null, ':aniosDest'=>$aniosDest, ':fracc'=>$fracc?:null,
                 ':jer'=>$jerarq?:null, ':fun'=>$func?:null,
                 ':tel'=>$tel?:null, ':cor'=>$cor?:null, ':usrIntra'=>$usuarioIntranet?:null, ':usrGde'=>$usuarioGde?:null,
@@ -670,16 +738,13 @@ $docs=[]; $sanidadUltimo=null; $sanidadHist=[]; $evidBySanidad=[]; $eventos=[];
 $destinosAll=[]; // Para sugerencias de destino interno en ficha
 
 try {
-    // Destinos internos ya usados en el personal de la unidad
-    $st=$pdo->prepare("
-        SELECT DISTINCT TRIM(destino_interno) AS nombre
-        FROM personal_unidad
-        WHERE unidad_id=:u
-          AND destino_interno IS NOT NULL
-          AND TRIM(destino_interno) <> ''
+    // Destinos internos disponibles desde la tabla maestra.
+    $st=$pdo->query("
+        SELECT id, nombre
+        FROM destino_interno
+        WHERE estado = 'ACTIVO' OR estado IS NULL
         ORDER BY nombre ASC
     ");
-    $st->execute([':u'=>$unidadActiva]);
     $destinosAll=$st->fetchAll(PDO::FETCH_ASSOC)?:[];
 
     if ($id<=0) {
@@ -687,16 +752,37 @@ try {
         $SQL_JER_L = "CASE jerarquia WHEN 'OFICIAL' THEN 1 WHEN 'SUBOFICIAL' THEN 2 WHEN 'SOLDADO' THEN 3 WHEN 'AGENTE_CIVIL' THEN 4 ELSE 5 END";
         $SQL_GRD_L = "CASE grado WHEN 'TG' THEN 9 WHEN 'GD' THEN 10 WHEN 'GB' THEN 11 WHEN 'CR' THEN 12 WHEN 'TC' THEN 13 WHEN 'MY' THEN 14 WHEN 'CT' THEN 15 WHEN 'TP' THEN 16 WHEN 'TT' THEN 17 WHEN 'ST' THEN 18 WHEN 'ST EC' THEN 19 WHEN 'SM' THEN 20 WHEN 'SP' THEN 21 WHEN 'SA' THEN 22 WHEN 'SI' THEN 23 WHEN 'SG' THEN 24 WHEN 'CI' THEN 25 WHEN 'CI EC' THEN 26 WHEN 'CI Art 11' THEN 27 WHEN 'CB' THEN 28 WHEN 'CB EC' THEN 29 WHEN 'CB Art 11' THEN 30 WHEN 'VP' THEN 31 WHEN 'VS' THEN 32 WHEN 'VS EC' THEN 33 WHEN 'SV' THEN 34 WHEN 'AC' THEN 35 ELSE 99 END";
 
-        $sql="SELECT id, jerarquia, grado, arma, apellido_nombre, dni, destino_interno, tiene_parte_enfermo
-              FROM personal_unidad WHERE unidad_id=:u";
+        $sql="SELECT 
+        pu.id,
+        pu.jerarquia,
+        pu.grado,
+        pu.arma,
+        pu.apellido_nombre,
+        pu.dni,
+        di.nombre AS destino_interno,
+        pu.tiene_parte_enfermo
+      FROM personal_unidad pu
+      LEFT JOIN destino_interno di 
+        ON di.id = pu.destino_interno
+      WHERE pu.unidad_id=:u";
         $params=[':u'=>$unidadActiva];
         if($q!==''){$sql.=" AND (apellido_nombre LIKE :q OR dni LIKE :q)";$params[':q']='%'.$q.'%';}
         $sql.=" ORDER BY $SQL_JER_L, $SQL_GRD_L, apellido_nombre ASC";
         $st=$pdo->prepare($sql);$st->execute($params);
         $listado=$st->fetchAll(PDO::FETCH_ASSOC)?:[];
     } else {
-        $st=$pdo->prepare("SELECT * FROM personal_unidad WHERE id=:id AND unidad_id=:u LIMIT 1");
-        $st->execute([':id'=>$id,':u'=>$unidadActiva]);
+        $st=$pdo->prepare("
+    SELECT 
+        pu.*,
+        di.nombre AS destino_interno_nombre
+    FROM personal_unidad pu
+    LEFT JOIN destino_interno di 
+        ON di.id = pu.destino_interno
+    WHERE pu.id=:id 
+      AND pu.unidad_id=:u 
+    LIMIT 1
+");
+    $st->execute([':id'=>$id,':u'=>$unidadActiva]);
         $persona=$st->fetch(PDO::FETCH_ASSOC);
         if(!$persona) throw new RuntimeException("No se encontró el personal (ID={$id}).");
 
@@ -974,7 +1060,7 @@ function evento_badge(string $tipo): string {
       <div style="font-weight:900;font-size:1.1rem;">Ficha de personal</div>
       <div class="help-small">
         <?= e($linea) ?> · DNI: <b><?= e($persona['dni']??'') ?></b>
-        <?php if(!empty($persona['destino_interno'])): ?> · Destino: <b><?= e($persona['destino_interno']) ?></b><?php endif; ?>
+        <?php if(!empty($persona['destino_interno_nombre'])): ?> · Destino: <b><?= e($persona['destino_interno_nombre']) ?></b><?php endif; ?>
       </div>
     </div>
   </div>
@@ -983,7 +1069,9 @@ function evento_badge(string $tipo): string {
   <div class="d-flex flex-wrap gap-2 my-3">
     <a class="tab-pill <?= $tab==='ficha'?'active':'' ?>" href="?id=<?= $id ?>&tab=ficha"><i class="bi bi-person-vcard"></i> Datos</a>
     <a class="tab-pill <?= $tab==='sanidad'?'active':'' ?>" href="?id=<?= $id ?>&tab=sanidad"><i class="bi bi-heart-pulse"></i> Sanidad</a>
+    <?php if(!$modoSanidadSolo): ?>
     <a class="tab-pill <?= $tab==='docs'?'active':'' ?>" href="?id=<?= $id ?>&tab=docs"><i class="bi bi-folder2"></i> Documentos</a>
+    <?php endif; ?>
   </div>
 
   <!-- ┌─ FOTO ─────────────────────────────────────────────────────────────┐ -->
@@ -996,7 +1084,7 @@ function evento_badge(string $tipo): string {
         <div class="foto-ph"><i class="bi bi-person-circle" style="font-size:3rem;opacity:.3;display:block;"></i>Sin foto</div>
       <?php endif; ?>
     </div>
-    <?php if($esAdmin): ?>
+    <?php if($puedeEditarPersonal): ?>
     <form method="post" enctype="multipart/form-data" class="text-center" style="max-width:300px;">
       <?php csrf_if_exists(); ?>
       <input type="hidden" name="accion" value="subir_foto">
@@ -1017,7 +1105,7 @@ function evento_badge(string $tipo): string {
   <div class="card-sub">
     <div class="section-title"><i class="bi bi-person-lines-fill me-1 text-info"></i> Datos del personal</div>
 
-    <?php if($esAdmin): ?>
+    <?php if($puedeEditarPersonal): ?>
     <form method="post" class="row g-2">
       <?php csrf_if_exists(); ?>
       <input type="hidden" name="accion" value="guardar_personal">
@@ -1088,13 +1176,17 @@ function evento_badge(string $tipo): string {
       <div class="col-md-4">
         <label class="form-label">Area / Destino</label>
         <input type="hidden" name="destino_id" value="">
-        <input class="form-control form-control-sm" name="destino_interno" list="destinos-internos"
-               value="<?= e($persona['destino_interno']??'') ?>" placeholder="Escribi o elegi un destino">
-        <datalist id="destinos-internos">
+        <select class="form-select form-select-sm" name="destino_interno_id" id="destinoInternoSelect">
+          <option value="">-- Sin destino asignado --</option>
           <?php foreach($destinosAll as $dst): ?>
-            <option value="<?= e($dst['nombre'] ?? '') ?>"></option>
+            <option value="<?= (int)($dst['id'] ?? 0) ?>" <?= ((int)($persona['destino_interno'] ?? 0) === (int)($dst['id'] ?? 0)) ? 'selected' : '' ?>>
+              <?= e($dst['nombre'] ?? '') ?>
+            </option>
           <?php endforeach; ?>
-        </datalist>
+          <option value="NUEVO">+ Agregar nuevo destino</option>
+        </select>
+        <input class="form-control form-control-sm mt-1 d-none" id="destinoInternoNuevo" name="destino_interno_nuevo"
+               placeholder="Nombre del nuevo destino interno">
       </div>
       <div class="col-md-5">
         <label class="form-label">Funcion</label>
@@ -1223,7 +1315,7 @@ function evento_badge(string $tipo): string {
       <?php endif; ?>
     </div>
 
-    <?php if($esAdmin): ?>
+    <?php if($puedeEditarSanidad): ?>
     <form method="post" enctype="multipart/form-data" class="row g-2">
       <?php csrf_if_exists(); ?>
       <input type="hidden" name="accion" value="guardar_sanidad">
@@ -1310,7 +1402,7 @@ function evento_badge(string $tipo): string {
                     <td><?= e(fmt_bytes(isset($d['bytes'])?(int)$d['bytes']:null)) ?></td>
                     <td><?php if($url): ?><a class="btn btn-sm btn-outline-light py-0 px-2" href="<?= e($url) ?>" target="_blank">Ver</a><?php else: ?>—<?php endif; ?></td>
                     <td class="text-end">
-                      <?php if($esAdmin): ?>
+                      <?php if($puedeEditarPersonal): ?>
                       <form method="post" class="d-inline form-del-doc">
                         <?php csrf_if_exists(); ?>
                         <input type="hidden" name="accion" value="eliminar_documento">
@@ -1336,10 +1428,10 @@ function evento_badge(string $tipo): string {
   <?php endif; ?>
 
   <!-- ══════════════════════════ TAB: DOCUMENTOS ══════════════════════════ -->
-  <?php if($tab==='docs'): ?>
+  <?php if($tab==='docs' && !$modoSanidadSolo): ?>
   <div class="card-sub">
     <div class="section-title"><i class="bi bi-folder2-open me-1 text-warning"></i> Documentos del personal</div>
-    <?php if($esAdmin): ?>
+    <?php if($puedeEditarPersonal): ?>
     <form method="post" enctype="multipart/form-data" class="row g-2 mb-4">
       <?php csrf_if_exists(); ?>
       <input type="hidden" name="accion" value="subir_documento">
@@ -1397,7 +1489,7 @@ function evento_badge(string $tipo): string {
             <td><?= e(fmt_bytes(isset($d['bytes'])?(int)$d['bytes']:null)) ?></td>
             <td><?php if($url): ?><a class="btn btn-sm btn-outline-light py-0 px-2" href="<?= e($url) ?>" target="_blank">Ver</a><?php else: ?>—<?php endif; ?></td>
             <td style="min-width:240px;">
-              <?php if($esAdmin): ?>
+              <?php if($puedeEditarPersonal): ?>
               <form method="post" class="d-flex gap-2 align-items-start">
                 <?php csrf_if_exists(); ?>
                 <input type="hidden" name="accion" value="guardar_observacion_documento">
@@ -1411,7 +1503,7 @@ function evento_badge(string $tipo): string {
               <?php endif; ?>
             </td>
             <td class="text-end">
-              <?php if($esAdmin): ?>
+              <?php if($puedeEditarPersonal): ?>
               <form method="post" class="d-inline form-del-doc">
                 <?php csrf_if_exists(); ?>
                 <input type="hidden" name="accion" value="eliminar_documento">
@@ -1438,7 +1530,7 @@ function evento_badge(string $tipo): string {
       <code>comision</code>, <code>plan_llamada</code>, <code>retiro</code>, o cualquier texto libre.
     </div>
 
-    <?php if($esAdmin): ?>
+    <?php if($puedeEditarPersonal): ?>
     <form method="post" class="row g-2 mb-4 p-3" style="background:rgba(2,6,23,.5);border-radius:10px;">
       <?php csrf_if_exists(); ?>
       <input type="hidden" name="accion" value="crear_evento">
@@ -1546,7 +1638,7 @@ function evento_badge(string $tipo): string {
                 </div>
               <?php endif; ?>
             </div>
-            <?php if($esAdmin): ?>
+            <?php if($puedeEditarPersonal): ?>
             <form method="post" class="d-inline form-del-ev flex-shrink-0">
               <?php csrf_if_exists(); ?>
               <input type="hidden" name="accion" value="eliminar_evento">
@@ -1572,6 +1664,19 @@ function evento_badge(string $tipo): string {
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', () => {
+  const destinoSelect = document.getElementById('destinoInternoSelect');
+  const destinoNuevo = document.getElementById('destinoInternoNuevo');
+  const syncDestinoNuevo = () => {
+    if (!destinoSelect || !destinoNuevo) return;
+    const nuevo = destinoSelect.value === 'NUEVO';
+    destinoNuevo.classList.toggle('d-none', !nuevo);
+    destinoNuevo.required = nuevo;
+    if (nuevo) destinoNuevo.focus();
+    if (!nuevo) destinoNuevo.value = '';
+  };
+  destinoSelect?.addEventListener('change', syncDestinoNuevo);
+  syncDestinoNuevo();
+
   // Confirmar eliminación de documentos
   document.querySelectorAll('.form-del-doc .btn-del').forEach(btn => {
     btn.addEventListener('click', e => {

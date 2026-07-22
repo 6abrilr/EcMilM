@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NetMonitor — Stealth Dashboard</title>
+  
+  <link rel="stylesheet" href="fonts/fonts.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+  
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css" />
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body class="stealth-theme">
+
+  <div class="container">
+    <header class="header">
+      <div class="header-left">
+        <div class="logo">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="2"/><path d="M12 2v4m0 12v4M2 12h4m12 0h4"/><path d="M4.93 4.93l2.83 2.83m8.48 8.48l2.83 2.83M4.93 19.07l2.83-2.83m8.48-8.48l2.83-2.83"/>
+          </svg>
+          <h1>NetMonitor</h1>
+          <span class="stealth-badge">STEALTH</span>
+        </div>
+        <nav class="quick-actions">
+          <button class="btn-icon" data-action="openSettings" title="Configuración"><i class="fas fa-cog"></i></button>
+          <button class="btn-icon" data-action="logout" title="Cerrar sesión" hidden><i class="fas fa-sign-out-alt"></i></button>
+          <button class="btn-icon accent-amber" data-action="openVault" title="Bóveda (RMM)"><i class="fas fa-key"></i></button>
+          <button class="btn-icon accent-blue" data-action="openTopology" title="Mapa Topológico"><i class="fas fa-project-diagram"></i></button>
+          <button class="btn-icon accent-blue" data-action="openIPAM" title="Mapa de Subred IPAM"><i class="fas fa-th"></i></button>
+          <button class="btn-icon accent-amber" data-action="openNetworkTools" title="Herramientas de Red"><i class="fas fa-tools"></i></button>
+          <button class="btn-icon" data-action="openScanHistory" title="Historial de Escaneos"><i class="fas fa-history"></i></button>
+          <button class="btn-icon" data-action="openTerminal" title="Terminal Gateway"><i class="fas fa-terminal"></i></button>
+        </nav>
+      </div>
+      <div class="header-right">
+        <div class="scan-info">
+          <span id="lastScanLabel">Último scan: —</span>
+          <span id="nextScanLabel" class="next-scan">Próximo: —</span>
+        </div>
+        <button id="btnScan" class="btn btn-primary" data-action="triggerScan" type="button">
+          <i class="fas fa-sync-alt"></i> Escanear
+        </button>
+        <button id="btnToggleMode" class="btn btn-ghost" data-action="toggleScanMode" type="button" title="Cambiar modo de escaneo">
+          <i class="fas fa-exchange-alt"></i>
+        </button>
+      </div>
+    </header>
+
+    <section class="stats-row">
+      <div class="stat-card" id="statTotal">
+        <div class="stat-icon total"><i class="fas fa-server"></i></div>
+        <div class="stat-data">
+          <span class="stat-value" id="totalCount">0</span>
+          <span class="stat-label">Total Equipos</span>
+        </div>
+      </div>
+      <div class="stat-card" id="statOnline">
+        <div class="stat-icon online"><i class="fas fa-check-circle"></i></div>
+        <div class="stat-data">
+          <span class="stat-value" id="onlineCount">0</span>
+          <span class="stat-label">Online</span>
+        </div>
+      </div>
+      <div class="stat-card" id="statOffline">
+        <div class="stat-icon offline"><i class="fas fa-times-circle"></i></div>
+        <div class="stat-data">
+          <span class="stat-value" id="offlineCount">0</span>
+          <span class="stat-label">Offline</span>
+        </div>
+      </div>
+      <div class="stat-card" id="statNew">
+        <div class="stat-icon new-devices"><i class="fas fa-plus-circle"></i></div>
+        <div class="stat-data">
+          <span class="stat-value" id="newCount">0</span>
+          <span class="stat-label">Nuevos Hoy</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="charts-container">
+
+      <!-- Bandwidth panel -->
+      <div class="chart-card bw-card">
+        <h3>
+          <i class="fas fa-network-wired"></i> Ancho de Banda
+          <span class="bw-updated" id="bwUpdatedAt"></span>
+          <button type="button" class="btn-icon bw-refresh" id="btnRefreshBw" title="Actualizar"><i class="fas fa-sync-alt"></i></button>
+        </h3>
+
+        <!-- WAN status bar -->
+        <div class="bw-wan" id="bwWan">
+          <span class="bw-wan-dot" id="bwWanDot"></span>
+          <span class="bw-wan-label" id="bwWanLabel">Detectando WAN…</span>
+          <span class="bw-wan-lat" id="bwWanLat"></span>
+          <span class="bw-wan-loss" id="bwWanLoss"></span>
+          <span class="bw-wan-starlink" id="bwWanStarlink"></span>
+        </div>
+
+        <!-- WAN historical charts -->
+        <div class="bw-wan-charts">
+          <div class="bw-wan-chart-block">
+            <div class="bw-wan-chart-title">Latencia (ms)</div>
+            <div class="bw-wan-chart-wrap"><canvas id="wanLatencyChart"></canvas></div>
+          </div>
+          <div class="bw-wan-chart-block">
+            <div class="bw-wan-chart-title">Throughput</div>
+            <div class="bw-wan-chart-wrap"><canvas id="wanThroughputChart"></canvas></div>
+          </div>
+        </div>
+
+        <!-- Network totals -->
+        <div class="bw-totals" id="bwTotals">
+          <div class="bw-total-item">
+            <span class="bw-dir rx">▼ RX</span>
+            <span class="bw-val" id="bwRx">—</span>
+          </div>
+          <div class="bw-total-item">
+            <span class="bw-dir tx">▲ TX</span>
+            <span class="bw-val" id="bwTx">—</span>
+          </div>
+          <div class="bw-total-item">
+            <span class="bw-dir total">⇅ Total</span>
+            <span class="bw-val" id="bwTotal">—</span>
+          </div>
+        </div>
+
+        <!-- Switch utilization bars -->
+        <div class="bw-switches" id="bwSwitches"></div>
+
+        <!-- Top consumers -->
+        <div class="bw-consumers">
+          <div class="bw-section-title">Top consumers</div>
+          <div id="bwTopList" class="bw-top-list"></div>
+        </div>
+
+        <!-- No data state -->
+        <div id="bwNoData" class="bw-nodata bw-nodata--hidden">
+          <i class="fas fa-plug"></i>
+          <p>Sin datos SNMP. Configurá un switch para ver tráfico en tiempo real.</p>
+          <button type="button" class="btn btn-ghost btn-sm" data-action="openSwitches">Configurar switches</button>
+        </div>
+      </div>
+
+      <!-- Traffic distribution chart -->
+      <div class="chart-card">
+        <h3><i class="fas fa-chart-pie"></i> Tráfico por equipo</h3>
+        <div class="chart-body">
+          <div class="chart-wrapper"><canvas id="trafficChart"></canvas></div>
+          <div class="chart-legend" id="trafficChartLegend"></div>
+        </div>
+      </div>
+
+      <!-- Vendor chart -->
+      <div class="chart-card">
+        <h3><i class="fas fa-microchip"></i> Distribución por Vendor</h3>
+        <div class="chart-body">
+          <div class="chart-wrapper"><canvas id="vendorChart"></canvas></div>
+          <div class="chart-legend" id="vendorChartLegend"></div>
+        </div>
+      </div>
+
+    </section>
+
+    <section class="filters-bar">
+      <div class="search-box">
+        <i class="fas fa-search"></i>
+        <input type="text" id="searchInput" placeholder="Buscar por IP, MAC, hostname, vendor..." autocomplete="off">
+      </div>
+      <div class="filter-group">
+        <select id="filterStatus">
+          <option value="">Todos</option>
+          <option value="online">🟢 Online</option>
+          <option value="offline">🔴 Offline</option>
+        </select>
+        <select id="filterVendor" title="Filtrar por vendor">
+          <option value="">Vendor</option>
+        </select>
+        <select id="filterType" title="Filtrar por tipo">
+          <option value="">Tipo</option>
+        </select>
+        <button class="btn btn-ghost" data-action="exportCSV"  title="Exportar CSV"><i class="fas fa-file-csv"></i> CSV</button>
+        <button class="btn btn-ghost" data-action="exportXLSX" title="Exportar Excel"><i class="fas fa-file-excel"></i> XLSX</button>
+        <button class="btn btn-ghost" data-action="exportPDF"  title="Exportar PDF"><i class="fas fa-file-pdf"></i> PDF</button>
+        <div class="divider"></div>
+        <button class="btn btn-secondary" data-action="openSwitches" title="Gestor SNMP"><i class="fas fa-network-wired"></i> SNMP</button>
+        <button class="btn btn-ghost danger-text" data-action="resetDb" title="Resetear Inventario"><i class="fas fa-trash"></i> Reset</button>
+      </div>
+    </section>
+
+    <section class="table-container">
+      <table id="devicesTable">
+        <thead>
+          <tr>
+            <th class="th-status" data-sort="is_online">Estado</th>
+            <th data-sort="hostname">Nombre de PC</th>
+            <th data-sort="mac">MAC</th>
+            <th data-sort="inventory_name">Inventario EA</th>
+            <th data-sort="ip">IP</th>
+            <th data-sort="device_type">Tipo</th>
+            <th data-sort="os">OS</th>
+            <th data-sort="switch_name">Switch:Boca</th>
+            <th data-sort="inventory_area">Asignado / Área</th>
+            <th data-sort="last_seen">Último visto</th>
+            <th class="th-actions"></th>
+          </tr>
+        </thead>
+        <tbody id="devicesBody">
+          </tbody>
+      </table>
+    </section>
+  </div>
+
+  <aside class="detail-panel" id="detailPanel">
+    <div class="detail-header">
+      <h2 id="detailTitle">Detalle del Equipo</h2>
+      <button class="btn-close" data-action="closeDetail">&times;</button>
+    </div>
+    <div class="detail-body" id="detailBody"></div>
+  </aside>
+
+  <div class="overlay" id="overlay"></div>
+
+  <div class="modal" id="globalModal">
+    <div class="modal-content" id="modalContent">
+      <div class="modal-header">
+        <h3 id="modalTitle">Título Modal</h3>
+        <button class="btn-close" data-action="closeModal">&times;</button>
+      </div>
+      <div class="modal-body" id="modalBody"></div>
+    </div>
+  </div>
+
+  <!-- Toast container (floating bottom-right) -->
+  <div class="toast-container" id="toastContainer"></div>
+
+  <!-- Scan console overlay -->
+  <div class="scan-console" id="scanConsole">
+    <div class="scan-console-header">
+      <span><i class="fas fa-satellite-dish"></i> Escaneo de red</span>
+      <span class="scan-console-status" id="scanConsoleStatus">
+        <i class="fas fa-spinner fa-spin"></i> En progreso…
+      </span>
+      <button type="button" class="scan-console-close" id="scanConsoleClose">&times;</button>
+    </div>
+    <div class="scan-console-body" id="scanConsoleBody"></div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script src="js/vis-network.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js"></script>
+  <script src="socket.io/socket.io.js"></script>
+<script src="js/toast.js"></script>
+<script src="js/context-menu.js"></script>
+<script src="js/pdf-export.js"></script>
+<script src="js/api.js"></script>
+<script src="js/table.js"></script>
+<script src="js/charts.js"></script>
+<script src="js/bandwidth.js"></script>
+<script src="js/detail.js"></script>
+<script src="js/modal.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

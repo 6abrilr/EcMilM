@@ -8,9 +8,140 @@ require_once __DIR__ . '/../config/db.php';
 
 function e($v){ return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'); }
 function norm_dni(string $dni): string { return preg_replace('/\D+/', '', $dni); }
+function decode_area_codes($value): array {
+  if (!is_string($value) || trim($value) === '') return [];
+  $decoded = json_decode($value, true);
+  if (is_array($decoded)) {
+    return array_values(array_unique(array_filter(array_map(static fn($v) => strtoupper(trim((string)$v)), $decoded))));
+  }
+  return array_values(array_unique(array_filter(array_map(static fn($v) => strtoupper(trim($v)), explode(',', $value)))));
+}
+function inicio_norm_text(string $value): string {
+  $value = strtoupper(trim($value));
+  return str_replace(['Á','É','Í','Ó','Ú','Ü','Ñ'], ['A','E','I','O','U','U','N'], $value);
+}
+function inicio_area_code_from_destino_interno(string $nombre): string {
+  $n = inicio_norm_text($nombre);
+  if ($n === '') return '';
+  if (str_contains($n, 'DIVISION ENSENANZA') || str_contains($n, 'DIVISION DE ENSENANZA')) return 'ENS';
+  if (str_contains($n, 'DEPARTAMENTO EDUCACION') || str_contains($n, 'DEPTO EDUCACION')) return 'EDUC';
+  return '';
+}
+function inicio_item_scope_code(array $item): string {
+  $pill = inicio_norm_text((string)($item['pill'] ?? ''));
+  if (preg_match('/^(S[1-5]|SAF|INF|DIR|SAN|IGE|ENS|EDUC)$/', $pill)) return $pill;
+
+  $text = inicio_norm_text((string)($item['etiqueta'] ?? '') . ' ' . (string)($item['href'] ?? ''));
+  if (str_contains($text, 'DIVISION ENSENANZA') || str_contains($text, 'DIVISION_ENSENANZA')) return 'ENS';
+  if (str_contains($text, 'DEPARTAMENTO EDUCACION') || str_contains($text, 'DEPARTAMENTO_EDUCACION')) return 'EDUC';
+  if (preg_match('/\b(S[1-5]|SAF|INF|DIR|SAN|IGE)\b/', $text, $m)) return $m[1];
+  return '';
+}
+function inicio_item_allowed_for_scope(array $item, array $scopeCodes, bool $globalAccess): bool {
+  if ($globalAccess) return true;
+  if (!$scopeCodes) return false;
+  $code = inicio_item_scope_code($item);
+  return $code !== '' && in_array($code, $scopeCodes, true);
+}
+function inicio_destino_column_exists(PDO $pdo, string $column): bool {
+  $st = $pdo->prepare("
+    SELECT COUNT(*)
+    FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE()
+      AND TABLE_NAME = 'destino'
+      AND COLUMN_NAME = :col
+  ");
+  $st->execute([':col' => $column]);
+  return (int)$st->fetchColumn() > 0;
+}
+function inicio_ensure_destino_orden(PDO $pdo): void {
+  try {
+    if (!inicio_destino_column_exists($pdo, 'orden')) {
+      $pdo->exec("ALTER TABLE destino ADD COLUMN orden INT NOT NULL DEFAULT 0 AFTER activo");
+      $pdo->exec("UPDATE destino SET orden = id WHERE orden = 0");
+    }
+  } catch (Throwable $e) {
+  }
+}
+
+inicio_ensure_destino_orden($pdo);
+
+function inicio_ensure_menu_tables(PDO $pdo): void {
+  $pdo->exec("
+    CREATE TABLE IF NOT EXISTS inicio_menu_secciones (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      unidad_id INT NOT NULL,
+      section_key VARCHAR(40) NOT NULL,
+      titulo VARCHAR(120) NOT NULL,
+      orden INT NOT NULL DEFAULT 0,
+      visible TINYINT(1) NOT NULL DEFAULT 1,
+      UNIQUE KEY uq_inicio_sec (unidad_id, section_key)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+  ");
+  $pdo->exec("
+    CREATE TABLE IF NOT EXISTS inicio_menu_items (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      unidad_id INT NOT NULL,
+      section_key VARCHAR(40) NOT NULL,
+      etiqueta VARCHAR(160) NOT NULL,
+      href VARCHAR(255) NOT NULL,
+      pill VARCHAR(60) NULL,
+      orden INT NOT NULL DEFAULT 0,
+      visible TINYINT(1) NOT NULL DEFAULT 1,
+      admin_only TINYINT(1) NOT NULL DEFAULT 0,
+      UNIQUE KEY uq_inicio_item (unidad_id, etiqueta, href)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+  ");
+}
+
+function inicio_seed_menu(PDO $pdo, int $unidadId): void {
+  $sections = [
+    ['destinos', 'Destinos / Áreas de trabajo', 10, 1],
+    ['educacion', 'Educacion', 20, 1],
+    ['utilidades', 'Utilidades', 30, 1],
+    ['administracion', 'Administración', 40, 1],
+  ];
+  $st = $pdo->prepare("
+    INSERT INTO inicio_menu_secciones (unidad_id, section_key, titulo, orden, visible)
+    VALUES (:uid, :k, :t, :o, :v)
+    ON DUPLICATE KEY UPDATE titulo = titulo
+  ");
+  foreach ($sections as $s) {
+    $st->execute([':uid'=>$unidadId, ':k'=>$s[0], ':t'=>$s[1], ':o'=>$s[2], ':v'=>$s[3]]);
+  }
+
+  $items = [
+    ['educacion', 'Departamento Educacion', 'departamento_educacion/departamento_educacion.php', 'EDUC', 10, 1, 0],
+    ['educacion', 'Division Ensenanza', 'division_ensenanza/division_ensenanza.php', 'ENS', 20, 1, 0],
+    ['utilidades', 'CHAT', 'CHAT.php', 'Ver', 10, 1, 0],
+    ['utilidades', 'Calendario', 'calendario.php?area={AREA}', 'Ver', 20, 1, 0],
+    ['utilidades', 'Buscador de documentación', 'documentacion.php', 'DOCUMENTACIÓN', 30, 1, 0],
+    ['utilidades', 'Convertir PDF a Word o imágenes', 'editardocumentos.php', 'Herramienta', 40, 1, 0],
+    ['utilidades', 'Asistente IA sobre archivos', 'asistente_ia.php', 'Reglamentos', 50, 1, 0],
+    ['administracion', 'Panel de Administración', 'admin/administrar_gestiones.php', '{ROLE}', 10, 1, 1],
+  ];
+  $st = $pdo->prepare("
+    INSERT INTO inicio_menu_items (unidad_id, section_key, etiqueta, href, pill, orden, visible, admin_only)
+    VALUES (:uid, :sec, :etq, :href, :pill, :orden, :visible, :admin)
+    ON DUPLICATE KEY UPDATE etiqueta = etiqueta
+  ");
+  foreach ($items as $it) {
+    $st->execute([
+      ':uid'=>$unidadId, ':sec'=>$it[0], ':etq'=>$it[1], ':href'=>$it[2], ':pill'=>$it[3],
+      ':orden'=>$it[4], ':visible'=>$it[5], ':admin'=>$it[6],
+    ]);
+  }
+}
 
 $user = function_exists('current_user') ? current_user() : ($_SESSION['user'] ?? null);
 $dniNorm = norm_dni((string)($user['dni'] ?? $user['username'] ?? ''));
+$sessionRole = strtoupper(trim((string)($user['rol_app'] ?? $user['role_app'] ?? '')));
+if ($sessionRole === 'SUPERADMINISTRADOR') $sessionRole = 'SUPERADMIN';
+if ($sessionRole === 'ADMINISTRADOR') $sessionRole = 'ADMIN';
+$isHardcodedSuperAdmin = (
+  $dniNorm === '41742406'
+  || strtolower(trim((string)($user['username'] ?? ''))) === 'nesrojas'
+);
 
 /* ==========================================================
    BASE WEB robusta
@@ -25,6 +156,13 @@ $IMG_BG   = $ASSET_WEB . '/img/fondo.png';
 $ESCUDO   = $ASSET_WEB . '/img/ecmilm.png';
 $FAVICON  = $ASSET_WEB . '/img/ecmilm.png';
 $IMG_EC   = $ASSET_WEB . '/img/ecmilm2026.png';
+if (function_exists('unidad_context')) {
+  $UNIDAD_CTX = unidad_context($pdo);
+  $IMG_BG  = (string)$UNIDAD_CTX['bg_url'];
+  $ESCUDO  = (string)$UNIDAD_CTX['escudo_url'];
+  $FAVICON = (string)$UNIDAD_CTX['icon_url'];
+  $IMG_EC  = (string)$UNIDAD_CTX['hero_url'];
+}
 
 /* ===== Chat ===== */
 $CHAT_FULL_URL = $BASE_PUBLIC_WEB . '/chat.php';
@@ -86,6 +224,12 @@ try {
 } catch (Throwable $e) {}
 
 if ($roleCodigo === 'USUARIO') {
+  if (in_array($sessionRole, ['ADMIN', 'SUPERADMIN'], true)) {
+    $roleCodigo = $sessionRole;
+  }
+}
+
+if ($roleCodigo === 'USUARIO') {
   try {
     if ($personalId > 0) {
       $st = $pdo->prepare("
@@ -111,8 +255,13 @@ if ($roleCodigo === 'USUARIO') {
   } catch (Throwable $e) {}
 }
 
+if ($isHardcodedSuperAdmin) {
+  $roleCodigo = 'SUPERADMIN';
+}
+
 $esSuperAdmin = ($roleCodigo === 'SUPERADMIN');
 $esAdmin      = ($roleCodigo === 'ADMIN') || $esSuperAdmin;
+$userMenuAreaCodes = [];
 
 /* ==========================================================
    3) Unidad activa en UI
@@ -122,6 +271,49 @@ if ($esSuperAdmin) {
   $uSel = (int)($_SESSION['unidad_id'] ?? 0);
   if ($uSel > 0) $unidadActiva = $uSel;
 }
+
+if (!$esSuperAdmin && $personalId > 0) {
+  try {
+    $st = $pdo->prepare("
+      SELECT areas_acceso
+      FROM usuario_roles
+      WHERE personal_id = :pid
+        AND (unidad_id IS NULL OR unidad_id = :uid)
+      ORDER BY created_at DESC, id DESC
+      LIMIT 1
+    ");
+    $st->execute([':pid' => $personalId, ':uid' => $unidadActiva]);
+    $areasRaw = $st->fetchColumn();
+    $userMenuAreaCodes = decode_area_codes(is_string($areasRaw) ? $areasRaw : '');
+  } catch (Throwable $e) {
+    $userMenuAreaCodes = [];
+  }
+}
+
+if (!$esSuperAdmin && $personalId > 0) {
+  try {
+    $st = $pdo->prepare("
+      SELECT di.nombre
+      FROM personal_unidad pu
+      LEFT JOIN destino_interno di ON di.id = pu.destino_interno
+      WHERE pu.id = :pid
+      LIMIT 1
+    ");
+    $st->execute([':pid' => $personalId]);
+    $codeFromDestinoInterno = inicio_area_code_from_destino_interno((string)($st->fetchColumn() ?: ''));
+    if ($codeFromDestinoInterno !== '') $userMenuAreaCodes[] = $codeFromDestinoInterno;
+  } catch (Throwable $e) {}
+}
+
+if (!$esSuperAdmin && $userAreaCode !== '') {
+  $userMenuAreaCodes[] = $userAreaCode;
+}
+$userMenuAreaCodes = array_values(array_unique(array_filter(array_map(static fn($v) => strtoupper(trim((string)$v)), $userMenuAreaCodes))));
+$hasScopedMenu = !$esSuperAdmin && !($esAdmin && empty($userMenuAreaCodes));
+$hasGlobalMenuAccess = !$hasScopedMenu;
+
+inicio_ensure_menu_tables($pdo);
+inicio_seed_menu($pdo, (int)$unidadActiva);
 
 /* ==========================================================
    4) Datos de unidad
@@ -146,6 +338,10 @@ try {
   }
 } catch (Throwable $e) {}
 
+if (function_exists('unidad_context')) {
+  $unidadInfo = array_merge($unidadInfo, unidad_context($pdo, (int)$unidadActiva));
+}
+
 /* ==========================================================
    5) DESTINOS según unidad activa
    ========================================================== */
@@ -154,21 +350,32 @@ $destinosErr = '';
 
 // KPI básico de tareas por estado (para el área del usuario, o todas si es ADMIN)
 $kpiTareas = ['POR_HACER'=>0, 'EN_PROCESO'=>0, 'REALIZADA'=>0];
-$kpiArea = $esAdmin ? null : ($userAreaCode ?: null);
+$kpiArea = $hasGlobalMenuAccess ? null : ($userAreaCode ?: null);
+$kpiAreas = ($hasScopedMenu && $userMenuAreaCodes) ? $userMenuAreaCodes : [];
 
 try {
   $sql = "
-    SELECT id, codigo, nombre, ruta, activo
+    SELECT id, codigo, nombre, ruta, activo, orden
     FROM destino
     WHERE unidad_id = :uid
       AND activo = 1
   ";
   $params = [':uid' => $unidadActiva];
-  if (!$esAdmin && $userAreaCode !== '') {
+  if ($hasScopedMenu && $userMenuAreaCodes) {
+    $in = [];
+    foreach ($userMenuAreaCodes as $i => $code) {
+      $key = ':area' . $i;
+      $in[] = $key;
+      $params[$key] = $code;
+    }
+    $sql .= " AND codigo IN (" . implode(',', $in) . ") ";
+  } elseif ($hasScopedMenu && $userAreaCode !== '') {
     $sql .= " AND codigo = :codigo ";
     $params[':codigo'] = $userAreaCode;
+  } elseif ($hasScopedMenu) {
+    $sql .= " AND 1 = 0 ";
   }
-  $sql .= " ORDER BY id ASC, codigo ASC";
+  $sql .= " ORDER BY orden ASC, id ASC, codigo ASC";
 
   $st = $pdo->prepare($sql);
   $st->execute($params);
@@ -181,7 +388,15 @@ try {
 try {
   $sql = "SELECT estado, COUNT(*) AS cnt FROM calendario_tareas WHERE unidad_id = :uid";
   $params = [':uid' => $unidadActiva];
-  if ($kpiArea !== null) {
+  if ($kpiAreas) {
+    $in = [];
+    foreach ($kpiAreas as $i => $code) {
+      $key = ':karea' . $i;
+      $in[] = $key;
+      $params[$key] = $code;
+    }
+    $sql .= " AND area_code IN (" . implode(',', $in) . ")";
+  } elseif ($kpiArea !== null) {
     $sql .= " AND area_code = :area";
     $params[':area'] = $kpiArea;
   }
@@ -215,6 +430,48 @@ function destino_link(array $d): string {
   $id = (int)($d['id'] ?? 0);
   return 'admin/administrar_destino.php?id=' . $id;
 }
+
+function inicio_menu_href(string $href, string $basePublic, string $calendarArea, string $roleCodigo): string {
+  $href = trim(str_replace('\\', '/', $href));
+  $href = str_replace(['{AREA}', '{ROLE}'], [$calendarArea, $roleCodigo], $href);
+  if ($href === '') return '#';
+  if (preg_match('#^[a-zA-Z]+://#', $href) || str_starts_with($href, '/')) return $href;
+  return rtrim($basePublic, '/') . '/' . ltrim($href, '/');
+}
+
+$inicioMenuSections = [];
+$inicioMenuItems = [];
+$calendarArea = $hasGlobalMenuAccess ? 'ALL' : ($userAreaCode ?: ($userMenuAreaCodes[0] ?? 'ALL'));
+try {
+  $st = $pdo->prepare("
+    SELECT section_key, titulo, orden, visible
+    FROM inicio_menu_secciones
+    WHERE unidad_id = :uid
+      AND visible = 1
+    ORDER BY orden ASC, id ASC
+  ");
+  $st->execute([':uid' => $unidadActiva]);
+  $inicioMenuSections = $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
+
+  $st = $pdo->prepare("
+    SELECT section_key, etiqueta, href, pill, orden, visible, admin_only
+    FROM inicio_menu_items
+    WHERE unidad_id = :uid
+      AND visible = 1
+    ORDER BY orden ASC, id ASC
+  ");
+  $st->execute([':uid' => $unidadActiva]);
+  foreach ($st->fetchAll(PDO::FETCH_ASSOC) ?: [] as $item) {
+    if ((int)($item['admin_only'] ?? 0) === 1 && !$esAdmin) continue;
+    $sectionKey = (string)$item['section_key'];
+    if ($sectionKey !== 'utilidades' && !inicio_item_allowed_for_scope($item, $userMenuAreaCodes, $hasGlobalMenuAccess)) continue;
+    $inicioMenuItems[$sectionKey][] = $item;
+  }
+} catch (Throwable $e) {
+  $inicioMenuSections = [
+    ['section_key'=>'destinos','titulo'=>'Destinos / Áreas de trabajo'],
+  ];
+}
 ?>
 <!doctype html>
 <html lang="es">
@@ -235,10 +492,11 @@ function destino_link(array $d): string {
   .page-bg{
     position:fixed; inset:0; z-index:-2; pointer-events:none;
     background:
-      linear-gradient(160deg, rgba(0,0,0,.85) 0%, rgba(0,0,0,.65) 55%, rgba(0,0,0,.85) 100%),
-      url("<?= e($IMG_BG) ?>") center/cover no-repeat;
+      linear-gradient(160deg, rgba(0,0,0,.92) 0%, rgba(0,0,0,.78) 55%, rgba(0,0,0,.92) 100%),
+      url("<?= e($IMG_BG) ?>") center 24px / min(360px, 46vw) auto no-repeat;
     background-attachment: fixed, fixed;
-    filter:saturate(1.05);
+    filter:saturate(.95);
+    opacity:.72;
   }
   .page-bg::before{
     content:""; position:absolute; inset:0; z-index:-1; opacity:.18;
@@ -388,24 +646,56 @@ function destino_link(array $d): string {
   /* ===== Chat dock fijo ===== */
   .chat-launcher{
     position:fixed;
-    right:12px;
-    bottom:0;
-    width:min(250px, calc(100vw - 12px));
-    height:52px;
-    border-radius:16px 16px 0 0;
-    background:rgba(7,11,20,.96);
-    border:1px solid rgba(148,163,184,.28);
-    border-bottom:none;
+    right:18px;
+    bottom:18px;
+    width:58px;
+    height:58px;
+    border-radius:50%;
+    background:linear-gradient(180deg, #22c55e, #16a34a);
+    border:1px solid rgba(187,247,208,.55);
     display:none;
     align-items:center;
-    justify-content:space-between;
-    padding:0 14px;
+    justify-content:center;
+    padding:0;
     z-index:9998;
     cursor:pointer;
-    box-shadow:0 -6px 18px rgba(0,0,0,.35);
+    box-shadow:0 12px 30px rgba(0,0,0,.45), 0 0 0 6px rgba(34,197,94,.12);
+    transition:transform .16s ease, box-shadow .16s ease, filter .16s ease;
   }
   .chat-launcher.show{ display:flex; }
+  .chat-launcher:hover{
+    transform:translateY(-2px);
+    filter:brightness(1.06);
+    box-shadow:0 16px 34px rgba(0,0,0,.52), 0 0 0 8px rgba(34,197,94,.16);
+  }
+  .chat-launcher::before{
+    content:"";
+    width:28px;
+    height:22px;
+    border:3px solid #fff;
+    border-radius:9px;
+    display:block;
+    position:relative;
+  }
+  .chat-launcher::after{
+    content:"";
+    position:absolute;
+    width:10px;
+    height:10px;
+    left:20px;
+    bottom:16px;
+    border-left:3px solid #fff;
+    border-bottom:3px solid #fff;
+    transform:skew(-20deg) rotate(-12deg);
+    background:transparent;
+  }
   .chat-launcher-title{
+    position:absolute;
+    width:1px;
+    height:1px;
+    overflow:hidden;
+    clip:rect(0 0 0 0);
+    white-space:nowrap;
     font-weight:900;
     color:#eef2f7;
     letter-spacing:.02em;
@@ -413,6 +703,9 @@ function destino_link(array $d): string {
 
   .chat-total-badge{
     display:none;
+    position:absolute;
+    top:-6px;
+    right:-4px;
     min-width:24px;
     height:24px;
     padding:0 7px;
@@ -429,10 +722,11 @@ function destino_link(array $d): string {
   .chat-dock{
     position:fixed;
     right:12px;
-    bottom:0;
+    bottom:14px;
     width:min(540px, calc(100vw - 12px));
-    height:430px;
-    border-radius:18px 18px 0 0;
+    height:min(430px, calc(100vh - 86px));
+    max-height:calc(100vh - 86px);
+    border-radius:18px;
     overflow:hidden;
     border:1px solid rgba(148,163,184,.28);
     border-bottom:none;
@@ -497,6 +791,8 @@ function destino_link(array $d): string {
     display:grid;
     grid-template-columns: 185px 1fr;
     height:calc(100% - 54px);
+    min-height:0;
+    overflow:hidden;
   }
 
   .chat-conv-pane{
@@ -505,6 +801,8 @@ function destino_link(array $d): string {
     display:flex;
     flex-direction:column;
     min-width:0;
+    min-height:0;
+    overflow:hidden;
   }
 
   .chat-conv-pane-head{
@@ -520,6 +818,7 @@ function destino_link(array $d): string {
   .chat-conv-list{
     flex:1;
     overflow:auto;
+    min-height:0;
     padding:10px;
   }
 
@@ -592,6 +891,8 @@ function destino_link(array $d): string {
     display:flex;
     flex-direction:column;
     min-width:0;
+    min-height:0;
+    overflow:hidden;
     background:rgba(2,6,23,.40);
   }
 
@@ -613,6 +914,7 @@ function destino_link(array $d): string {
 
   .chat-messages{
     flex:1;
+    min-height:0;
     overflow:auto;
     padding:12px;
     background:
@@ -670,6 +972,7 @@ function destino_link(array $d): string {
   }
 
   .chat-compose{
+    flex:0 0 auto;
     border-top:1px solid rgba(148,163,184,.14);
     background:rgba(9,14,24,.70);
     padding:10px;
@@ -702,15 +1005,20 @@ function destino_link(array $d): string {
     .chat-dock{
       right:4px;
       width:calc(100vw - 8px);
-      height:min(72vh, 500px);
+      bottom:10px;
+      height:min(72vh, calc(100vh - 80px));
+      max-height:calc(100vh - 80px);
     }
     .chat-launcher{
-      right:4px;
-      width:calc(100vw - 8px);
+      right:14px;
+      bottom:10px;
+      width:58px;
+      height:58px;
     }
     .chat-dock-body{
       grid-template-columns: 1fr;
       grid-template-rows: 130px 1fr;
+      min-height:0;
     }
     .chat-conv-pane{
       border-right:none;
@@ -767,6 +1075,77 @@ function destino_link(array $d): string {
         <div class="sidebar-title">Tablero</div>
 
         <div class="accordion" id="navAcc">
+          <?php foreach ($inicioMenuSections as $sec): ?>
+            <?php
+              $sectionKey = (string)($sec['section_key'] ?? '');
+              $sectionTitle = (string)($sec['titulo'] ?? $sectionKey);
+              $sectionId = 'sec_' . preg_replace('/[^a-zA-Z0-9_]+/', '_', $sectionKey);
+              $items = $inicioMenuItems[$sectionKey] ?? [];
+              $hasContent = $sectionKey === 'destinos' ? (!empty($destinos) || !empty($items) || $userAreaCode !== '' || ($esAdmin && $destinosErr !== '')) : !empty($items);
+              if (!$hasContent) continue;
+            ?>
+            <div class="accordion-item">
+              <h2 class="accordion-header" id="h_<?= e($sectionId) ?>">
+                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#c_<?= e($sectionId) ?>" aria-expanded="false" aria-controls="c_<?= e($sectionId) ?>">
+                  <?= e($sectionTitle) ?>
+                </button>
+              </h2>
+              <div id="c_<?= e($sectionId) ?>" class="accordion-collapse collapse" aria-labelledby="h_<?= e($sectionId) ?>" data-bs-parent="#navAcc">
+                <div class="accordion-body">
+                  <?php if ($sectionKey === 'destinos'): ?>
+                    <?php if (empty($destinos) && empty($items)): ?>
+                      <div class="text-muted" style="font-size:.9rem;">No hay destinos cargados para esta unidad.</div>
+                      <?php if ($userAreaCode !== ''): ?>
+                        <a class="nav-link-card" href="<?= e($BASE_PUBLIC_WEB) ?>/calendario.php?area=<?= e($userAreaCode) ?>">
+                          Ir a tu área: <span class="pill"><?= e($userAreaCode) ?></span>
+                        </a>
+                      <?php endif; ?>
+                      <?php if ($esAdmin && $destinosErr !== ''): ?>
+                        <div class="alert alert-warning mt-2 py-2" style="font-size:.85rem;">
+                          <b>Error SQL destinos:</b> <?= e($destinosErr) ?>
+                        </div>
+                      <?php endif; ?>
+                    <?php else: ?>
+                      <?php foreach ($destinos as $d): ?>
+                        <?php
+                          $did = (int)($d['id'] ?? 0);
+                          $cod = (string)($d['codigo'] ?? '');
+                          $nom = (string)($d['nombre'] ?? $cod);
+                          if ($did <= 0) continue;
+                        ?>
+                        <a class="nav-link-card" href="<?= e(destino_link($d)) ?>">
+                          <?= e($nom) ?> <span class="pill"><?= e($cod !== '' ? $cod : ('ID '.$did)) ?></span>
+                        </a>
+                      <?php endforeach; ?>
+                      <?php foreach ($items as $item): ?>
+                        <?php
+                          $pill = str_replace(['{ROLE}', '{AREA}'], [$roleCodigo, $calendarArea], (string)($item['pill'] ?? ''));
+                          $href = inicio_menu_href((string)($item['href'] ?? ''), $BASE_PUBLIC_WEB, $calendarArea, $roleCodigo);
+                        ?>
+                        <a class="nav-link-card" href="<?= e($href) ?>">
+                          <?= e($item['etiqueta'] ?? '') ?>
+                          <?php if ($pill !== ''): ?><span class="pill"><?= e($pill) ?></span><?php endif; ?>
+                        </a>
+                      <?php endforeach; ?>
+                    <?php endif; ?>
+                  <?php else: ?>
+                    <?php foreach ($items as $item): ?>
+                      <?php
+                        $pill = str_replace(['{ROLE}', '{AREA}'], [$roleCodigo, $calendarArea], (string)($item['pill'] ?? ''));
+                        $href = inicio_menu_href((string)($item['href'] ?? ''), $BASE_PUBLIC_WEB, $calendarArea, $roleCodigo);
+                      ?>
+                      <a class="nav-link-card" href="<?= e($href) ?>">
+                        <?= e($item['etiqueta'] ?? '') ?>
+                        <?php if ($pill !== ''): ?><span class="pill"><?= e($pill) ?></span><?php endif; ?>
+                      </a>
+                    <?php endforeach; ?>
+                  <?php endif; ?>
+                </div>
+              </div>
+            </div>
+          <?php endforeach; ?>
+
+          <?php if (false): ?>
 
           <div class="accordion-item">
             <h2 class="accordion-header" id="hDest">
@@ -809,6 +1188,25 @@ function destino_link(array $d): string {
           </div>
 
           <div class="accordion-item">
+            <h2 class="accordion-header" id="hEduc">
+              <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#cEduc" aria-expanded="false" aria-controls="cEduc">
+                Educacion
+              </button>
+            </h2>
+            <div id="cEduc" class="accordion-collapse collapse" aria-labelledby="hEduc" data-bs-parent="#navAcc">
+              <div class="accordion-body">
+                <a class="nav-link-card" href="<?= e($BASE_PUBLIC_WEB) ?>/departamento_educacion/departamento_educacion.php">
+                  Departamento Educacion <span class="pill">EDUC</span>
+                </a>
+
+                <a class="nav-link-card" href="<?= e($BASE_PUBLIC_WEB) ?>/division_ensenanza/division_ensenanza.php">
+                  Division Ensenanza <span class="pill">ENS</span>
+                </a>
+              </div>
+            </div>
+          </div>
+
+          <div class="accordion-item">
             <h2 class="accordion-header" id="hQuick">
               <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#cQuick" aria-expanded="false" aria-controls="cQuick">
                 Utilidades
@@ -835,8 +1233,8 @@ function destino_link(array $d): string {
                   Convertir PDF a Word o imágenes <span class="pill">Herramienta</span>
                 </a>
 
-                <a class="nav-link-card" href="javascript:void(0)">
-                  Asistente IA sobre archivos <span class="pill">A implementar</span>
+                <a class="nav-link-card" href="<?= e($BASE_PUBLIC_WEB) ?>/asistente_ia.php">
+                  Asistente IA sobre archivos <span class="pill">Reglamentos</span>
                 </a>
 
               
@@ -862,6 +1260,7 @@ function destino_link(array $d): string {
           </div>
           <?php endif; ?>
 
+          <?php endif; ?>
         </div>
       </aside>
 

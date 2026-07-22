@@ -1,6 +1,11 @@
 <?php
 declare(strict_types=1);
 
+if (PHP_SAPI !== 'cli') {
+    require_once __DIR__ . '/auth/bootstrap.php';
+    require_login();
+}
+
 require __DIR__ . '/vendor/autoload.php';
 require __DIR__ . '/config/db.php';
 

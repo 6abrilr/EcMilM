@@ -6,6 +6,8 @@ if (!isset($AREA_TITLE, $AREA_CODE, $AREA_SLUG, $AREA_ROOT_ABS, $BACK_LINK)) {
     exit('Configuracion incompleta del explorador.');
 }
 
+require_once __DIR__ . '/area_shared_permissions.php';
+
 function area_shared_e($v): string {
     return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8');
 }
@@ -56,16 +58,52 @@ function area_shared_mime_for_ext(string $ext): string {
     };
 }
 
-function area_shared_send_file(string $absPath, string $downloadName, string $mime): void {
+function area_shared_safe_filename(string $name): string {
+    $name = trim(str_replace('\\', '/', $name));
+    $name = basename($name);
+    $base = pathinfo($name, PATHINFO_FILENAME);
+    $ext = strtolower((string)pathinfo($name, PATHINFO_EXTENSION));
+    $base = preg_replace('/[^\pL\pN\s._()-]+/u', '', $base) ?? '';
+    $base = preg_replace('/\s+/', ' ', $base) ?? '';
+    $base = trim($base, " ._-");
+    if ($base === '') $base = 'archivo';
+    $file = $base . ($ext !== '' ? '.' . $ext : '');
+    return mb_substr($file, 0, 180, 'UTF-8');
+}
+
+function area_shared_unique_upload_path(string $dir, string $file): string {
+    $target = $dir . DIRECTORY_SEPARATOR . $file;
+    if (!file_exists($target)) return $target;
+    $base = pathinfo($file, PATHINFO_FILENAME);
+    $ext = (string)pathinfo($file, PATHINFO_EXTENSION);
+    for ($i = 1; $i <= 999; $i++) {
+        $candidate = $dir . DIRECTORY_SEPARATOR . $base . ' (' . $i . ')' . ($ext !== '' ? '.' . $ext : '');
+        if (!file_exists($candidate)) return $candidate;
+    }
+    return $dir . DIRECTORY_SEPARATOR . $base . ' ' . date('YmdHis') . ($ext !== '' ? '.' . $ext : '');
+}
+
+function area_shared_resolve_file(string $baseAbs, string $relative): ?string {
+    $rel = area_shared_normalize_rel_path($relative);
+    $base = realpath($baseAbs);
+    if ($rel === null || $rel === '' || !$base) return null;
+    $abs = $base . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $rel);
+    $realAbs = realpath($abs);
+    if (!$realAbs || !is_file($realAbs) || !area_shared_starts_with($realAbs, $base)) return null;
+    return $realAbs;
+}
+
+function area_shared_send_file(string $absPath, string $downloadName, string $mime, string $disposition = 'inline'): void {
     if (!is_file($absPath) || !is_readable($absPath)) {
         http_response_code(404);
         exit('Archivo no disponible.');
     }
     $size = (int)@filesize($absPath);
+    $disposition = $disposition === 'attachment' ? 'attachment' : 'inline';
     header('X-Content-Type-Options: nosniff');
     header('Content-Type: ' . $mime);
     header('Content-Length: ' . $size);
-    header('Content-Disposition: inline; filename="' . rawurlencode($downloadName) . '"');
+    header('Content-Disposition: ' . $disposition . '; filename="' . rawurlencode($downloadName) . '"');
     header('Cache-Control: private, max-age=0, no-cache, no-store, must-revalidate');
     header('Pragma: no-cache');
     header('Expires: 0');
@@ -118,24 +156,163 @@ $IMG_BG = $ASSET_WEB . '/img/fondo.png';
 $ESCUDO = $ASSET_WEB . '/img/ecmilm.png';
 $FAVICON = $ESCUDO;
 
+area_shared_perm_ensure_schema($pdo);
+$AREA_CODE = area_shared_perm_code_for_slug((string)$AREA_SLUG, (string)$AREA_CODE);
+$hasSharedAccess = area_shared_perm_can_access($pdo, (string)$AREA_SLUG, (string)$AREA_CODE, 'read');
+if (!$hasSharedAccess) {
+    http_response_code(403);
+    ?>
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Acceso restringido</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+<style>
+  body{min-height:100vh;margin:0;display:grid;place-items:center;background:#0f172a;color:#e5e7eb;font-family:system-ui,-apple-system,"Segoe UI",Roboto,Ubuntu,sans-serif;}
+  .box{max-width:560px;margin:24px;padding:28px;border:1px solid rgba(148,163,184,.25);border-radius:18px;background:rgba(15,23,42,.92);box-shadow:0 22px 60px rgba(0,0,0,.35);}
+  h1{font-size:1.45rem;margin:0 0 12px;font-weight:900;}
+  p{color:#cbd5e1;line-height:1.55;margin:0 0 18px;}
+  a{display:inline-flex;padding:.62rem 1rem;border-radius:12px;border:1px solid rgba(148,163,184,.28);color:#fff;text-decoration:none;font-weight:800;}
+</style>
+</head>
+<body>
+  <div class="box">
+    <h1>Acceso restringido</h1>
+    <p>No tenes permiso para ingresar a la carpeta compartida de <?= area_shared_e((string)$AREA_TITLE) ?>.</p>
+    <a href="<?= area_shared_e($BACK_LINK) ?>">Volver</a>
+  </div>
+</body>
+</html>
+    <?php
+    exit;
+}
+
+$allowUpload = !empty($AREA_ALLOW_UPLOAD) && $hasSharedAccess;
+$uploadOk = '';
+$uploadErr = '';
+
 if (isset($_GET['download']) && (string)($_GET['download']) === '1') {
-    $rel = area_shared_normalize_rel_path((string)($_GET['path'] ?? ''));
-    $base = realpath($AREA_ROOT_ABS);
-    if ($rel === null || $rel === '' || !$base) {
-        http_response_code(400);
-        exit('Ruta invalida.');
-    }
-    $abs = $base . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $rel);
-    $realAbs = realpath($abs);
-    if (!$realAbs || !is_file($realAbs) || !area_shared_starts_with($realAbs, $base)) {
+    $realAbs = area_shared_resolve_file($AREA_ROOT_ABS, (string)($_GET['path'] ?? ''));
+    if (!$realAbs) {
         http_response_code(404);
         exit('Archivo no encontrado.');
     }
-    area_shared_send_file($realAbs, basename($realAbs), area_shared_mime_for_ext((string)pathinfo($realAbs, PATHINFO_EXTENSION)));
+    $disposition = (isset($_GET['inline']) && (string)$_GET['inline'] === '1') ? 'inline' : 'attachment';
+    area_shared_send_file($realAbs, basename($realAbs), area_shared_mime_for_ext((string)pathinfo($realAbs, PATHINFO_EXTENSION)), $disposition);
+}
+
+if (isset($_GET['preview']) && (string)($_GET['preview']) === '1') {
+    $rel = area_shared_normalize_rel_path((string)($_GET['path'] ?? ''));
+    $realAbs = area_shared_resolve_file($AREA_ROOT_ABS, (string)($_GET['path'] ?? ''));
+    if (!$realAbs || $rel === null) {
+        http_response_code(404);
+        exit('Archivo no encontrado.');
+    }
+    $ext = strtolower((string)pathinfo($realAbs, PATHINFO_EXTENSION));
+    $inlineUrl = $SELF_WEB . '?download=1&inline=1&path=' . rawurlencode($rel);
+    $downloadUrl = $SELF_WEB . '?download=1&path=' . rawurlencode($rel);
+    $backDir = '';
+    if (str_contains($rel, '/')) {
+        $parts = explode('/', $rel);
+        array_pop($parts);
+        $backDir = implode('/', $parts);
+    }
+    $backUrl = $SELF_WEB . ($backDir !== '' ? ('?dir=' . rawurlencode($backDir)) : '');
+    $canEmbed = in_array($ext, ['pdf', 'jpg', 'jpeg', 'png', 'webp', 'gif'], true);
+    $canText = in_array($ext, ['txt', 'log', 'csv'], true);
+    ?>
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title><?= area_shared_e(basename($realAbs)) ?></title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+<style>
+  html,body{height:100%;margin:0;background:#0f172a;color:#e5e7eb;font-family:system-ui,-apple-system,"Segoe UI",Roboto,Ubuntu,sans-serif;}
+  .top{height:58px;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:0 18px;background:#111827;border-bottom:1px solid rgba(148,163,184,.25);}
+  .title{font-weight:900;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .actions{display:flex;gap:8px;flex:0 0 auto;}
+  .viewer{height:calc(100% - 58px);}
+  iframe{width:100%;height:100%;border:0;background:#fff;}
+  .image-wrap{height:100%;display:grid;place-items:center;padding:18px;}
+  .image-wrap img{max-width:100%;max-height:100%;object-fit:contain;}
+  pre{height:100%;margin:0;padding:18px;overflow:auto;background:#f8fafc;color:#111827;white-space:pre-wrap;font:14px/1.45 Consolas,Monaco,monospace;}
+  .empty{padding:30px;color:#cbd5e1;}
+</style>
+</head>
+<body>
+  <div class="top">
+    <div class="title"><?= area_shared_e(basename($realAbs)) ?></div>
+    <div class="actions">
+      <a class="btn btn-outline-light btn-sm" href="<?= area_shared_e($backUrl) ?>">Volver</a>
+      <a class="btn btn-outline-light btn-sm" href="<?= area_shared_e($inlineUrl) ?>" target="_blank" rel="noopener">Abrir archivo</a>
+      <a class="btn btn-success btn-sm" href="<?= area_shared_e($downloadUrl) ?>">Descargar</a>
+    </div>
+  </div>
+  <div class="viewer">
+    <?php if ($ext === 'pdf'): ?>
+      <iframe src="<?= area_shared_e($inlineUrl) ?>" title="<?= area_shared_e(basename($realAbs)) ?>"></iframe>
+    <?php elseif (in_array($ext, ['jpg', 'jpeg', 'png', 'webp', 'gif'], true)): ?>
+      <div class="image-wrap"><img src="<?= area_shared_e($inlineUrl) ?>" alt="<?= area_shared_e(basename($realAbs)) ?>"></div>
+    <?php elseif ($canText): ?>
+      <pre><?= area_shared_e((string)@file_get_contents($realAbs)) ?></pre>
+    <?php else: ?>
+      <div class="empty">Este tipo de archivo no tiene vista previa. Us&aacute; Abrir archivo para descargarlo o abrirlo.</div>
+    <?php endif; ?>
+  </div>
+</body>
+</html>
+    <?php
+    exit;
 }
 
 $browseRel = area_shared_normalize_rel_path((string)($_GET['dir'] ?? ''));
 if ($browseRel === null) $browseRel = '';
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && (string)($_POST['action'] ?? '') === 'upload') {
+    try {
+        if (!$allowUpload) throw new RuntimeException('No tenes permiso para importar archivos.');
+        if (function_exists('csrf_verify')) csrf_verify();
+
+        $postRel = area_shared_normalize_rel_path((string)($_POST['dir'] ?? $browseRel));
+        if ($postRel === null) throw new RuntimeException('Ruta invalida.');
+
+        $base = realpath($AREA_ROOT_ABS);
+        if (!$base) throw new RuntimeException('No existe la carpeta compartida.');
+        $targetDir = $postRel === '' ? $base : ($base . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $postRel));
+        $targetReal = realpath($targetDir);
+        if (!$targetReal || !is_dir($targetReal) || !area_shared_starts_with($targetReal, $base)) {
+            throw new RuntimeException('La carpeta destino no es valida.');
+        }
+
+        $uploads = $_FILES['archivos'] ?? null;
+        if (!is_array($uploads) || empty($uploads['name'])) throw new RuntimeException('Selecciona al menos un archivo.');
+        $names = is_array($uploads['name']) ? $uploads['name'] : [$uploads['name']];
+        $tmpNames = is_array($uploads['tmp_name']) ? $uploads['tmp_name'] : [$uploads['tmp_name']];
+        $errors = is_array($uploads['error']) ? $uploads['error'] : [$uploads['error']];
+
+        $saved = 0;
+        foreach ($names as $i => $rawName) {
+            if ((int)($errors[$i] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_NO_FILE) continue;
+            if ((int)($errors[$i] ?? UPLOAD_ERR_OK) !== UPLOAD_ERR_OK) throw new RuntimeException('No se pudo importar ' . (string)$rawName . '.');
+            $tmp = (string)($tmpNames[$i] ?? '');
+            if ($tmp === '' || !is_uploaded_file($tmp)) throw new RuntimeException('Archivo temporal invalido.');
+            $file = area_shared_safe_filename((string)$rawName);
+            $dest = area_shared_unique_upload_path($targetReal, $file);
+            if (!move_uploaded_file($tmp, $dest)) throw new RuntimeException('No se pudo guardar ' . $file . '.');
+            @chmod($dest, 0664);
+            $saved++;
+        }
+        if ($saved <= 0) throw new RuntimeException('Selecciona al menos un archivo.');
+        $uploadOk = $saved === 1 ? 'Archivo importado correctamente.' : $saved . ' archivos importados correctamente.';
+    } catch (Throwable $ex) {
+        $uploadErr = $ex->getMessage();
+    }
+}
+
 $sharedState = area_shared_scan_dir($AREA_ROOT_ABS, $browseRel);
 $segments = [];
 if ($sharedState['ok'] && $sharedState['current'] !== '') {
@@ -150,7 +327,7 @@ if ($sharedState['ok'] && $sharedState['current'] !== '') {
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<title><?= area_shared_e($AREA_TITLE) ?> · Carpeta compartida</title>
+<title><?= area_shared_e($AREA_TITLE) ?> - Carpeta compartida</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
@@ -174,6 +351,9 @@ if ($sharedState['ok'] && $sharedState['current'] !== '') {
   .panel-title{font-size:1.12rem;font-weight:900;display:flex;align-items:center;gap:10px;}
   .pathbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;color:#dbe7f6;font-size:.88rem;margin-bottom:14px;}
   .pathbar a{color:#93c5fd;text-decoration:none;font-weight:800;}
+  .upload-box{margin:0 0 14px;padding:14px;border:1px solid rgba(148,163,184,.18);border-radius:16px;background:rgba(15,23,42,.50);}
+  .upload-box form{display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
+  .upload-box input[type=file]{max-width:520px;color:#dbe7f6;}
   .table-wrap{overflow:auto;border-radius:18px;}
   table{width:100%;border-collapse:collapse;min-width:820px;background:rgba(15,23,42,.46);}
   th,td{padding:.78rem .85rem;border-bottom:1px solid rgba(148,163,184,.10);vertical-align:middle;}
@@ -197,7 +377,6 @@ if ($sharedState['ok'] && $sharedState['current'] !== '') {
         <div>
           <div class="hero-kicker"><?= area_shared_e($AREA_CODE) ?> <?= area_shared_e($AREA_TITLE) ?></div>
           <div class="hero-title">Carpeta compartida</div>
-          <div class="hero-sub">Navegá los archivos físicos del área en <code><?= area_shared_e(str_replace('\\', '/', $AREA_ROOT_ABS)) ?></code>.</div>
         </div>
       </div>
       <div class="hero-actions">
@@ -210,7 +389,7 @@ if ($sharedState['ok'] && $sharedState['current'] !== '') {
     <div class="panel-head">
       <div>
         <div class="panel-title"><i class="bi bi-folder2-open"></i> Explorador de archivos</div>
-        <div class="panel-sub">Mostramos carpetas primero y archivos después, sin salir del árbol permitido.</div>
+        <div class="panel-sub">Carpetas primero y archivos despues.</div>
       </div>
       <div class="d-flex gap-2 flex-wrap">
         <?php if ($sharedState['current'] !== ''): ?>
@@ -231,8 +410,21 @@ if ($sharedState['ok'] && $sharedState['current'] !== '') {
           <a href="<?= area_shared_e($SELF_WEB) ?>?dir=<?= area_shared_e(rawurlencode((string)$seg['rel'])) ?>"><?= area_shared_e((string)$seg['name']) ?></a>
         <?php endforeach; ?>
       </div>
+      <?php if ($uploadOk !== ''): ?><div class="alert alert-success"><?= area_shared_e($uploadOk) ?></div><?php endif; ?>
+      <?php if ($uploadErr !== ''): ?><div class="alert alert-danger"><?= area_shared_e($uploadErr) ?></div><?php endif; ?>
+      <?php if ($allowUpload): ?>
+        <div class="upload-box">
+          <form method="post" enctype="multipart/form-data">
+            <?php if (function_exists('csrf_input')) echo csrf_input(); ?>
+            <input type="hidden" name="action" value="upload">
+            <input type="hidden" name="dir" value="<?= area_shared_e((string)$sharedState['current']) ?>">
+            <input class="form-control" type="file" name="archivos[]" multiple required>
+            <button class="btn btn-success fw-bold" type="submit"><i class="bi bi-upload"></i> Importar archivos</button>
+          </form>
+        </div>
+      <?php endif; ?>
       <?php if (empty($sharedState['entries'])): ?>
-        <div class="empty-state">Esta carpeta está vacía.</div>
+        <div class="empty-state">Esta carpeta esta vacia.</div>
       <?php else: ?>
         <div class="table-wrap">
           <table>
@@ -241,17 +433,24 @@ if ($sharedState['ok'] && $sharedState['current'] !== '') {
                 <th>Nombre</th>
                 <th style="width:130px;">Tipo</th>
                 <th style="width:170px;">Modificado</th>
-                <th style="width:130px;">Tamaño</th>
-                <th style="width:140px;">Acción</th>
+                <th style="width:130px;">Tamano</th>
+                <th style="width:220px;">Accion</th>
               </tr>
             </thead>
             <tbody>
             <?php foreach ($sharedState['entries'] as $entry): ?>
-              <?php $isDir = (bool)$entry['is_dir']; $rel = (string)$entry['rel']; $href = $isDir ? ($SELF_WEB . '?dir=' . rawurlencode($rel)) : ($SELF_WEB . '?download=1&path=' . rawurlencode($rel)); ?>
+              <?php
+                $isDir = (bool)$entry['is_dir'];
+                $rel = (string)$entry['rel'];
+                $ext = strtolower((string)($entry['ext'] ?? ''));
+                $canPreview = in_array($ext, ['pdf','txt','log','csv','jpg','jpeg','png','webp','gif'], true);
+                $href = $isDir ? ($SELF_WEB . '?dir=' . rawurlencode($rel)) : ($SELF_WEB . '?' . ($canPreview ? 'preview=1' : 'download=1&inline=1') . '&path=' . rawurlencode($rel));
+                $downloadHref = $SELF_WEB . '?download=1&path=' . rawurlencode($rel);
+              ?>
               <tr>
                 <td>
                   <div class="item-name">
-                    <div class="item-icon"><?= $isDir ? '📁' : '📄' ?></div>
+                    <div class="item-icon"><i class="bi <?= $isDir ? 'bi-folder-fill' : 'bi-file-earmark-text' ?>"></i></div>
                     <div style="min-width:0;">
                       <a class="item-link" <?= $isDir ? '' : 'target="_blank" rel="noopener"' ?> href="<?= area_shared_e($href) ?>"><?= area_shared_e((string)$entry['name']) ?></a>
                       <div class="item-meta"><?= area_shared_e($rel) ?></div>
@@ -261,7 +460,16 @@ if ($sharedState['ok'] && $sharedState['current'] !== '') {
                 <td><span class="type-pill"><?= $isDir ? 'Carpeta' : area_shared_e(strtoupper((string)($entry['ext'] !== '' ? $entry['ext'] : 'archivo'))) ?></span></td>
                 <td><?= area_shared_e(area_shared_format_dt((int)$entry['mtime'])) ?></td>
                 <td><?= $isDir ? '-' : area_shared_e(area_shared_human_size((int)($entry['size'] ?? 0))) ?></td>
-                <td><a class="btn btn-outline-light btn-sm" <?= $isDir ? '' : 'target="_blank" rel="noopener"' ?> href="<?= area_shared_e($href) ?>"><?= $isDir ? 'Entrar' : 'Abrir' ?></a></td>
+                <td>
+                  <?php if ($isDir): ?>
+                    <a class="btn btn-outline-light btn-sm" href="<?= area_shared_e($href) ?>">Entrar</a>
+                  <?php else: ?>
+                    <div class="d-flex gap-2 flex-wrap">
+                      <a class="btn btn-outline-light btn-sm" target="_blank" rel="noopener" href="<?= area_shared_e($href) ?>">Abrir</a>
+                      <a class="btn btn-success btn-sm" href="<?= area_shared_e($downloadHref) ?>"><i class="bi bi-download"></i> Descargar</a>
+                    </div>
+                  <?php endif; ?>
+                </td>
               </tr>
             <?php endforeach; ?>
             </tbody>

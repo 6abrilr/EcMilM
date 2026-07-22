@@ -391,14 +391,14 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === '1') {
         FROM personal_unidad
         WHERE unidad_id = :uid
         ORDER BY
-          CASE WHEN id = :me THEN 0 ELSE 1 END ASC,
+          CASE WHEN id = :me_order THEN 0 ELSE 1 END ASC,
           COALESCE(NULLIF(apellido,''), NULLIF(apellido_nombre,''), '') ASC,
           nombre ASC,
           grado ASC
       ");
       $st->execute([
-        ':uid' => $unidadPropia,
-        ':me'  => $personalId
+        ':uid'      => $unidadPropia,
+        ':me_order' => $personalId
       ]);
 
       $items = [];
@@ -458,10 +458,10 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === '1') {
         FROM chat_conversaciones c
         INNER JOIN chat_participantes cp1
           ON cp1.conversacion_id = c.id
-         AND cp1.personal_id = :me
+         AND cp1.personal_id = :me_owner
         LEFT JOIN chat_participantes cp2
           ON cp2.conversacion_id = c.id
-         AND cp2.personal_id <> :me
+         AND cp2.personal_id <> :me_other
         LEFT JOIN personal_unidad p2
           ON p2.id = cp2.personal_id
         LEFT JOIN (
@@ -482,8 +482,9 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === '1') {
         ORDER BY COALESCE(lm.last_at, c.updated_at, c.created_at) DESC, c.id DESC
       ");
       $st->execute([
-        ':me'  => $personalId,
-        ':uid' => $unidadPropia
+        ':me_owner' => $personalId,
+        ':me_other' => $personalId,
+        ':uid'      => $unidadPropia
       ]);
 
       while ($r = $st->fetch(PDO::FETCH_ASSOC)) {
@@ -521,10 +522,10 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === '1') {
           FROM chat_conversaciones c
           INNER JOIN chat_participantes cp1
             ON cp1.conversacion_id = c.id
-           AND cp1.personal_id = :me
+           AND cp1.personal_id = :me_owner
           LEFT JOIN chat_participantes cp2
             ON cp2.conversacion_id = c.id
-           AND cp2.personal_id <> :me
+           AND cp2.personal_id <> :me_other
           WHERE c.tipo = 'privado'
             AND c.unidad_id = :uid
             AND cp2.personal_id IS NULL
@@ -532,8 +533,9 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === '1') {
           LIMIT 1
         ");
         $st->execute([
-          ':me'  => $personalId,
-          ':uid' => $unidadPropia
+          ':me_owner' => $personalId,
+          ':me_other' => $personalId,
+          ':uid'      => $unidadPropia
         ]);
         $existingId = (int)$st->fetchColumn();
 
@@ -957,6 +959,26 @@ $ASSET_WEB       = $BASE_APP_WEB . '/assets';
 $IMG_BG   = $ASSET_WEB . '/img/fondo.png';
 $ESCUDO   = $ASSET_WEB . '/img/ecmilm.png';
 $FAVICON  = $ASSET_WEB . '/img/ecmilm.png';
+$returnRaw = trim((string)($_GET['return'] ?? ''));
+$refererRaw = trim((string)($_SERVER['HTTP_REFERER'] ?? ''));
+$backUrl = 'inicio.php';
+if ($returnRaw !== '') {
+  $decodedReturn = rawurldecode($returnRaw);
+  if (preg_match('#^/[A-Za-z0-9/_.,%?=&:+-]+$#', $decodedReturn) || preg_match('#^[A-Za-z0-9_./?=&:%+-]+$#', $decodedReturn)) {
+    $backUrl = $decodedReturn;
+  }
+} elseif ($refererRaw !== '') {
+  $host = (string)($_SERVER['HTTP_HOST'] ?? '');
+  $refParts = @parse_url($refererRaw);
+  if (is_array($refParts)) {
+    $refHost = (string)($refParts['host'] ?? '');
+    $refPath = (string)($refParts['path'] ?? '');
+    $refQuery = isset($refParts['query']) ? ('?' . (string)$refParts['query']) : '';
+    if ($refHost === '' || $refHost === $host) {
+      $backUrl = $refPath . $refQuery;
+    }
+  }
+}
 
 $CHAT_BG_FS_UPPER = __DIR__ . '/../assets/img/ecmilm2026.PNG';
 $CHAT_BG_FS_LOWER = __DIR__ . '/../assets/img/ecmilm2026.png';
@@ -1382,7 +1404,7 @@ $embeddedMode = (
     <div style="margin-left:auto; margin-right:17px; text-align:right; font-size:.85rem;">
       <div><strong><?= e($fullNameDB) ?></strong></div>
       <div class="mt-2 d-flex gap-2 justify-content-end">
-        <a href="inicio.php" class="btn btn-success btn-sm btn-top">Volver</a>
+        <a href="<?= e($backUrl) ?>" class="btn btn-success btn-sm btn-top">Volver</a>
         <a href="<?= e($BASE_APP_WEB) ?>/logout.php" class="btn btn-success btn-sm btn-top">Cerrar sesión</a>
       </div>
     </div>

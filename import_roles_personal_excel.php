@@ -1,6 +1,11 @@
 <?php
 declare(strict_types=1);
 
+if (PHP_SAPI !== 'cli') {
+    require_once __DIR__ . '/auth/bootstrap.php';
+    require_login();
+}
+
 require __DIR__ . '/vendor/autoload.php';
 require __DIR__ . '/config/db.php';
 
@@ -20,18 +25,18 @@ function norm(string $value): string
     }
 
     $map = [
-        'Á' => 'A', 'À' => 'A', 'Ä' => 'A', 'Â' => 'A',
-        'É' => 'E', 'È' => 'E', 'Ë' => 'E', 'Ê' => 'E',
-        'Í' => 'I', 'Ì' => 'I', 'Ï' => 'I', 'Î' => 'I',
-        'Ó' => 'O', 'Ò' => 'O', 'Ö' => 'O', 'Ô' => 'O',
-        'Ú' => 'U', 'Ù' => 'U', 'Ü' => 'U', 'Û' => 'U',
-        'Ñ' => 'N',
-        'á' => 'A', 'à' => 'A', 'ä' => 'A', 'â' => 'A',
-        'é' => 'E', 'è' => 'E', 'ë' => 'E', 'ê' => 'E',
-        'í' => 'I', 'ì' => 'I', 'ï' => 'I', 'î' => 'I',
-        'ó' => 'O', 'ò' => 'O', 'ö' => 'O', 'ô' => 'O',
-        'ú' => 'U', 'ù' => 'U', 'ü' => 'U', 'û' => 'U',
-        'ñ' => 'N',
+        'Ã' => 'A', 'Ã€' => 'A', 'Ã„' => 'A', 'Ã‚' => 'A',
+        'Ã‰' => 'E', 'Ãˆ' => 'E', 'Ã‹' => 'E', 'ÃŠ' => 'E',
+        'Ã' => 'I', 'ÃŒ' => 'I', 'Ã' => 'I', 'ÃŽ' => 'I',
+        'Ã“' => 'O', 'Ã’' => 'O', 'Ã–' => 'O', 'Ã”' => 'O',
+        'Ãš' => 'U', 'Ã™' => 'U', 'Ãœ' => 'U', 'Ã›' => 'U',
+        'Ã‘' => 'N',
+        'Ã¡' => 'A', 'Ã ' => 'A', 'Ã¤' => 'A', 'Ã¢' => 'A',
+        'Ã©' => 'E', 'Ã¨' => 'E', 'Ã«' => 'E', 'Ãª' => 'E',
+        'Ã­' => 'I', 'Ã¬' => 'I', 'Ã¯' => 'I', 'Ã®' => 'I',
+        'Ã³' => 'O', 'Ã²' => 'O', 'Ã¶' => 'O', 'Ã´' => 'O',
+        'Ãº' => 'U', 'Ã¹' => 'U', 'Ã¼' => 'U', 'Ã»' => 'U',
+        'Ã±' => 'N',
     ];
 
     $value = strtr($value, $map);
@@ -53,7 +58,7 @@ function findHeaderRow(\PhpOffice\PhpSpreadsheet\Worksheet\Worksheet $sheet, int
             return $row;
         }
     }
-    throw new RuntimeException('No se encontró la fila de encabezados.');
+    throw new RuntimeException('No se encontrÃ³ la fila de encabezados.');
 }
 
 function buildHeaderMap(\PhpOffice\PhpSpreadsheet\Worksheet\Worksheet $sheet, int $headerRow, int $highestCol): array
@@ -283,7 +288,7 @@ for ($row = $headerRow + 1; $row <= $highestRow; $row++) {
 out('Archivo: ' . $excelPath);
 out('Unidad: ' . $unidadId);
 out('Modo: ' . ($apply ? 'APLICAR' : 'PREVIEW'));
-out('Coincidencias únicas: ' . count($updates));
+out('Coincidencias Ãºnicas: ' . count($updates));
 out('Sin match: ' . count($unmatched));
 out('Ambiguas: ' . count($ambiguous));
 out('Ignoradas: ' . $ignored);

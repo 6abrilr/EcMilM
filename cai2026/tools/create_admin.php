@@ -1,0 +1,3 @@
+<?php
+require_once __DIR__.'/../config/bootstrap.php';if(PHP_SAPI!=='cli')exit("Solo CLI\n");[$script,$email,$name]=$argv+[null,null,null];if(!$email||!filter_var($email,FILTER_VALIDATE_EMAIL)||!$name)exit("Uso: php tools/create_admin.php correo@gmail.com \"Nombre\"\n");echo "Contraseña (mínimo 10 caracteres): ";$pass=trim((string)fgets(STDIN));if(strlen($pass)<10)exit("Contraseña demasiado corta.\n");$q=db()->prepare("INSERT INTO usuarios(nombre,email,password_hash,rol)VALUES(?,?,?,'admin')");$q->execute([$name,strtolower($email),password_hash($pass,PASSWORD_DEFAULT)]);echo "Administrador creado.\n";
+

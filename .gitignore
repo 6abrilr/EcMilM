@@ -4,3 +4,19 @@ storage/*
 vendor/*
 !storage/.gitkeep
 !vendor/.gitkeep
+
+# Local/runtime artifacts
+.codex-remote-attachments/
+.pnpm-store/
+tmp/
+_tmp_*
+public/informatica/network-manager-agent.zip
+
+# Network scanner runtime/dependencies
+public/informatica/network-manager/node_modules/
+public/informatica/network-manager/data/*.db*
+public/informatica/network-manager/*.log
+public/informatica/network-manager-mamalon-upstream/node_modules/
+public/informatica/network-manager-mamalon-upstream/data/*.db*
+public/informatica/network-manager-mamalon-upstream/
+public/informatica/network-manager/.claude/

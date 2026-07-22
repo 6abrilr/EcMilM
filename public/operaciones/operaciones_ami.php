@@ -19,7 +19,9 @@ $modoResumido = !$esAdmin;
 
 $ASSET_WEB = operaciones_assets_url();
 $IMG_BG    = operaciones_assets_url('img/fondo.png');
-$ESCUDO    = operaciones_assets_url('img/escudo_bcom602.png');
+$ESCUDO    = operaciones_assets_url('img/ecmilm.png');
+$UNIDAD_NOMBRE = 'Escuela Militar de Monta&ntilde;a';
+$UNIDAD_LEMA   = '&ldquo;La monta&ntilde;a nos une&rdquo;';
 
 // Compatibility helper used in templates
 function e($v){ return operaciones_e($v); }
@@ -59,7 +61,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         ]);
     }
 
-    header('Location: s3_tiro_ami.php');
+    header('Location: operaciones_ami.php');
     exit;
 }
 
@@ -99,6 +101,8 @@ body{
 .badge-no{ background:#dc2626; }
 
 .table-sm th,.table-sm td{ font-size:.82rem; }
+.brand-title:not(.brand-title-fixed),
+.brand-sub:not(.brand-sub-fixed){ display:none; }
 </style>
 </head>
 <body>
@@ -106,13 +110,16 @@ body{
 <header class="brand-hero">
   <div class="container-main d-flex justify-content-between align-items-center py-2">
     <div class="d-flex gap-3 align-items-center">
-      <img src="<?= e($ESCUDO) ?>" style="height:55px;">
+      <img src="<?= e($ESCUDO) ?>" alt="Escudo ECMILM" style="height:55px;"
+           onerror="this.onerror=null;this.src='<?= e($ASSET_WEB) ?>/img/EA.png';">
       <div>
-        <div class="brand-title">Batallón de Comunicaciones 602</div>
+        <div class="brand-title brand-title-fixed"><?= $UNIDAD_NOMBRE ?></div>
+        <div class="brand-sub brand-sub-fixed text-muted"><?= $UNIDAD_LEMA ?></div>
+        <div class="brand-title"><?= $UNIDAD_NOMBRE ?></div>
         <div class="brand-sub text-muted">S-3 · Tiro · AMI asignada</div>
       </div>
     </div>
-    <a href="s3_tiro.php" class="btn btn-secondary btn-sm fw-bold">Volver</a>
+    <a href="operaciones_tiro.php" class="btn btn-secondary btn-sm fw-bold">Volver a Tiro</a>
   </div>
 </header>
 

@@ -1,0 +1,37 @@
+# Dependencies
+node_modules/
+
+# npm lockfile (migrated to pnpm — use pnpm-lock.yaml)
+package-lock.json
+
+# Database files (runtime data, not source)
+data/*.db
+data/*.db-shm
+data/*.db-wal
+
+# Environment / secrets
+.env
+.env.*
+config.local.js
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/settings.json
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+
+# Misc
+.hintrc
+
+# Generated OUI database (run: node src/utils/oui-update.js)
+src/utils/oui-db.json

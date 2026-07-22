@@ -1,0 +1,27 @@
+{
+  "name": "network-monitor",
+  "version": "1.0.0",
+  "description": "Dashboard de monitoreo de red empresarial — modo stealth",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "dependencies": {
+    "@google/genai": "^1.45.0",
+    "better-sqlite3": "^11.7.0",
+    "castv2": "^0.1.10",
+    "express": "^4.21.0",
+    "geoip-lite": "^1.4.10",
+    "multicast-dns": "^7.2.5",
+    "net-snmp": "^3.26.1",
+    "socket.io": "^4.8.3"
+  },
+  "devDependencies": {
+    "@fontsource/inter": "^5.2.8",
+    "@fontsource/jetbrains-mono": "^5.2.8"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": ["better-sqlite3", "protobufjs"]
+  }
+}

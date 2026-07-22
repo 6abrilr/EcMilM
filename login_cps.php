@@ -466,6 +466,7 @@ function auth_login_cps(string $username, string $password): bool {
 
     $_SESSION['user'] = [
       'id'              => (int)($personal['id'] ?? 0),
+      'username'        => $username,
       'dni'             => $dni,
       'apellido'        => $personal['apellido'] ?? null,
       'nombre'          => $personal['nombre'] ?? null,

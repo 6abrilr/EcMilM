@@ -1,16 +1,19 @@
 <?php
 declare(strict_types=1);
 
+require_once __DIR__ . '/../auth/bootstrap.php';
+require_login();
+
 /**
  * public/editordocumentos.php
  * Centro de herramientas documentales estilo iLovePDF (base)
  *
  * Funciones:
  * - Unir PDF
- * - Imágenes a PDF
+ * - ImÃ¡genes a PDF
  * - Word a PDF
  * - PDF a Word (requiere LibreOffice; resultado depende del PDF)
- * - PDF a imágenes
+ * - PDF a imÃ¡genes
  * - Rotar PDF
  * - Agregar marca de agua de texto
  *
@@ -22,7 +25,7 @@ declare(strict_types=1);
  *     libreoffice, imagemagick, ghostscript, poppler-utils, php-imagick
  *
  * IMPORTANTE:
- * - "Editar PDF" acá significa operaciones documentales.
+ * - "Editar PDF" acÃ¡ significa operaciones documentales.
  * - Editar texto interno de un PDF como Word/Acrobat NO es realista en puro PHP.
  */
 
@@ -39,7 +42,6 @@ ini_set('display_errors', '1');
 error_reporting(E_ALL);
 set_time_limit(300);
 
-session_start();
 
 /* =========================================================
    CONFIG
@@ -85,8 +87,8 @@ function redirectSelf(): never {
 function requirePdfToolkit(): void {
     if (!PDF_TOOLKIT_AVAILABLE) {
         throw new RuntimeException(
-            'Las herramientas PDF avanzadas no están disponibles porque faltan las librerías FPDI/FPDF. ' .
-            'Instalá: composer require setasign/fpdf setasign/fpdi'
+            'Las herramientas PDF avanzadas no estÃ¡n disponibles porque faltan las librerÃ­as FPDI/FPDF. ' .
+            'InstalÃ¡: composer require setasign/fpdf setasign/fpdi'
         );
     }
 }
@@ -169,7 +171,7 @@ function moveUploadedFiles(array $files, string $targetDir, array $allowedExts):
     $saved = [];
 
     if (count($files) > MAX_FILES) {
-        throw new RuntimeException('Se superó el máximo de archivos permitidos.');
+        throw new RuntimeException('Se superÃ³ el mÃ¡ximo de archivos permitidos.');
     }
 
     foreach ($files as $file) {
@@ -183,16 +185,16 @@ function moveUploadedFiles(array $files, string $targetDir, array $allowedExts):
         $ext  = strtolower(pathinfo($name, PATHINFO_EXTENSION));
 
         if ($size <= 0) {
-            throw new RuntimeException("El archivo {$name} está vacío.");
+            throw new RuntimeException("El archivo {$name} estÃ¡ vacÃ­o.");
         }
         if ($size > MAX_FILE_SIZE) {
-            throw new RuntimeException("El archivo {$name} supera el límite permitido.");
+            throw new RuntimeException("El archivo {$name} supera el lÃ­mite permitido.");
         }
         if (!in_array($ext, $allowedExts, true)) {
-            throw new RuntimeException("Extensión no permitida en {$name}.");
+            throw new RuntimeException("ExtensiÃ³n no permitida en {$name}.");
         }
         if (!is_uploaded_file($tmp)) {
-            throw new RuntimeException("Archivo inválido: {$name}.");
+            throw new RuntimeException("Archivo invÃ¡lido: {$name}.");
         }
 
         $newName = uniqueName(pathinfo(safeBaseName($name), PATHINFO_FILENAME), $ext);
@@ -211,7 +213,7 @@ function moveUploadedFiles(array $files, string $targetDir, array $allowedExts):
     }
 
     if (!$saved) {
-        throw new RuntimeException('No se subió ningún archivo válido.');
+        throw new RuntimeException('No se subiÃ³ ningÃºn archivo vÃ¡lido.');
     }
 
     return $saved;
@@ -301,7 +303,7 @@ function imagesToPdf(array $imagePaths, string $outputPath): void {
     foreach ($imagePaths as $img) {
         [$wPx, $hPx] = getimagesize($img);
         if (!$wPx || !$hPx) {
-            throw new RuntimeException('No se pudo leer una de las imágenes.');
+            throw new RuntimeException('No se pudo leer una de las imÃ¡genes.');
         }
 
         $wMm = $wPx * 0.264583;
@@ -413,7 +415,7 @@ function convertWithLibreOffice(string $inputPath, string $outDir, string $targe
     $outPath = rtrim($outDir, '/') . '/' . $base . '.' . $expectedExt;
 
     if (!is_file($outPath)) {
-        throw new RuntimeException('La conversión aparentemente terminó, pero no se encontró el archivo de salida.');
+        throw new RuntimeException('La conversiÃ³n aparentemente terminÃ³, pero no se encontrÃ³ el archivo de salida.');
     }
 
     return $outPath;
@@ -424,7 +426,7 @@ function convertWithLibreOffice(string $inputPath, string $outDir, string $targe
    ========================================================= */
 function pdfToImages(string $inputPdf, string $outputZipPath, string $tempDir, string $format = 'png', int $density = 150): void {
     if (!extension_loaded('imagick')) {
-        throw new RuntimeException('La extensión Imagick no está instalada.');
+        throw new RuntimeException('La extensiÃ³n Imagick no estÃ¡ instalada.');
     }
 
     $img = new Imagick();
@@ -447,7 +449,7 @@ function pdfToImages(string $inputPdf, string $outputZipPath, string $tempDir, s
     $img->destroy();
 
     if (!$generated) {
-        throw new RuntimeException('No se generaron imágenes.');
+        throw new RuntimeException('No se generaron imÃ¡genes.');
     }
 
     $zip = new ZipArchive();
@@ -506,7 +508,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 imagesToPdf($images, $outPath);
 
-                setFlash('success', 'PDF generado desde imágenes.');
+                setFlash('success', 'PDF generado desde imÃ¡genes.');
                 $_SESSION['last_output'] = $outName;
                 break;
             }
@@ -516,7 +518,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $saved = moveUploadedFiles($files, $jobDir, ['doc', 'docx', 'odt']);
 
                 if (count($saved) !== 1) {
-                    throw new RuntimeException('Debés subir un solo archivo Word/ODT.');
+                    throw new RuntimeException('DebÃ©s subir un solo archivo Word/ODT.');
                 }
 
                 $converted = convertWithLibreOffice($saved[0]['path'], $jobDir, 'pdf');
@@ -537,7 +539,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $saved = moveUploadedFiles($files, $jobDir, ['pdf']);
 
                 if (count($saved) !== 1) {
-                    throw new RuntimeException('Debés subir un solo PDF.');
+                    throw new RuntimeException('DebÃ©s subir un solo PDF.');
                 }
 
                 $converted = convertWithLibreOffice($saved[0]['path'], $jobDir, 'docx');
@@ -548,7 +550,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     throw new RuntimeException('No se pudo copiar el DOCX generado.');
                 }
 
-                setFlash('success', 'PDF convertido a Word. Revisá el formato, porque depende del PDF original.');
+                setFlash('success', 'PDF convertido a Word. RevisÃ¡ el formato, porque depende del PDF original.');
                 $_SESSION['last_output'] = $outName;
                 break;
             }
@@ -558,7 +560,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $saved = moveUploadedFiles($files, $jobDir, ['pdf']);
 
                 if (count($saved) !== 1) {
-                    throw new RuntimeException('Debés subir un solo PDF.');
+                    throw new RuntimeException('DebÃ©s subir un solo PDF.');
                 }
 
                 $format = strtolower((string)($_POST['image_format'] ?? 'png'));
@@ -570,7 +572,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 pdfToImages($saved[0]['path'], $outPath, $jobDir, $format, $density);
 
-                setFlash('success', 'PDF convertido a imágenes dentro de un ZIP.');
+                setFlash('success', 'PDF convertido a imÃ¡genes dentro de un ZIP.');
                 $_SESSION['last_output'] = $outName;
                 break;
             }
@@ -580,7 +582,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $saved = moveUploadedFiles($files, $jobDir, ['pdf']);
 
                 if (count($saved) !== 1) {
-                    throw new RuntimeException('Debés subir un solo PDF.');
+                    throw new RuntimeException('DebÃ©s subir un solo PDF.');
                 }
 
                 $degrees = (int)($_POST['degrees'] ?? 90);
@@ -603,12 +605,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $saved = moveUploadedFiles($files, $jobDir, ['pdf']);
 
                 if (count($saved) !== 1) {
-                    throw new RuntimeException('Debés subir un solo PDF.');
+                    throw new RuntimeException('DebÃ©s subir un solo PDF.');
                 }
 
                 $text = trim((string)($_POST['watermark_text'] ?? 'CONFIDENCIAL'));
                 if ($text === '') {
-                    throw new RuntimeException('La marca de agua no puede estar vacía.');
+                    throw new RuntimeException('La marca de agua no puede estar vacÃ­a.');
                 }
 
                 $outName = uniqueName('pdf_marca_agua', 'pdf');
@@ -622,7 +624,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
 
             default:
-                throw new RuntimeException('Herramienta no válida.');
+                throw new RuntimeException('Herramienta no vÃ¡lida.');
         }
     } catch (Throwable $ex) {
         setFlash('danger', $ex->getMessage());
@@ -808,7 +810,7 @@ $ESCUDO = $ASSET_WEB . '/img/ecmilm.png';
             <img src="<?= e($ESCUDO) ?>" alt="EC MIL M" style="height:52px;width:auto;"
                  onerror="this.onerror=null;this.style.display='none';">
             <div>
-                <div class="brand-title">Escuela Militar de Montaña</div>
+                <div class="brand-title">Escuela Militar de MontaÃ±a</div>
                 <div class="brand-sub">Herramientas documentales</div>
             </div>
         </div>
@@ -826,13 +828,13 @@ $ESCUDO = $ASSET_WEB . '/img/ecmilm.png';
     <div class="hero">
         <h1>Editor de Documentos</h1>
         <p>
-            Herramientas documentales en PHP para PDF, Word e imágenes.
+            Herramientas documentales en PHP para PDF, Word e imÃ¡genes.
             Base tipo iLovePDF para integrar a tu sistema.
         </p>
         <div class="hero-badges">
             <div class="hero-badge"><i class="bi bi-file-earmark-pdf"></i> PDF</div>
             <div class="hero-badge"><i class="bi bi-file-earmark-word"></i> Word</div>
-            <div class="hero-badge"><i class="bi bi-images"></i> Imágenes</div>
+            <div class="hero-badge"><i class="bi bi-images"></i> ImÃ¡genes</div>
             <div class="hero-badge"><i class="bi bi-shield-check"></i> Integrado al sistema</div>
         </div>
     </div>
@@ -843,14 +845,14 @@ $ESCUDO = $ASSET_WEB . '/img/ecmilm.png';
 
     <?php if (!PDF_TOOLKIT_AVAILABLE): ?>
         <div class="alert alert-warning">
-            Las herramientas que usan FPDI/FPDF están deshabilitadas en este servidor.
-            Instalá <code>setasign/fpdf</code> y <code>setasign/fpdi</code> con Composer para habilitarlas.
+            Las herramientas que usan FPDI/FPDF estÃ¡n deshabilitadas en este servidor.
+            InstalÃ¡ <code>setasign/fpdf</code> y <code>setasign/fpdi</code> con Composer para habilitarlas.
         </div>
     <?php endif; ?>
 
     <?php if ($lastOutput): ?>
         <div class="download-box">
-            Último archivo generado:
+            Ãšltimo archivo generado:
             <strong><?= e($lastOutput) ?></strong><br>
             <a class="btn btn-success btn-sm mt-2" href="?download=<?= urlencode($lastOutput) ?>">Descargar</a>
         </div>
@@ -860,22 +862,22 @@ $ESCUDO = $ASSET_WEB . '/img/ecmilm.png';
 
         <div class="tool-card">
             <div class="tool-title">Unir PDF</div>
-            <div class="tool-desc">Subí varios PDF y generá un solo archivo final.</div>
+            <div class="tool-desc">SubÃ­ varios PDF y generÃ¡ un solo archivo final.</div>
             <form method="post" enctype="multipart/form-data">
                 <input type="hidden" name="tool" value="merge_pdf">
                 <label class="form-label">PDF</label>
                 <input class="form-control" type="file" name="files[]" accept=".pdf" multiple required <?= PDF_TOOLKIT_AVAILABLE ? '' : 'disabled' ?>>
-                <div class="small-help mt-2">Podés subir varios archivos.</div>
+                <div class="small-help mt-2">PodÃ©s subir varios archivos.</div>
                 <button class="btn btn-main text-white mt-3 w-100" type="submit" <?= PDF_TOOLKIT_AVAILABLE ? '' : 'disabled' ?>>Unir PDF</button>
             </form>
         </div>
 
         <div class="tool-card">
-            <div class="tool-title">Imágenes a PDF</div>
-            <div class="tool-desc">Convertí JPG, PNG o WEBP a un PDF multipágina.</div>
+            <div class="tool-title">ImÃ¡genes a PDF</div>
+            <div class="tool-desc">ConvertÃ­ JPG, PNG o WEBP a un PDF multipÃ¡gina.</div>
             <form method="post" enctype="multipart/form-data">
                 <input type="hidden" name="tool" value="images_to_pdf">
-                <label class="form-label">Imágenes</label>
+                <label class="form-label">ImÃ¡genes</label>
                 <input class="form-control" type="file" name="files[]" accept=".jpg,.jpeg,.png,.webp" multiple required <?= PDF_TOOLKIT_AVAILABLE ? '' : 'disabled' ?>>
                 <button class="btn btn-main text-white mt-3 w-100" type="submit" <?= PDF_TOOLKIT_AVAILABLE ? '' : 'disabled' ?>>Convertir a PDF</button>
             </form>
@@ -904,8 +906,8 @@ $ESCUDO = $ASSET_WEB . '/img/ecmilm.png';
         </div>
 
         <div class="tool-card">
-            <div class="tool-title">PDF a Imágenes</div>
-            <div class="tool-desc">Extrae cada página del PDF como imagen y devuelve un ZIP.</div>
+            <div class="tool-title">PDF a ImÃ¡genes</div>
+            <div class="tool-desc">Extrae cada pÃ¡gina del PDF como imagen y devuelve un ZIP.</div>
             <form method="post" enctype="multipart/form-data">
                 <input type="hidden" name="tool" value="pdf_to_images">
                 <label class="form-label">PDF</label>
@@ -930,13 +932,13 @@ $ESCUDO = $ASSET_WEB . '/img/ecmilm.png';
                     </div>
                 </div>
 
-                <button class="btn btn-main text-white mt-3 w-100" type="submit" <?= PDF_TOOLKIT_AVAILABLE ? '' : 'disabled' ?>>PDF a Imágenes</button>
+                <button class="btn btn-main text-white mt-3 w-100" type="submit" <?= PDF_TOOLKIT_AVAILABLE ? '' : 'disabled' ?>>PDF a ImÃ¡genes</button>
             </form>
         </div>
 
         <div class="tool-card">
             <div class="tool-title">Rotar PDF</div>
-            <div class="tool-desc">Rota todas las páginas del PDF 90°, 180° o 270°.</div>
+            <div class="tool-desc">Rota todas las pÃ¡ginas del PDF 90Â°, 180Â° o 270Â°.</div>
             <form method="post" enctype="multipart/form-data">
                 <input type="hidden" name="tool" value="rotate_pdf">
                 <label class="form-label">PDF</label>
@@ -944,9 +946,9 @@ $ESCUDO = $ASSET_WEB . '/img/ecmilm.png';
 
                 <label class="form-label mt-3">Grados</label>
                 <select name="degrees" class="form-select" <?= PDF_TOOLKIT_AVAILABLE ? '' : 'disabled' ?>>
-                    <option value="90">90°</option>
-                    <option value="180">180°</option>
-                    <option value="270">270°</option>
+                    <option value="90">90Â°</option>
+                    <option value="180">180Â°</option>
+                    <option value="270">270Â°</option>
                 </select>
 
                 <button class="btn btn-main text-white mt-3 w-100" type="submit" <?= PDF_TOOLKIT_AVAILABLE ? '' : 'disabled' ?>>Rotar PDF</button>
@@ -972,10 +974,10 @@ $ESCUDO = $ASSET_WEB . '/img/ecmilm.png';
 
     <div class="note">
         <strong>Importante:</strong><br>
-        1. Este módulo resuelve muy bien tareas documentales comunes.<br>
-        2. La conversión <strong>PDF a Word</strong> nunca queda perfecta en todos los casos; depende de cómo fue creado el PDF.<br>
-        3. Si querés un “editor PDF” más completo, lo normal es sumar herramientas externas o separar en módulos:
-        unir, dividir, extraer páginas, comprimir, firmar, OCR, etc.
+        1. Este mÃ³dulo resuelve muy bien tareas documentales comunes.<br>
+        2. La conversiÃ³n <strong>PDF a Word</strong> nunca queda perfecta en todos los casos; depende de cÃ³mo fue creado el PDF.<br>
+        3. Si querÃ©s un â€œeditor PDFâ€ mÃ¡s completo, lo normal es sumar herramientas externas o separar en mÃ³dulos:
+        unir, dividir, extraer pÃ¡ginas, comprimir, firmar, OCR, etc.
     </div>
 
 </div>

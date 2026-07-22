@@ -13,7 +13,7 @@ $user = function_exists('current_user') ? current_user() : null;
 /* =========================
    Mono-unidad (EC MIL M)
    ========================= */
-$unidadActiva = 2;
+$unidadActiva = function_exists('unidad_activa_id') ? unidad_activa_id() : (int)($user['unidad_id'] ?? 1);
 
 // Branding fijo (como venís trabajando para EC MIL M)
 $PUBLIC_URL = rtrim(str_replace('\\','/', dirname($_SERVER['SCRIPT_NAME'] ?? $_SERVER['PHP_SELF'])), '/'); // /ea/public
@@ -26,6 +26,15 @@ $FAVICON  = $ASSETS_URL . '/img/ecmilm.png';
 
 $NOMBRE  = 'Escuela Militar de Montaña';
 $LEYENDA = 'La Montaña Nos Une';
+
+if (function_exists('unidad_context')) {
+  $UNIDAD_CTX = unidad_context($pdo, (int)$unidadActiva);
+  $IMG_BG  = (string)$UNIDAD_CTX['bg_url'];
+  $ESCUDO  = (string)$UNIDAD_CTX['escudo_url'];
+  $FAVICON = (string)$UNIDAD_CTX['icon_url'];
+  $NOMBRE  = (string)$UNIDAD_CTX['nombre_completo'];
+  $LEYENDA = (string)$UNIDAD_CTX['subnombre'];
+}
 
 // Info usuario (tolerante)
 $display = (string)($user['display_name'] ?? $user['nombre_completo'] ?? $user['full_name'] ?? '');
@@ -298,11 +307,8 @@ $dni     = (string)($user['dni'] ?? $user['username'] ?? '');
       <div class="grid">
 
         <div class="cardx cardx--blue">
-          <div class="cardx-title">Documentación técnica</div>
-          <div class="cardx-sub">Procedimientos · Manuales · Notas</div>
-          <div class="cardx-text">
-            Repositorio interno de documentación de informática: políticas, instructivos, actas y evidencias.
-          </div>
+          <div class="cardx-title">Documentación rectora</div>
+          <div class="cardx-sub">Procedimientos · Manuales</div>
           <a class="btn-pill" href="info_documentacion.php">Abrir documentación</a>
         </div>
 
@@ -324,6 +330,15 @@ $dni     = (string)($user['dni'] ?? $user['username'] ?? '');
 
           <!-- ✅ CAMBIO: apunta al nuevo módulo -->
           <a class="btn-pill btn-pill--green" href="informatica_red.php">Abrir red</a>
+        </div>
+
+        <div class="cardx cardx--blue">
+          <div class="cardx-title">Escaner de red</div>
+          <div class="cardx-sub">Dispositivos conectados Â· ARP Â· Topologia</div>
+          <div class="cardx-text">
+            Escanea la red de la escuela, detecta IP/MAC activas y muestra inventario/topologia de dispositivos conectados.
+          </div>
+          <a class="btn-pill" href="informatica_network_scanner.php">Abrir escaner</a>
         </div>
 
         <div class="cardx cardx--blue">
@@ -359,7 +374,7 @@ $dni     = (string)($user['dni'] ?? $user['username'] ?? '');
           <div class="cardx-text">
             Registro y consulta de marcaciones. Integración futura con el dispositivo/lector o carga manual.
           </div>
-          <a class="btn-pill btn-pill--amber" href="info_huella.php">Abrir control</a>
+          <a class="btn-pill btn-pill--amber" href="../personal/personal_civil_asistencia.php">Abrir control</a>
         </div>
 
         <div class="cardx cardx--green">

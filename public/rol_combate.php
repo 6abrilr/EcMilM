@@ -309,9 +309,41 @@ if ($isAjax) {
 
         if ($campo === 'destino') {
             $destinoId = null;
-            $destinoInterno = null;
+            $destinoInternoId = null;
+            $destinoInternoNombre = '';
 
             if ($valor !== '') {
+                $stDestinoInterno = $pdo->prepare("
+                  SELECT id, nombre
+                  FROM destino_interno
+                  WHERE COALESCE(estado,'ACTIVO')='ACTIVO'
+                    AND (
+                      (id = :valor_id AND :valor_is_id = 1)
+                      OR UPPER(TRIM(nombre)) = UPPER(TRIM(:valor_nombre))
+                    )
+                  ORDER BY nombre ASC
+                  LIMIT 1
+                ");
+                $stDestinoInterno->execute([
+                    ':valor_id' => ctype_digit($valor) ? (int)$valor : 0,
+                    ':valor_is_id' => ctype_digit($valor) ? 1 : 0,
+                    ':valor_nombre' => $valor,
+                ]);
+                $destinoInternoRow = $stDestinoInterno->fetch(PDO::FETCH_ASSOC) ?: null;
+
+                if (!$destinoInternoRow) {
+                    $stInsertDestinoInterno = $pdo->prepare("
+                      INSERT INTO destino_interno (nombre, estado)
+                      VALUES (:nombre, 'ACTIVO')
+                    ");
+                    $stInsertDestinoInterno->execute([':nombre' => mb_strtoupper($valor, 'UTF-8')]);
+                    $destinoInternoId = (int)$pdo->lastInsertId();
+                    $destinoInternoNombre = mb_strtoupper($valor, 'UTF-8');
+                } else {
+                    $destinoInternoId = (int)$destinoInternoRow['id'];
+                    $destinoInternoNombre = trim((string)($destinoInternoRow['nombre'] ?? ''));
+                }
+
                 $stDestino = $pdo->prepare("
                   SELECT id, nombre
                   FROM destino
@@ -336,9 +368,6 @@ if ($isAjax) {
 
                 if ($destinoRow) {
                     $destinoId = (int)$destinoRow['id'];
-                    $destinoInterno = trim((string)($destinoRow['nombre'] ?? ''));
-                } else {
-                    $destinoInterno = $valor;
                 }
             }
 
@@ -350,7 +379,7 @@ if ($isAjax) {
               LIMIT 1
             ");
             $stUpdDestino->execute([
-                ':destino_interno' => $destinoInterno !== '' ? $destinoInterno : null,
+                ':destino_interno' => $destinoInternoId,
                 ':destino_id' => $destinoId,
                 ':pid' => $personalId,
                 ':uid' => $unidadActiva,
@@ -361,7 +390,8 @@ if ($isAjax) {
                 'asignacion_id' => $asignacionId,
                 'rol_id' => $rolId,
                 'seccion' => $seccion,
-                'destino' => $destinoInterno ?? '',
+                'destino' => $destinoInternoNombre,
+                'destino_interno_id' => $destinoInternoId,
                 'destino_id' => $destinoId,
             ], JSON_UNESCAPED_UNICODE);
             exit;
@@ -462,12 +492,24 @@ $destinosFiltro = [];
 try {
     $stDestinos = $pdo->prepare("
         SELECT DISTINCT
-            TRIM(COALESCE(NULLIF(p.destino_interno, ''), d.nombre, '')) AS destino
+            TRIM(COALESCE(
+                NULLIF(di.nombre, ''),
+                NULLIF(TRIM(CAST(p.destino_interno AS CHAR)), ''),
+                NULLIF(d.nombre, ''),
+                ''
+            )) AS destino
         FROM personal_unidad p
+        LEFT JOIN destino_interno di
+               ON di.id = p.destino_interno
         LEFT JOIN destino d
                ON d.id = p.destino_id
         WHERE p.unidad_id = :uid
-          AND TRIM(COALESCE(NULLIF(p.destino_interno, ''), d.nombre, '')) <> ''
+          AND TRIM(COALESCE(
+                NULLIF(di.nombre, ''),
+                NULLIF(TRIM(CAST(p.destino_interno AS CHAR)), ''),
+                NULLIF(d.nombre, ''),
+                ''
+          )) <> ''
         ORDER BY destino ASC
     ");
     $stDestinos->execute([':uid' => $unidadActiva]);
@@ -501,6 +543,7 @@ try {
 
             rca.id            AS asignacion_id,
             rca.nota          AS nota_json,
+            di.nombre         AS destino_interno_nombre,
             d.codigo          AS destino_codigo,
             d.nombre          AS destino_nombre
         FROM personal_unidad p
@@ -511,6 +554,8 @@ try {
         LEFT JOIN rol_combate rc
                ON rc.id = rca.rol_id
                AND rc.unidad_id = p.unidad_id
+        LEFT JOIN destino_interno di
+               ON di.id = p.destino_interno
         LEFT JOIN destino d
                ON d.id = p.destino_id
         WHERE p.unidad_id = :uid
@@ -530,7 +575,12 @@ try {
     }
 
     if ($filtroDestino !== '') {
-        $sql .= " AND TRIM(COALESCE(NULLIF(p.destino_interno, ''), d.nombre, '')) = :destino";
+        $sql .= " AND TRIM(COALESCE(
+            NULLIF(di.nombre, ''),
+            NULLIF(TRIM(CAST(p.destino_interno AS CHAR)), ''),
+            NULLIF(d.nombre, ''),
+            ''
+        )) = :destino";
         $params[':destino'] = $filtroDestino;
     }
 
@@ -550,13 +600,17 @@ try {
         $r['rol_combate'] = trim((string)($r['personal_rol_combate'] ?? '')) !== ''
             ? (string)$r['personal_rol_combate']
             : (string)($notaArr['rol_combate'] ?? '');
-        $destinoInterno = trim((string)($r['destino_interno'] ?? ''));
+        $destinoInternoNombre = trim((string)($r['destino_interno_nombre'] ?? ''));
+        $destinoInternoValor = trim((string)($r['destino_interno'] ?? ''));
         $destinoCatalogo = trim(
             ((string)($r['destino_codigo'] ?? '') !== '' ? (string)$r['destino_codigo'] . ' - ' : '')
             . (string)($r['destino_nombre'] ?? '')
         );
-        $r['destino_mostrar'] = $destinoInterno !== '' ? $destinoInterno : $destinoCatalogo;
-        $r['destino_edicion'] = $destinoInterno !== '' ? $destinoInterno : (string)($r['destino_nombre'] ?? '');
+        $destinoFallback = $destinoInternoValor !== '' && !ctype_digit($destinoInternoValor)
+            ? $destinoInternoValor
+            : $destinoCatalogo;
+        $r['destino_mostrar'] = $destinoInternoNombre !== '' ? $destinoInternoNombre : $destinoFallback;
+        $r['destino_edicion'] = $destinoInternoNombre !== '' ? $destinoInternoNombre : $destinoFallback;
         $r['destino_placeholder'] = $destinoCatalogo;
         $r['armamento_principal'] = (string)($notaArr['armamento_principal'] ?? '');
         $r['ni_armamento_principal'] = (string)($notaArr['ni_armamento_principal'] ?? '');
